@@ -2065,24 +2065,78 @@ textarea.field-input {
     updateEditNotice();
 
     var category = document.getElementById('category').value;
-    currentRun = {
-      id: String(Date.now()) + '-' + Math.random().toString(36).slice(2, 8),
-      date: new Date().toISOString(),
-      category: category,
-      seq: nextSeq(category),
-      title: '',
-      input: collectState(),
-      /* копія, а не посилання: пізніше результат прийде від моделі
-         і буде різним для кожного прогону */
-      result: JSON.parse(JSON.stringify(MOCK_RESULT))
-    };
-    runs.unshift(currentRun);
+    var state = collectState();
+    var hasTasks = state.tasks.some(function (t) { return t.trim() !== ''; });
 
-    /* провал запису більше не мовчить; успіх — коротке повідомлення */
-    var saved = saveState();
-    saveNotice.hidden = saved;
-    renderCurrentRun();
-    if (saved) { showToast('Прогін збережено в ', true); }
+    function finish(finalState) {
+      currentRun = {
+        id: String(Date.now()) + '-' + Math.random().toString(36).slice(2, 8),
+        date: new Date().toISOString(),
+        category: category,
+        seq: nextSeq(category),
+        title: '',
+        input: finalState,
+        /* копія, а не посилання: пізніше результат прийде від моделі
+           і буде різним для кожного прогону */
+        result: JSON.parse(JSON.stringify(MOCK_RESULT))
+      };
+      runs.unshift(currentRun);
+
+      /* провал запису більше не мовчить; успіх — коротке повідомлення */
+      var saved = saveState();
+      saveNotice.hidden = saved;
+      renderCurrentRun();
+      if (saved) { showToast('Прогін збережено в ', true); }
+    }
+
+    if (hasTasks) {
+      finish(state);
+      return;
+    }
+
+    /* Top Tasks не задані — виводимо їх через /api/top-tasks (див. CLAUDE.md,
+       розділ «Дозволено в app.html»): ключ моделі лишається на сервері */
+    submitBtn.disabled = true;
+    confirmRunBtn.disabled = true;
+    var originalConfirmText = confirmRunBtn.textContent;
+    confirmRunBtn.textContent = 'Виводимо задачі…';
+
+    var audienceText = state.audiences
+      .filter(function (a) { return a.value.trim() !== ''; })
+      .map(function (a) { return a.value + ' (' + a.type + ')'; })
+      .join('; ');
+
+    fetch('/api/top-tasks', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        category: state.category,
+        support: state.support,
+        audience: audienceText,
+        goal: state.goal
+      })
+    })
+      .then(function (res) {
+        if (!res.ok) { throw new Error('Запит не вдався'); }
+        return res.json();
+      })
+      .then(function (data) {
+        if (Array.isArray(data.tasks) && data.tasks.length) {
+          state.tasks = data.tasks;
+          showToast('Top Tasks виведено моделлю', false);
+        } else {
+          showToast('Модель не повернула задачі — прогін без них', false);
+        }
+      })
+      .catch(function () {
+        showToast('Не вдалось звернутись до Gemini — прогін без Top Tasks', false);
+      })
+      .finally(function () {
+        submitBtn.disabled = false;
+        confirmRunBtn.disabled = false;
+        confirmRunBtn.textContent = originalConfirmText;
+        finish(state);
+      });
   }
 
   function openRun(id) {
