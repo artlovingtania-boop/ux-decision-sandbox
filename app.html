@@ -1063,7 +1063,8 @@ textarea.field-input {
   <div class="container container--wide topbar__inner">
     <button type="button" id="logo-btn" class="topbar__logo">UX Sandbox</button>
     <nav class="topbar__nav">
-      <button type="button" id="runs-btn" class="topbar__link">Мої прогони</button>
+      <button type="button" id="page-desc-btn" class="topbar__link" hidden>Опис сторінки</button>
+      <button type="button" id="runs-btn" class="topbar__link" hidden>Мої прогони</button>
       <button type="button" id="login-btn" class="topbar__link">Увійти</button>
     </nav>
   </div>
@@ -1479,6 +1480,7 @@ firebase.initializeApp(firebaseConfig);
   var runsScreen = document.getElementById('runs-screen');
   var runsBody = document.getElementById('runs-body');
   var runsBtn = document.getElementById('runs-btn');
+  var pageDescBtn = document.getElementById('page-desc-btn');
   var logoBtn = document.getElementById('logo-btn');
   var filePickBtn = document.getElementById('file-pick-btn');
   var fileNameLabel = document.getElementById('file-name');
@@ -2095,6 +2097,7 @@ firebase.initializeApp(firebaseConfig);
   }
 
   function renderCurrentRun() {
+    if (!isLoggedIn) { showLogin(); return; }
     /* вузол живе між прогонами: без цього раз розгорнутий блок
        лишався б розгорнутим і на наступному запуску */
     inputSummary.open = false;
@@ -2220,6 +2223,7 @@ firebase.initializeApp(firebaseConfig);
   }
 
   function showRuns() {
+    if (!isLoggedIn) { showLogin(); return; }
     formScreen.hidden = true;
     resultScreen.hidden = true;
     loginScreen.hidden = true;
@@ -2275,6 +2279,7 @@ firebase.initializeApp(firebaseConfig);
   }
 
   function showForm() {
+    if (!isLoggedIn) { showLogin(); return; }
     resultScreen.hidden = true;
     runsScreen.hidden = true;
     loginScreen.hidden = true;
@@ -2432,7 +2437,10 @@ firebase.initializeApp(firebaseConfig);
   revertBtn.addEventListener('click', revertToRun);
   rerunBtn.addEventListener('click', runAnalysis);
 
-  logoBtn.addEventListener('click', showForm);
+  logoBtn.addEventListener('click', function () {
+    window.location.href = 'index.html';
+  });
+  pageDescBtn.addEventListener('click', showForm);
   runsBtn.addEventListener('click', showRuns);
   toastLink.addEventListener('click', function () {
     toast.hidden = true;
@@ -2625,6 +2633,10 @@ firebase.initializeApp(firebaseConfig);
     firebase.auth().onAuthStateChanged(function (user) {
       isLoggedIn = !!user;
       loginBtn.textContent = user ? 'Вийти' : 'Увійти';
+      /* навігація застосунку — тільки для авторизованого; до входу її не видно,
+         а гейт на самих функціях показу лишається другим рубежем */
+      pageDescBtn.hidden = !user;
+      runsBtn.hidden = !user;
       if (user) {
         showForm();
       } else {
