@@ -46,6 +46,14 @@
 /* ---------- reset ---------- */
 *, *::before, *::after { box-sizing: border-box; }
 
+html { scroll-behavior: smooth; }
+
+/* єдиний медіазапит у файлі: вимикає плавний скрол тим, хто просив
+   систему прибрати рух. Без нього анімація б'є по вестибулярці. */
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+}
+
 body,
 h1, h2, h3, h4, h5, h6,
 p, ul, ol, figure {
@@ -77,6 +85,11 @@ body {
 }
 
 /* ---------- layout ---------- */
+/* висота хедера (58 + 1px межі) — щоб секція не лягала впритул до верху вікна */
+#how, #variants, #faq, #access {
+  scroll-margin-top: 59px;
+}
+
 .container {
   width: 100%;
   max-width: 1200px;
@@ -86,6 +99,9 @@ body {
 
 /* ---------- header ---------- */
 .header {
+  position: sticky;
+  top: 0;
+  z-index: 10;
   width: 100%;
   background: var(--surface-page);
   border-bottom: 1px solid var(--border-medium);
@@ -959,14 +975,14 @@ body {
     <div class="header__left">
       <a class="logo" href="#">UX Sandbox</a>
       <nav class="nav">
-        <a class="nav-link" href="#">Як працює</a>
-        <a class="nav-link" href="#">Три варіанти</a>
-        <a class="nav-link" href="#">FAQ</a>
+        <a class="nav-link" href="#how">Як працює</a>
+        <a class="nav-link" href="#variants">Три варіанти</a>
+        <a class="nav-link" href="#faq">FAQ</a>
       </nav>
     </div>
     <div class="header__right">
       <a class="nav-link" href="#">Увійти</a>
-      <a class="button button--dark" href="#">
+      <a class="button button--dark" href="#access">
         Отримати доступ
         <img class="button__icon" src="assets/arrow-icon-light-text.svg" alt="" width="24" height="24">
       </a>
@@ -983,7 +999,7 @@ body {
       </div>
       <h1 class="hero__title">Обґрунтуй структуру сторінки на підставах, а не на смаку </h1>
       <p class="hero__lead">Опиши продукт — отримай три варіанти структури з розбором і аргументами для розмови зі стейкхолдерами.</p>
-      <a class="button button--primary" href="#">
+      <a class="button button--primary" href="#access">
         Отримати доступ
         <img class="button__icon" src="assets/arrow-icon-dark-text.svg" alt="" width="24" height="24">
       </a>
@@ -1014,7 +1030,7 @@ body {
   </div>
 </section>
 
-<section class="process">
+<section class="process" id="how">
   <div class="container process__inner">
     <div class="process__head">
       <div class="process__head-cell">
@@ -1069,7 +1085,7 @@ body {
   </div>
 </section>
 
-<section class="variants">
+<section class="variants" id="variants">
   <div class="container">
     <div class="variants__grid">
       <div class="variants__head">
@@ -1155,7 +1171,7 @@ body {
   <div class="container">
     <div class="cta__banner">
       <h2 class="cta__title">Твоя структура отримає аргументи,<br>не здогадки</h2>
-      <a class="button button--dark button--stretch" href="#">
+      <a class="button button--dark button--stretch" href="#access">
         Отримати доступ
         <img class="button__icon" src="assets/arrow-icon-light-text.svg" alt="" width="24" height="24">
       </a>
@@ -1163,7 +1179,7 @@ body {
   </div>
 </section>
 
-<section class="faq">
+<section class="faq" id="faq">
   <div class="container">
     <div class="faq__grid">
       <div class="faq__head">
@@ -1250,7 +1266,7 @@ body {
   </div>
 </section>
 
-<section class="final">
+<section class="final" id="access">
   <div class="container">
     <div class="final__grid">
       <div class="final__brand">
@@ -1284,15 +1300,15 @@ body {
           <div class="final__cell final__cell--br final__cell--bb">
             <h3>Інструмент</h3>
             <ul>
-              <li><a href="#">Як працює</a></li>
-              <li><a href="#">Три варіанти</a></li>
-              <li><a href="#">FAQ</a></li>
+              <li><a href="#how">Як працює</a></li>
+              <li><a href="#variants">Три варіанти</a></li>
+              <li><a href="#faq">FAQ</a></li>
             </ul>
           </div>
           <div class="final__cell final__cell--bb">
             <h3>Доступ</h3>
             <ul>
-              <li><a href="#">Отримати доступ</a></li>
+              <li><a href="#access">Отримати доступ</a></li>
               <li><a href="#">Увійти</a></li>
             </ul>
           </div>

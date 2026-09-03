@@ -1,0 +1,2371 @@
+<!doctype html>
+<html lang="uk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>UX Sandbox — Опис сторінки</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400&family=DM+Sans:opsz,wght@9..40,400;9..40,700;9..40,900&display=swap" rel="stylesheet">
+<style>
+/* ---------- tokens (копія :root з index.html, без змін) ---------- */
+:root {
+  --surface-page: #faf9f5;
+  --surface-card: #f4f4f0;
+
+  --text-primary: #1a1714;
+  --text-secondary: #8a857e;
+  --text-on-dark: #f6f4f0;
+
+  --border-medium: #d9d9d9;
+  --border-default: #ddd9d2;
+  --border-card: #dfe1dc;
+
+  --accent-yellow: #fbdc42;
+  --accent-yellow-light: #ffe26a;
+  --accent-green: #52d68a;
+  --accent-green-soft: #a8e8c0;
+
+  --radius-md: 4px;
+  --radius-ml: 8px;
+  --radius-lg: 12px;
+  --radius-pill: 9999px;
+
+  --spacing-4: 4px;
+  --spacing-8: 8px;
+  --spacing-12: 12px;
+  --spacing-16: 16px;
+  --spacing-20: 20px;
+  --spacing-24: 24px;
+  --spacing-32: 32px;
+  --spacing-40: 40px;
+  --spacing-48: 48px;
+  --spacing-80: 80px;
+}
+
+/* ---------- reset ---------- */
+*, *::before, *::after { box-sizing: border-box; }
+
+/* Браузерне [hidden] { display: none } походить зі стилю браузера, а будь-яке
+   авторське display: flex його перекриває — тобто елемент із класом-флексом
+   не ховається атрибутом. Через це повідомлення після дії висіло на екрані
+   замість 4 секунд, а панель підтвердження була видима завжди. Див. BUGS.md */
+[hidden] { display: none !important; }
+
+body,
+h1, h2, h3, h4, h5, h6,
+p, ul, ol {
+  margin: 0;
+  padding: 0;
+}
+
+img { display: block; max-width: 100%; }
+
+body {
+  min-width: 760px;
+  background: var(--surface-page);
+  color: var(--text-primary);
+  font-family: 'DM Sans', sans-serif;
+  font-weight: 400;
+  font-size: 16px;
+  line-height: 1.5;
+  font-variation-settings: 'opsz' 14;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ---------- button (з лендінгу, без змін) ---------- */
+.button {
+  display: flex;
+  align-items: center;
+  border-radius: var(--radius-pill);
+  /* у лендінгу клас висить на <a>, який успадковує шрифт сторінки; тут це
+     <button>, а він не успадковує — без цього рядка всі кнопки були Arial */
+  font-family: 'DM Sans', sans-serif;
+  font-weight: 700;
+  font-size: 16px;
+  line-height: 1.2;
+  white-space: nowrap;
+  border: none;
+  cursor: pointer;
+}
+
+.button--dark {
+  gap: var(--spacing-8);
+  padding: var(--spacing-8) var(--spacing-24);
+  background: var(--text-primary);
+  color: var(--text-on-dark);
+}
+
+.button--primary {
+  gap: var(--spacing-4);
+  padding: var(--spacing-12) var(--spacing-24);
+  background: var(--accent-yellow);
+  color: var(--text-primary);
+}
+
+.button__icon {
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+}
+
+/* вторинна дія: тихіша за жовту й чорну, але щільна — не вимкнена.
+   Рамки навмисно немає: у .button стоїть border: none, і рамка зробила б
+   кнопку на 2px вищою за сусідню жовту в тому самому ряду */
+.button--secondary {
+  gap: var(--spacing-4);
+  padding: var(--spacing-12) var(--spacing-24);
+  background: var(--surface-card);
+  color: var(--text-primary);
+}
+
+/* дія поруч із головною, яка не має з нею змагатись: без заливки й рамки,
+   падінги ті самі, щоб обидві стояли на одній лінії */
+.button--text {
+  gap: var(--spacing-4);
+  padding: var(--spacing-12) var(--spacing-24);
+  background: none;
+  color: var(--text-primary);
+}
+
+/* вимкнена кнопка не має читатись як заклик натиснути: жовта заливка
+   знімається, і поверх тихого фону йде прозорість — самого кольору тексту
+   було замало, кнопка лишалась схожою на натискну */
+.button:disabled {
+  background: var(--surface-card);
+  color: var(--text-secondary);
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ---------- tag (з лендінгу, без змін) ---------- */
+.tag {
+  padding: 6px var(--spacing-16);
+  border-radius: var(--radius-pill);
+  font-family: 'DM Mono', monospace;
+  font-weight: 400;
+  font-size: 14px;
+  line-height: 1.2;
+  letter-spacing: 0.6px;
+  color: var(--text-primary);
+  white-space: nowrap;
+}
+
+.tag--green-soft {
+  background: var(--accent-green-soft);
+}
+
+.tag--muted {
+  background: var(--surface-card);
+  border: 1px solid var(--border-card);
+}
+
+/* ---------- layout ---------- */
+.container {
+  width: 100%;
+  max-width: 760px;
+  margin-inline: auto;
+  padding-inline: var(--spacing-40);
+  padding-block: var(--spacing-80);
+}
+
+/* ---------- заголовок екрана ---------- */
+.app-head {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--spacing-16);
+  margin-bottom: var(--spacing-48);
+}
+
+/* масштаб заголовка картки (.cbox__title / .final__access-title в лендінгу) —
+   на щабель менший за заголовок секції, щоб не конкурувати з формою */
+.app-head__title {
+  font-weight: 700;
+  font-size: 30px;
+  line-height: 1.15;
+  letter-spacing: -0.66px;
+  color: var(--text-primary);
+}
+
+.app-head__lead {
+  font-weight: 400;
+  font-size: 18px;
+  line-height: 1.4;
+  color: var(--text-secondary);
+}
+
+/* ---------- форма ---------- */
+.app-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-40);
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-8);
+}
+
+.field-label {
+  font-weight: 700;
+  font-size: 14px;
+  line-height: 1.2;
+  color: var(--text-primary);
+}
+
+.field {
+  width: 100%;
+  background: var(--surface-card);
+  border: 1px solid var(--border-card);
+  border-radius: var(--radius-md);
+  padding: var(--spacing-12) var(--spacing-16);
+  font-family: 'DM Sans', sans-serif;
+  font-size: 16px;
+  line-height: 1.5;
+  color: var(--text-primary);
+}
+
+/* поле з кнопкою очищення: рамка й фон на оболонці .field,
+   всередині прозорий .field-input — щоб не ставити кнопку через position: absolute */
+.field-wrap {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--spacing-8);
+}
+
+.field-input {
+  flex: 1;
+  min-width: 0;
+  background: none;
+  border: none;
+  padding: 0;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 16px;
+  line-height: 1.5;
+  color: var(--text-primary);
+}
+
+.field-input:focus {
+  outline: none;
+}
+
+/* висоту задає JS під обсяг тексту, тому ні ручного тягання, ні внутрішнього скролу */
+textarea.field-input {
+  resize: none;
+  overflow-y: hidden;
+}
+
+.field:focus-within {
+  outline: none;
+  border-color: var(--accent-yellow);
+}
+
+.field-clear {
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  padding: 0;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+/* коли поле порожнє, кнопка лише невидима — інакше поле ширшало б,
+   і текст стрибав би на першому введеному символі */
+.field-clear--hidden {
+  visibility: hidden;
+}
+
+.field-caption {
+  font-family: 'DM Mono', monospace;
+  font-weight: 400;
+  font-size: 14px;
+  line-height: 1.4;
+  letter-spacing: 0.6px;
+  color: var(--text-secondary);
+}
+
+/* Лічильник — орієнтир, а не обмеження. Падінг і радіус стоять в обох станах,
+   змінюється тільки фон, тому перехід у перевищення не зсуває нічого нижче.
+   Жовтий як колір тексту дав би 1.29:1 на тлі сторінки — тому плашка,
+   тим самим прийомом, що .feature__label--yellow на лендінгу. */
+.field-counter {
+  align-self: flex-end;
+  padding: var(--spacing-4) var(--spacing-8);
+  border-radius: var(--radius-md);
+  background: transparent;
+  font-family: 'DM Mono', monospace;
+  font-weight: 400;
+  font-size: 14px;
+  line-height: 1.4;
+  letter-spacing: 0.6px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.field-counter--over {
+  background: var(--accent-yellow);
+  color: var(--text-primary);
+}
+
+/* ---------- аудиторія ---------- */
+.audience-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-12);
+}
+
+/* рядок + власний лічильник під ним: ліміт у 120 символів рахується на кожну аудиторію */
+.audience-item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-4);
+}
+
+.audience-row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--spacing-12);
+}
+
+.audience-row .field-wrap {
+  flex: 1;
+  min-width: 0;
+}
+
+.audience-row .audience-select {
+  width: 160px;
+  flex-shrink: 0;
+}
+
+/* ---------- top tasks ---------- */
+.task-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-12);
+}
+
+.task-item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-4);
+}
+
+.task-row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--spacing-12);
+}
+
+.task-row .field-wrap {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Видалення рядка — значок, видимий завжди: показ лише при наведенні робив
+   кнопку невидимою доти, доки на неї не наведеш, тобто про можливість видалити
+   рядок не було звідки дізнатись.
+   Від хрестика очищення відрізняється розміром (18 проти 14), місцем (поза
+   полем, не всередині) і відступом 24px — gap рядка 12 плюс ці 12. */
+.task-remove,
+.audience-remove {
+  flex-shrink: 0;
+  align-self: center;
+  background: none;
+  border: none;
+  padding: var(--spacing-4);
+  margin-left: var(--spacing-12);
+  font-family: 'DM Sans', sans-serif;
+  font-size: 18px;
+  line-height: 1;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+/* у першої аудиторії кнопки видалення немає; visibility замість display —
+   щоб поле першого рядка не стало ширшим і списки двох рядків стояли один під одним.
+   З таб-порядку й озвучення елемент при цьому теж зникає. */
+.audience-remove--hidden {
+  visibility: hidden;
+}
+
+/* ---------- кнопки додавання рядків ---------- */
+.field-add-btn {
+  align-self: flex-start;
+  background: transparent;
+  border: 1px dashed var(--border-card);
+  border-radius: var(--radius-md);
+  padding: var(--spacing-8) var(--spacing-16);
+  font-family: 'DM Sans', sans-serif;
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+/* ---------- додатково (details/summary, патерн FAQ) ---------- */
+.advanced {
+  border-top: 1px solid var(--border-default);
+  border-bottom: 1px solid var(--border-default);
+}
+
+.advanced__summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-block: var(--spacing-24);
+  cursor: pointer;
+  list-style: none;
+  font-weight: 700;
+  font-size: 20px;
+  line-height: 1.15;
+  letter-spacing: -0.44px;
+  color: var(--text-primary);
+}
+
+.advanced__summary::-webkit-details-marker {
+  display: none;
+}
+
+.advanced__icon {
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+}
+
+.advanced__icon--minus,
+.advanced[open] .advanced__icon--plus {
+  display: none;
+}
+
+.advanced[open] .advanced__icon--minus {
+  display: block;
+}
+
+.advanced__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-40);
+  padding-bottom: var(--spacing-40);
+}
+
+/* ---------- наявна структура ---------- */
+/* три джерела різної точності підряд, а не три режими на вибір */
+.structure-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-24);
+}
+
+.form-actions {
+  display: flex;
+  gap: var(--spacing-12);
+}
+
+/* ---------- екран результату ---------- */
+/* ширини в токенах немає взагалі: 760 форми й 1280 результату — рішення проєкту, див. BUGS.md */
+.container--wide {
+  max-width: 1280px;
+}
+
+.result {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-48);
+}
+
+/* шапка застосунку — спільна для обох екранів, на всю ширину вікна;
+   нутро лишається 1280 і на формі: шапка належить застосунку, не екрану */
+.topbar {
+  width: 100%;
+  border-bottom: 1px solid var(--border-medium);
+}
+
+.topbar__inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-24);
+  min-height: 58px;
+  padding-block: var(--spacing-8);
+}
+
+/* значення з .logo лендінгу */
+.topbar__logo {
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  padding: 0;
+  font-family: 'DM Sans', sans-serif;
+  font-weight: 900;
+  font-size: 18px;
+  line-height: 1.15;
+  letter-spacing: -0.936px;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.topbar__nav {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-24);
+  flex-shrink: 0;
+}
+
+.topbar__link {
+  background: none;
+  border: none;
+  padding: 0;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 16px;
+  line-height: 1.5;
+  color: var(--text-primary);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+/* ---------- екран прогонів ---------- */
+.runs-list {
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid var(--border-default);
+}
+
+.run-row {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-24);
+  padding-block: var(--spacing-16);
+  border-bottom: 1px solid var(--border-default);
+}
+
+.run-row__date {
+  flex-shrink: 0;
+  font-family: 'DM Mono', monospace;
+  font-size: 14px;
+  letter-spacing: 0.6px;
+  color: var(--text-secondary);
+}
+
+/* клік по назві відкриває прогін */
+.run-row__title {
+  flex: 1;
+  min-width: 0;
+  background: none;
+  border: none;
+  padding: 0;
+  text-align: left;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 16px;
+  line-height: 1.5;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.run-row__actions {
+  display: flex;
+  gap: var(--spacing-16);
+  flex-shrink: 0;
+}
+
+.text-action {
+  background: none;
+  border: none;
+  padding: 0;
+  font-family: 'DM Mono', monospace;
+  font-size: 14px;
+  letter-spacing: 0.6px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+/* ---------- підтвердження в стилі сторінки ---------- */
+/* для дій, де двох слів у кнопці замало: тут свій текст */
+.confirm {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--spacing-12);
+  padding: var(--spacing-16);
+  background: var(--surface-card);
+  border: 1px solid var(--border-card);
+  border-radius: var(--radius-md);
+}
+
+.confirm__text {
+  font-size: 16px;
+  line-height: 1.5;
+  color: var(--text-primary);
+}
+
+.confirm__actions {
+  display: flex;
+  gap: var(--spacing-12);
+}
+
+/* ---------- повідомлення після дії ---------- */
+/* некритична дія — повідомлення після; критична — підтвердження до.
+   Темна пігулка, щоб не сплутати з жовтою плашкою помилки */
+.toast {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: var(--spacing-24);
+  z-index: 20;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.toast__inner {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-8);
+  padding: var(--spacing-12) var(--spacing-24);
+  background: var(--text-primary);
+  border-radius: var(--radius-pill);
+  font-size: 16px;
+  line-height: 1.5;
+  color: var(--text-on-dark);
+  pointer-events: auto;
+}
+
+.toast__link {
+  background: none;
+  border: none;
+  padding: 0;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 16px;
+  line-height: 1.5;
+  color: var(--text-on-dark);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.runs-empty {
+  font-size: 16px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+/* спільна плашка повідомлень: незбережений прогін на результаті
+   і змінений опис на формі */
+.notice {
+  padding: var(--spacing-12) var(--spacing-16);
+  background: var(--accent-yellow);
+  border-radius: var(--radius-md);
+  font-size: 16px;
+  line-height: 1.5;
+  color: var(--text-primary);
+}
+
+/* варіант із діями: текст ліворуч, кнопки праворуч */
+.notice--row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-24);
+}
+
+.notice__text {
+  min-width: 0;
+}
+
+.notice__actions {
+  display: flex;
+  gap: var(--spacing-12);
+  flex-shrink: 0;
+}
+
+/* Закріплена панель: банер має лишатись видимим при прокрутці, поки опис
+   розходиться з прогоном. Це відступ від заборони position: absolute у
+   CLAUDE.md — там ідеться про розкладку блоків, а тут закріплення панелі,
+   інакше не зробити. Живе всередині #form-screen, тому на інших екранах
+   не показується сам собою.
+   Тінь — єдине таке значення у файлі, у токенах тіней немає: це --text-primary
+   у прозорості, слабка, щоб смуга читалась як панель над формою. */
+.notice--pinned {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 10;
+  background: var(--surface-card);
+  border-top: 1px solid var(--border-medium);
+  box-shadow: 0 -2px 12px rgba(26, 23, 20, 0.08);
+}
+
+/* нутро широке (1280): при 760 тексту лишалось 277px і він ставав у три рядки.
+   Падінги задані явно: .container несе padding-block: 80px, у смузі це дало б 160 */
+.notice--pinned .notice {
+  background: none;
+  border-radius: 0;
+  padding-block: var(--spacing-12);
+  padding-inline: var(--spacing-40);
+}
+
+/* ---------- вибір файлу ---------- */
+/* нативний input лишається в DOM, але прихований: кнопка українською
+   і кнопкою, а не <label> — лейбл не отримує фокус з клавіатури */
+.file-input-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.file-picker {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-16);
+}
+
+.file-name {
+  font-family: 'DM Mono', monospace;
+  font-size: 14px;
+  letter-spacing: 0.6px;
+  color: var(--text-secondary);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+/* ---------- звіт унизу екрана ---------- */
+.report-actions {
+  display: flex;
+  gap: var(--spacing-12);
+}
+
+
+.result-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-24);
+}
+
+.result-section__title {
+  font-weight: 700;
+  font-size: 20px;
+  line-height: 1.15;
+  letter-spacing: -0.44px;
+  color: var(--text-primary);
+}
+
+/* ---------- вхідний опис ---------- */
+/* категорія поруч із заголовком: видно, що всередині, поки блок згорнутий */
+.summary-hint {
+  font-family: 'DM Mono', monospace;
+  font-size: 14px;
+  letter-spacing: 0.6px;
+  color: var(--text-secondary);
+}
+
+#input-summary[open] .summary-hint {
+  display: none;
+}
+
+/* компактніше, ніж у «Додатково»: підпис і значення в один рядок.
+   Селектори звужені — .summary-row і .advanced__body спільні з іншими блоками */
+#input-summary .advanced__body {
+  gap: var(--spacing-24);
+  padding-bottom: var(--spacing-24);
+}
+
+.summary-rows {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-12);
+}
+
+.summary-actions {
+  display: flex;
+  gap: var(--spacing-12);
+}
+
+#summary-body .summary-row {
+  display: grid;
+  grid-template-columns: 200px 1fr;
+  gap: var(--spacing-16);
+  align-items: baseline;
+}
+
+.summary-row {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-4);
+}
+
+.summary-row__value {
+  font-size: 16px;
+  line-height: 1.5;
+  color: var(--text-primary);
+  white-space: pre-wrap;
+}
+
+.summary-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-4);
+}
+
+/* ---------- картки варіантів ---------- */
+/* сім рядків: бейдж, шапка, потік, осі, метрики, аудит, висновок.
+   Картки — subgrid цієї ж сітки, тому однойменні секції всіх трьох
+   стоять на одній лінії: це екран порівняння, око читає рядками. */
+.variants-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: repeat(7, auto);
+  gap: var(--spacing-24);
+}
+
+.variant-card {
+  display: grid;
+  grid-row: span 7;
+  grid-template-rows: subgrid;
+  justify-items: start;
+  padding: var(--spacing-24);
+  background: var(--surface-page);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-ml);
+}
+
+.variant-card__badge--empty {
+  visibility: hidden;
+}
+
+.variant-card__head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-8);
+  width: 100%;
+}
+
+.variant-card__title {
+  font-weight: 700;
+  font-size: 20px;
+  line-height: 1.15;
+  letter-spacing: -0.44px;
+  color: var(--text-primary);
+}
+
+.variant-card__subtitle {
+  font-size: 16px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+.card-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-8);
+  width: 100%;
+}
+
+/* лінія між секціями: над нею проміжок дає row-gap сітки (24), під нею —
+   цей падінг (теж 24), тому відступи однакові, а всередині секції лишається 8 */
+.card-section--divided {
+  padding-top: var(--spacing-24);
+  border-top: 1px solid var(--border-card);
+}
+
+/* ---------- потік блоків ---------- */
+/* стрічка переноситься, а не ховається в скрол: на екрані порівняння
+   всі три варіанти мають бути видимі одразу */
+.flow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--spacing-8);
+}
+
+.flow__item {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--spacing-8);
+  padding: 6px var(--spacing-12);
+  background: var(--surface-card);
+  border: 1px solid var(--border-card);
+  border-radius: var(--radius-md);
+  font-size: 14px;
+  line-height: 1.2;
+  color: var(--text-primary);
+}
+
+/* порядок несе нумерація, а не стрілки: при переносі стрічки на другий рядок
+   номер лишається видимим, а дрібна стрілка на стику рядків читалась як обрив */
+.flow__index {
+  font-family: 'DM Mono', monospace;
+  font-size: 14px;
+  letter-spacing: 0.6px;
+  color: var(--text-secondary);
+}
+
+/* точка дії — факт структури, а не висновок, тому нейтрально:
+   рамка без заливки. Зелений лишився тільки бейджу «чистий за обома перевірками» */
+.flow__item--action {
+  background: transparent;
+  border-color: var(--text-primary);
+}
+
+.flow__note {
+  font-family: 'DM Mono', monospace;
+  font-size: 14px;
+  letter-spacing: 0.6px;
+  color: var(--text-secondary);
+}
+
+/* ---------- осі та метрики ---------- */
+.axis-list,
+.metric-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-12);
+}
+
+.axis-value {
+  font-size: 16px;
+  line-height: 1.5;
+  color: var(--text-primary);
+}
+
+.metric-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-8);
+}
+
+.metric-row__value {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-8);
+  flex-shrink: 0;
+  font-size: 16px;
+  line-height: 1.5;
+  color: var(--text-primary);
+}
+
+/* ---------- персонний аудит ---------- */
+.remark-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-12);
+}
+
+.remark {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--spacing-8);
+}
+
+/* крапка замість плашки: рівень читається кольором, слово стоїть підписом */
+.remark__dot {
+  flex-shrink: 0;
+  width: 8px;
+  height: 8px;
+  /* центр крапки на середині першого рядка підпису (14px × 1.4 = 19.6) */
+  margin-top: 6px;
+  border-radius: var(--radius-pill);
+}
+
+.remark__dot--critical { background: var(--text-primary); }
+.remark__dot--moderate { background: var(--accent-yellow); }
+.remark__dot--minor { background: var(--border-medium); }
+
+.remark__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-4);
+  min-width: 0;
+}
+
+.remark__text {
+  font-size: 16px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+/* три рівні на наявних токенах, без червоного:
+   критично — темна плашка як .button--dark, помірно — жовта, незначно — .tag--muted */
+.tag--critical {
+  background: var(--text-primary);
+  color: var(--text-on-dark);
+}
+
+.tag--moderate {
+  background: var(--accent-yellow);
+}
+
+/* ---------- висновок ---------- */
+.conclusion__text {
+  font-size: 16px;
+  line-height: 1.5;
+  color: var(--text-primary);
+}
+
+/* висновки різної довжини — кнопка стоїть по нижньому краю картки */
+.copy-btn {
+  margin-top: auto;
+}
+
+/* ---------- таблиця розходжень ---------- */
+.table-wrap {
+  overflow-x: auto;
+}
+
+.divergence {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.divergence th,
+.divergence td {
+  padding: var(--spacing-16);
+  border-bottom: 1px solid var(--border-default);
+  text-align: left;
+  vertical-align: top;
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+.divergence th {
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--text-primary);
+  border-bottom: 1px solid var(--border-medium);
+}
+
+.divergence td {
+  color: var(--text-secondary);
+}
+
+.divergence td:first-child {
+  width: 96px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.divergence tr:last-child td {
+  border-bottom: 0;
+}
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="container container--wide topbar__inner">
+    <button type="button" id="logo-btn" class="topbar__logo">UX Sandbox</button>
+    <nav class="topbar__nav">
+      <button type="button" id="runs-btn" class="topbar__link">Мої прогони</button>
+      <button type="button" id="login-btn" class="topbar__link">Увійти</button>
+    </nav>
+  </div>
+</header>
+
+<div id="form-screen">
+<div class="container">
+  <header class="app-head">
+    <h1 class="app-head__title">Опис сторінки</h1>
+    <p class="app-head__lead">Заповніть параметри, щоб система вивела структуру й перевірила її</p>
+  </header>
+
+  <form id="app-form" class="app-form" novalidate>
+
+    <div class="form-group">
+      <label class="field-label" for="category">Категорія продукту</label>
+      <div class="field field-wrap">
+        <input class="field-input" type="text" id="category" data-limit="80" placeholder="тип сторінки або продукту одним рядком">
+        <button type="button" class="field-clear" aria-label="Очистити поле">✕</button>
+      </div>
+      <span class="field-counter"></span>
+    </div>
+
+    <div class="form-group">
+      <label class="field-label" for="support">Чим підкріплюється діяльність</label>
+      <div class="field field-wrap">
+        <textarea class="field-input" id="support" rows="3" data-limit="600" placeholder="що організація робить і чим це доводиться: події, публікації, партнери, люди, документи, показники"></textarea>
+        <button type="button" class="field-clear" aria-label="Очистити поле">✕</button>
+      </div>
+      <span class="field-counter"></span>
+      <p class="field-caption">Без цього поля система виведе шаблонний список секцій — професійний на вигляд, але без блоків, що несуть задачі.</p>
+    </div>
+
+    <div class="form-group">
+      <label class="field-label">Цільова аудиторія</label>
+      <div id="audience-list" class="audience-list"></div>
+      <button type="button" id="add-audience" class="field-add-btn">+ Додати другу аудиторію</button>
+    </div>
+
+    <div class="form-group">
+      <label class="field-label" for="goal">Бізнес-ціль</label>
+      <div class="field field-wrap">
+        <input class="field-input" type="text" id="goal" data-limit="120" placeholder="що має статися після візиту">
+        <button type="button" class="field-clear" aria-label="Очистити поле">✕</button>
+      </div>
+      <span class="field-counter"></span>
+    </div>
+
+    <details class="advanced">
+      <summary class="advanced__summary">
+        <span>Додатково · необов'язково</span>
+        <img class="advanced__icon advanced__icon--plus" src="assets/icon-plus.svg" alt="" width="24" height="24">
+        <img class="advanced__icon advanced__icon--minus" src="assets/icon-minus.svg" alt="" width="24" height="24">
+      </summary>
+      <div class="advanced__body">
+
+        <div class="form-group">
+          <label class="field-label">Top Tasks</label>
+          <div id="task-list" class="task-list"></div>
+          <button type="button" id="add-task" class="field-add-btn">+ Додати задачу</button>
+          <p class="field-caption">Якщо не заповните — система виведе сама з аудиторії й бізнес-цілі. Формат: дієслово + об'єкт.</p>
+        </div>
+
+        <div class="form-group">
+          <label class="field-label" for="constraints">Обмеження й особливості</label>
+          <div class="field field-wrap">
+            <textarea class="field-input" id="constraints" rows="3" data-limit="400"></textarea>
+            <button type="button" class="field-clear" aria-label="Очистити поле">✕</button>
+          </div>
+          <span class="field-counter"></span>
+          <p class="field-caption">Що вже вирішено або обмежено ззовні: законом, домовленостями, наявними каналами, ризиками для людей.</p>
+        </div>
+
+        <div class="form-group">
+          <label class="field-label">Наявна структура</label>
+          <p class="field-caption">Заповніть те, що є. Перелік і посилання дають точні показники, скріншот — приблизні.</p>
+
+          <div class="structure-group">
+            <div class="form-group">
+              <label class="field-label" for="structure-link-input">Посилання на сторінку</label>
+              <div class="field field-wrap">
+                <input class="field-input" type="url" id="structure-link-input" placeholder="https://">
+                <button type="button" class="field-clear" aria-label="Очистити поле">✕</button>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label class="field-label" for="structure-blocks-input">Перелік блоків</label>
+              <div class="field field-wrap">
+                <textarea class="field-input" id="structure-blocks-input" rows="3" placeholder="назви секцій по одній на рядок"></textarea>
+                <button type="button" class="field-clear" aria-label="Очистити поле">✕</button>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label class="field-label" for="structure-file-input">Скріншот</label>
+              <input class="file-input-hidden" type="file" id="structure-file-input" accept="image/*">
+              <div class="file-picker">
+                <button type="button" id="file-pick-btn" class="button button--secondary">Вибрати файл</button>
+                <span class="file-name" id="file-name">файл не обрано</span>
+              </div>
+              <p class="field-caption" id="screenshot-hint" hidden>Файл обирався раніше, але не зберігається між сеансами — виберіть його ще раз.</p>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </details>
+
+    <div class="confirm" id="run-confirm" hidden>
+      <p class="confirm__text">Опис змінено. Це буде новий прогін, попередній лишиться в історії</p>
+      <div class="confirm__actions">
+        <button type="button" id="confirm-run-btn" class="button button--primary">Запустити</button>
+        <button type="button" id="cancel-run-btn" class="button button--text">Скасувати</button>
+      </div>
+    </div>
+
+    <div class="form-actions" id="form-actions">
+      <button type="button" id="submit-btn" class="button button--primary" disabled>Запустити аналіз</button>
+      <button type="button" id="form-reset-btn" class="button button--secondary">Новий прогін</button>
+    </div>
+
+  </form>
+</div>
+
+<div class="notice--pinned" id="edit-notice" hidden>
+  <div class="container container--wide notice notice--row">
+    <span class="notice__text">Опис змінено. Попередній результат більше не відповідає введеному — запустіть аналіз заново</span>
+    <span class="notice__actions">
+      <button type="button" id="rerun-btn" class="button button--primary">Запустити заново</button>
+      <button type="button" id="revert-btn" class="button button--text">Скасувати зміни</button>
+    </span>
+  </div>
+</div>
+</div>
+
+<div id="runs-screen" hidden>
+  <div class="container container--wide result">
+    <h1 class="app-head__title">Мої прогони</h1>
+    <div id="runs-body"></div>
+  </div>
+</div>
+
+<div id="result-screen" hidden>
+  <div class="container container--wide result">
+
+    <p class="notice" id="save-notice" hidden>Прогін не збережено: сховище браузера недоступне або переповнене.</p>
+
+    <details class="advanced" id="input-summary">
+      <summary class="advanced__summary">
+        <span>Вхідний опис <span class="summary-hint" id="summary-hint"></span></span>
+        <img class="advanced__icon advanced__icon--plus" src="assets/icon-plus.svg" alt="" width="24" height="24">
+        <img class="advanced__icon advanced__icon--minus" src="assets/icon-minus.svg" alt="" width="24" height="24">
+      </summary>
+      <div class="advanced__body">
+        <div class="summary-rows" id="summary-body"></div>
+        <div class="summary-actions">
+          <button type="button" id="edit-btn" class="button button--secondary">Змінити опис</button>
+          <button type="button" id="reset-btn" class="button button--secondary">Новий прогін</button>
+        </div>
+      </div>
+    </details>
+
+    <div class="variants-grid" id="variants-grid"></div>
+
+    <section class="result-section">
+      <h2 class="result-section__title">Розходження: код ↔ персона</h2>
+      <div class="table-wrap">
+        <table class="divergence">
+          <thead>
+            <tr>
+              <th>Варіант</th>
+              <th>Код</th>
+              <th>Персона</th>
+              <th>Що це означає</th>
+            </tr>
+          </thead>
+          <tbody id="divergence-body"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <div class="report-actions">
+      <button type="button" id="copy-report-btn" class="button button--secondary">Скопіювати звіт</button>
+      <button type="button" id="save-report-btn" class="button button--secondary">Завантажити звіт</button>
+      <button type="button" id="delete-run-btn" class="button button--text">Видалити прогін</button>
+    </div>
+
+  </div>
+</div>
+
+<div class="toast" id="toast" hidden>
+  <span class="toast__inner">
+    <span id="toast-text"></span>
+    <button type="button" id="toast-link" class="toast__link" hidden>Мої прогони</button>
+  </span>
+</div>
+
+<script>
+(function () {
+  var STORAGE_KEY = 'ux-sandbox-app-state';
+  /* обмеження методики: аудиторій рівно дві — головна й другорядна */
+  var MAX_AUDIENCES = 2;
+
+  /* ТИМЧАСОВІ ДАНІ. Заглушка для розкладки екрана результату — пізніше це
+     прийде від моделі й замінить константу цілком. Осі, рівні зауважень і
+     склад метрик узяті з SANDBOX-CORE.md; нічого зі списку «Чого в цій
+     версії немає» тут бути не повинно. */
+  /* ТИМЧАСОВІ ДАНІ. Приклад, яким форма заповнюється при першому відкритті —
+     тільки якщо у сховищі нічого немає. Підібраний під MOCK_RESULT, щоб
+     результат читався з описом. Зникне разом із заглушкою. */
+  var EXAMPLE_STATE = {
+    category: 'лендінг громадської організації',
+    support: 'щомісячні звіти про витрачання, реєстр партнерів, архів подій за три роки, сторінки команди',
+    audiences: [
+      { value: 'донори, які прийшли після допису в соцмережах', type: 'головна' },
+      { value: 'грантодавці, які перевіряють звітність перед рішенням', type: 'другорядна' }
+    ],
+    goal: 'разова пожертва або підписка на щомісячну',
+    tasks: ['переказати кошти', 'знайти звіт за минулий рік', 'перевірити, хто партнери']
+  };
+
+  var MOCK_RESULT = {
+    variants: [
+      {
+        id: 'A',
+        title: 'Варіант A',
+        subtitle: 'Групування за типом контенту',
+        clean: false,
+        flow: [
+          { name: 'Хто ми' },
+          { name: 'Напрямки' },
+          { name: 'Звіти' },
+          { name: 'Партнери' },
+          { name: 'Підтримати', action: true },
+          { name: 'Події' }
+        ],
+        axes: [
+          { name: 'Доказова база до дії', value: 'повна' },
+          { name: 'Принцип групування', value: 'за типом контенту' },
+          { name: 'Розподіл ваги', value: 'рівний' }
+        ],
+        metrics: [
+          { name: 'Кроків до задачі', value: 5 },
+          { name: 'Розкид кроків', value: 3 }
+        ],
+        remarks: [
+          { level: 'критично', text: 'Спосіб допомогти стоїть п’ятим. Людина, яка прийшла вже готовою переказати кошти, проходить чотири блоки, що її не переконують, — вона вже переконана.' },
+          { level: 'помірно', text: 'Звіти й партнери стоять поруч і читаються як один довгий блок доказів: погляд не має за що зачепитись.' }
+        ],
+        conclusion: 'До способу допомогти людина доходить аж на п’ятій секції. Хто прийшов готовим — шукає кнопку довше, ніж готовий шукати; хто прийшов сумніватись — отримує всі докази, але вже втомленим.'
+      },
+      {
+        id: 'Б',
+        title: 'Варіант Б',
+        subtitle: 'Групування за задачею',
+        clean: true,
+        flow: [
+          { name: 'Хто ми' },
+          { name: 'Підтримати', action: true },
+          { name: 'Куди йдуть кошти' },
+          { name: 'Звіти' },
+          { name: 'Партнери' },
+          { name: 'Події' }
+        ],
+        axes: [
+          { name: 'Доказова база до дії', value: 'достатня' },
+          { name: 'Принцип групування', value: 'за задачею' },
+          { name: 'Розподіл ваги', value: 'TT1' }
+        ],
+        metrics: [
+          { name: 'Кроків до задачі', value: 2 },
+          { name: 'Розкид кроків', value: 1 }
+        ],
+        remarks: [
+          { level: 'незначно', text: 'Події стоять останніми — той, хто шукає найближчу подію, гортає всю сторінку.' }
+        ],
+        conclusion: 'Спосіб допомогти стоїть одразу після знайомства, а пояснення, куди йдуть кошти, — наступним блоком. Людина бачить дію тоді, коли ще пам’ятає, навіщо прийшла, і має чим підкріпити рішення.'
+      },
+      {
+        id: 'В',
+        title: 'Варіант В',
+        subtitle: 'Групування за етапом знайомства',
+        clean: false,
+        flow: [
+          { name: 'Проблема' },
+          { name: 'Як ми діємо' },
+          { name: 'Звіти' },
+          { name: 'Підтримати', action: true },
+          { name: 'Партнери' },
+          { name: 'Події' }
+        ],
+        axes: [
+          { name: 'Доказова база до дії', value: 'повна' },
+          { name: 'Принцип групування', value: 'за етапом знайомства' },
+          { name: 'Розподіл ваги', value: 'TT2' }
+        ],
+        metrics: [
+          { name: 'Кроків до задачі', value: 4 },
+          { name: 'Розкид кроків', value: 1 }
+        ],
+        remarks: [
+          { level: 'помірно', text: 'Три блоки поспіль пояснюють і доводять. Читач, який уже вирішив допомогти, змушений пройти їх усі, перш ніж побачить, як саме це зробити.' },
+          { level: 'незначно', text: 'Партнери після дії читаються як додаток, а не як підстава довіряти.' }
+        ],
+        conclusion: 'До дії людина проходить проблему, спосіб роботи і звіти — це найповніша підготовка з трьох. Ціна: той, хто вже вирішив допомогти, читає три блоки, які його не переконують.'
+      }
+    ],
+    divergence: [
+      {
+        variant: 'A',
+        code: 'Кроків до задачі — 5, розкид 3: обидва показники найбільші з трьох.',
+        persona: 'Критично: до способу допомогти людина не доходить.',
+        meaning: 'Тут перевірки збігаються, і це рідший випадок. Коли код і персона вказують на те саме місце, сумніватись у ньому не доводиться — довгий шлях до дії відчувається так само довгим, як рахується.'
+      },
+      {
+        variant: 'Б',
+        code: 'Кроків до задачі — 2, розкид 1: обидва найменші.',
+        persona: 'Одне незначне зауваження, критичних немає.',
+        meaning: 'Розходження немає — саме тому варіант позначений як чистий за обома перевірками. Це фактичне твердження, а не оцінка «найкращий»: ваг між метриками система не має.'
+      },
+      {
+        variant: 'В',
+        code: 'Кроків до задачі — 4, розкид 1: шлях середній, стабільний.',
+        persona: 'Помірно: три блоки поспіль сприймаються як щільні.',
+        meaning: 'Ось власне розходження. Код рахує кількість секцій, персона реагує на щільність змісту: чотири секції читаються довше, ніж їх чотири. Якщо аудиторія приходить уже готовою, порахований шлях коротший за відчутий — і рішення тут за вами, система нічого не відсіює.'
+      }
+    ]
+  };
+
+  var form = document.getElementById('app-form');
+  var audienceList = document.getElementById('audience-list');
+  var taskList = document.getElementById('task-list');
+  var addAudienceBtn = document.getElementById('add-audience');
+  var addTaskBtn = document.getElementById('add-task');
+  var fileInput = document.getElementById('structure-file-input');
+  var screenshotHint = document.getElementById('screenshot-hint');
+  var submitBtn = document.getElementById('submit-btn');
+
+  var formScreen = document.getElementById('form-screen');
+  var resultScreen = document.getElementById('result-screen');
+  var editBtn = document.getElementById('edit-btn');
+  /* кнопок скидання дві — у блоці «Вхідний опис» і на екрані форми */
+  var resetButtons = [document.getElementById('reset-btn'), document.getElementById('form-reset-btn')];
+  var copyReportBtn = document.getElementById('copy-report-btn');
+  var saveReportBtn = document.getElementById('save-report-btn');
+  var deleteRunBtn = document.getElementById('delete-run-btn');
+  var summaryBody = document.getElementById('summary-body');
+  var inputSummary = document.getElementById('input-summary');
+  var summaryHint = document.getElementById('summary-hint');
+  var variantsGrid = document.getElementById('variants-grid');
+  var divergenceBody = document.getElementById('divergence-body');
+  var saveNotice = document.getElementById('save-notice');
+
+  var runsScreen = document.getElementById('runs-screen');
+  var runsBody = document.getElementById('runs-body');
+  var runsBtn = document.getElementById('runs-btn');
+  var logoBtn = document.getElementById('logo-btn');
+  var filePickBtn = document.getElementById('file-pick-btn');
+  var fileNameLabel = document.getElementById('file-name');
+
+  var editNotice = document.getElementById('edit-notice');
+  var revertBtn = document.getElementById('revert-btn');
+  var rerunBtn = document.getElementById('rerun-btn');
+  var runConfirm = document.getElementById('run-confirm');
+  var formActions = document.getElementById('form-actions');
+  var confirmRunBtn = document.getElementById('confirm-run-btn');
+  var cancelRunBtn = document.getElementById('cancel-run-btn');
+  var toast = document.getElementById('toast');
+  var toastText = document.getElementById('toast-text');
+  var toastLink = document.getElementById('toast-link');
+  var toastTimer = null;
+
+  var currentFileName = '';
+  /* збережені прогони; наповнюється в loadState(), пишеться в saveState() */
+  var runs = [];
+  /* прогін, який зараз показано: новий або відкритий зі списку */
+  var currentRun = null;
+  /* прогін, з якого зайшли у форму через «Змінити опис»; поки він є,
+     форма порівнюється з ним і показує попередження про розбіжність */
+  var editingRun = null;
+
+  /* ---------- єдине місце роботи зі сховищем ---------- */
+
+  function collectState() {
+    return {
+      category: document.getElementById('category').value,
+      support: document.getElementById('support').value,
+      audiences: Array.from(audienceList.querySelectorAll('.audience-row')).map(function (row) {
+        return {
+          value: row.querySelector('.audience-input').value,
+          type: row.querySelector('.audience-select').value
+        };
+      }),
+      goal: document.getElementById('goal').value,
+      tasks: Array.from(taskList.querySelectorAll('.task-input')).map(function (input) {
+        return input.value;
+      }),
+      constraints: document.getElementById('constraints').value,
+      structureLink: document.getElementById('structure-link-input').value,
+      structureBlocks: document.getElementById('structure-blocks-input').value,
+      structureFileName: currentFileName
+    };
+  }
+
+  /* Під ключем лежить увесь документ: чернетка форми і збережені прогони.
+     Повертає false, якщо записати не вдалось — виклик показує це на екрані,
+     раніше провал сховища проковтувався мовчки. */
+  function saveState() {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ form: collectState(), runs: runs }));
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  function loadState() {
+    var doc = null;
+    var stored = null;
+    try {
+      stored = localStorage.getItem(STORAGE_KEY);
+      doc = JSON.parse(stored);
+    } catch (e) {
+      doc = null;
+    }
+
+    /* стани, збережені до появи прогонів, лежать плоским об'єктом форми */
+    var state = doc && doc.form ? doc.form : doc;
+    runs = doc && Array.isArray(doc.runs) ? doc.runs : [];
+
+    /* прогони, записані до появи назв, не мають seq і title — добудовуємо,
+       інакше назва вийшла б «прогін undefined». Рахуємо від старіших до новіших,
+       тобто з кінця масиву: нові лежать спереду */
+    var seqByCategory = {};
+    runs.slice().reverse().forEach(function (run) {
+      if (typeof run.title !== 'string') { run.title = ''; }
+      if (typeof run.seq !== 'number') {
+        seqByCategory[run.category] = (seqByCategory[run.category] || 0) + 1;
+        run.seq = seqByCategory[run.category];
+      } else if (run.seq > (seqByCategory[run.category] || 0)) {
+        seqByCategory[run.category] = run.seq;
+      }
+    });
+
+    /* приклад підставляється лише при справді першому відкритті:
+       якщо стан збережений — навіть порожній після «Нового прогону» — він і виграє */
+    state = state || (stored === null ? EXAMPLE_STATE : {});
+    applyFormState(state);
+  }
+
+  /* ---------- заповнення форми ---------- */
+
+  function applyFormState(state) {
+    document.getElementById('category').value = state.category || '';
+    document.getElementById('support').value = state.support || '';
+    document.getElementById('goal').value = state.goal || '';
+    document.getElementById('constraints').value = state.constraints || '';
+    document.getElementById('structure-link-input').value = state.structureLink || '';
+    document.getElementById('structure-blocks-input').value = state.structureBlocks || '';
+
+    audienceList.innerHTML = '';
+    /* у сховищі може лежати більше двох аудиторій, збережених до введення обмеження */
+    var audiences = (state.audiences && state.audiences.length)
+      ? state.audiences.slice(0, MAX_AUDIENCES)
+      : [{ value: '', type: 'головна' }];
+    audiences.forEach(function (a) { addAudienceRow(a.value, a.type); });
+
+    taskList.innerHTML = '';
+    (state.tasks || []).forEach(function (t) { addTaskRow(t); });
+
+    currentFileName = state.structureFileName || '';
+    updateScreenshotHint();
+    refreshFieldUi();
+    autoGrowAll();
+  }
+
+  /* ---------- динамічні рядки ---------- */
+
+  function addAudienceRow(value, type) {
+    var item = document.createElement('div');
+    item.className = 'audience-item';
+    item.innerHTML =
+      '<div class="audience-row">' +
+      '<div class="field field-wrap">' +
+      '<input class="field-input audience-input" type="text" data-limit="120" placeholder="хто читає сторінку і в якому стані приходить">' +
+      '<button type="button" class="field-clear" aria-label="Очистити поле">✕</button>' +
+      '</div>' +
+      '<select class="field audience-select">' +
+      '<option value="головна">головна</option>' +
+      '<option value="другорядна">другорядна</option>' +
+      '</select>' +
+      '<button type="button" class="audience-remove" aria-label="Видалити аудиторію">✕</button>' +
+      '</div>' +
+      '<span class="field-counter"></span>';
+    item.querySelector('.audience-input').value = value || '';
+    item.querySelector('.audience-select').value = type || 'головна';
+    item.querySelector('.audience-remove').addEventListener('click', function () {
+      item.remove();
+      updateAudienceControls();
+      saveState();
+      updateSubmitState();
+      updateEditNotice();
+    });
+    audienceList.appendChild(item);
+    updateAudienceControls();
+    refreshFieldUi();
+  }
+
+  /* єдине місце, де вирішується видимість керувань блоку аудиторій:
+     аудиторій максимум дві, у першої немає кнопки видалення */
+  function updateAudienceControls() {
+    var rows = Array.from(audienceList.querySelectorAll('.audience-row'));
+    rows.forEach(function (row, index) {
+      row.querySelector('.audience-remove').classList.toggle('audience-remove--hidden', index === 0);
+    });
+    addAudienceBtn.hidden = rows.length >= MAX_AUDIENCES;
+  }
+
+  function addTaskRow(value) {
+    var item = document.createElement('div');
+    item.className = 'task-item';
+    item.innerHTML =
+      '<div class="task-row">' +
+      '<div class="field field-wrap">' +
+      '<input class="field-input task-input" type="text" data-limit="60">' +
+      '<button type="button" class="field-clear" aria-label="Очистити поле">✕</button>' +
+      '</div>' +
+      '<button type="button" class="task-remove" aria-label="Видалити задачу">✕</button>' +
+      '</div>' +
+      '<span class="field-counter"></span>';
+    item.querySelector('.task-input').value = value || '';
+    item.querySelector('.task-remove').addEventListener('click', function () {
+      item.remove();
+      saveState();
+      updateSubmitState();
+      updateEditNotice();
+    });
+    taskList.appendChild(item);
+    refreshFieldUi();
+  }
+
+  /* ---------- ріст textarea, лічильники, очищення ---------- */
+
+  function autoGrow(textarea) {
+    if (textarea.offsetParent === null) { return; }
+    textarea.style.height = 'auto';
+    textarea.style.height = textarea.scrollHeight + 'px';
+  }
+
+  function autoGrowAll() {
+    Array.from(form.querySelectorAll('textarea.field-input')).forEach(autoGrow);
+  }
+
+  /* видимість кнопок очищення й стан лічильників — один прохід по всіх полях */
+  function refreshFieldUi() {
+    Array.from(form.querySelectorAll('.field-input')).forEach(function (input) {
+      var wrap = input.closest('.field-wrap');
+      var clearBtn = wrap ? wrap.querySelector('.field-clear') : null;
+      if (clearBtn) {
+        clearBtn.classList.toggle('field-clear--hidden', input.value.length === 0);
+      }
+
+      var group = input.closest('.form-group, .audience-item, .task-item');
+      var counter = group ? group.querySelector(':scope > .field-counter') : null;
+      if (counter && input.dataset.limit) {
+        var limit = Number(input.dataset.limit);
+        counter.textContent = input.value.length + ' / ' + limit;
+        /* орієнтир, не обмеження: ввід не блокується, змінюється лише вигляд */
+        counter.classList.toggle('field-counter--over', input.value.length > limit);
+      }
+    });
+  }
+
+  function updateScreenshotHint() {
+    var hasStoredName = !!currentFileName;
+    var hasLiveFile = fileInput.files && fileInput.files.length > 0;
+    screenshotHint.hidden = !(hasStoredName && !hasLiveFile);
+    fileNameLabel.textContent = currentFileName || 'файл не обрано';
+  }
+
+  function updateSubmitState() {
+    var category = document.getElementById('category').value.trim();
+    var support = document.getElementById('support').value.trim();
+    var firstAudienceInput = audienceList.querySelector('.audience-input');
+    var audience = firstAudienceInput ? firstAudienceInput.value.trim() : '';
+    var goal = document.getElementById('goal').value.trim();
+    var ready = !!(category && support && audience && goal);
+    submitBtn.disabled = !ready;
+    /* з банера теж не можна запустити аналіз на неповному описі */
+    rerunBtn.disabled = !ready;
+  }
+
+  /* ---------- екран результату ---------- */
+
+  /* текст скрізь через textContent: у вхідний опис іде те, що ввела людина */
+  function el(tag, className, text) {
+    var node = document.createElement(tag);
+    if (className) { node.className = className; }
+    if (text !== undefined) { node.textContent = text; }
+    return node;
+  }
+
+  function summaryRow(label, value) {
+    var row = el('div', 'summary-row');
+    row.appendChild(el('span', 'field-caption', label));
+    row.appendChild(el('p', 'summary-row__value', value));
+    return row;
+  }
+
+  function renderSummary() {
+    /* показуємо вхід того прогону, що відкритий, а не поточну чернетку форми */
+    var state = currentRun.input;
+
+    summaryHint.textContent = state.category;
+
+    summaryBody.innerHTML = '';
+
+    summaryBody.appendChild(summaryRow('Категорія продукту', state.category));
+    summaryBody.appendChild(summaryRow('Чим підкріплюється діяльність', state.support));
+
+    var audienceRow = el('div', 'summary-row');
+    audienceRow.appendChild(el('span', 'field-caption', 'Цільова аудиторія'));
+    var audienceValues = el('div', 'summary-list');
+    state.audiences.forEach(function (a) {
+      audienceValues.appendChild(el('p', 'summary-row__value', a.value + ' · ' + a.type));
+    });
+    audienceRow.appendChild(audienceValues);
+    summaryBody.appendChild(audienceRow);
+
+    summaryBody.appendChild(summaryRow('Бізнес-ціль', state.goal));
+
+    /* задачі необов'язкові: якщо їх немає, рядка теж немає */
+    var tasks = state.tasks.filter(function (t) { return t.trim() !== ''; });
+    if (tasks.length) {
+      var taskRow = el('div', 'summary-row');
+      taskRow.appendChild(el('span', 'field-caption', 'Top Tasks'));
+      var list = el('div', 'summary-list');
+      tasks.forEach(function (t) {
+        list.appendChild(el('p', 'summary-row__value', t));
+      });
+      taskRow.appendChild(list);
+      summaryBody.appendChild(taskRow);
+    }
+
+    /* наявна структура: три джерела різної точності, виводимо лише заповнені —
+       якщо аналіз спирався на них, це має бути видно */
+    if (state.structureLink.trim()) {
+      summaryBody.appendChild(summaryRow('Посилання на сторінку', state.structureLink));
+    }
+    if (state.structureBlocks.trim()) {
+      summaryBody.appendChild(summaryRow('Перелік блоків', state.structureBlocks));
+    }
+    if (state.structureFileName) {
+      summaryBody.appendChild(summaryRow('Скріншот', state.structureFileName));
+    }
+  }
+
+  /* мінімум рахується по трьох варіантах окремо для кожної метрики;
+     якщо мінімум спільний, позначку отримують усі, хто його ділить */
+  function metricMinimums() {
+    var mins = {};
+    currentRun.result.variants.forEach(function (variant) {
+      variant.metrics.forEach(function (metric) {
+        if (mins[metric.name] === undefined || metric.value < mins[metric.name]) {
+          mins[metric.name] = metric.value;
+        }
+      });
+    });
+    return mins;
+  }
+
+  function renderFlow(variant) {
+    var section = el('div', 'card-section');
+    section.appendChild(el('span', 'field-label', 'Потік блоків'));
+
+    var flow = el('div', 'flow');
+    variant.flow.forEach(function (block, index) {
+      var item = el('span', 'flow__item' + (block.action ? ' flow__item--action' : ''));
+      item.appendChild(el('span', 'flow__index', String(index + 1) + ' ·'));
+      item.appendChild(el('span', null, block.name));
+      if (block.action) {
+        item.appendChild(el('span', 'flow__note', '· точка дії'));
+      }
+      flow.appendChild(item);
+    });
+    section.appendChild(flow);
+    return section;
+  }
+
+  function renderAxes(variant) {
+    var section = el('div', 'card-section card-section--divided');
+    section.appendChild(el('span', 'field-label', 'Осі'));
+    var list = el('div', 'axis-list');
+    variant.axes.forEach(function (axis) {
+      var row = el('div', 'summary-row');
+      row.appendChild(el('span', 'field-caption', axis.name));
+      row.appendChild(el('span', 'axis-value', axis.value));
+      list.appendChild(row);
+    });
+    section.appendChild(list);
+    return section;
+  }
+
+  function renderMetrics(variant, mins) {
+    var section = el('div', 'card-section card-section--divided');
+    section.appendChild(el('span', 'field-label', 'Порівняльні метрики'));
+    section.appendChild(el('p', 'field-caption', 'порогів немає — метрики показують різницю між варіантами, не оцінку'));
+
+    var list = el('div', 'metric-list');
+    variant.metrics.forEach(function (metric) {
+      var row = el('div', 'metric-row');
+      row.appendChild(el('span', 'remark__text', metric.name));
+      var value = el('span', 'metric-row__value');
+      value.appendChild(el('span', null, String(metric.value)));
+      if (metric.value === mins[metric.name]) {
+        value.appendChild(el('span', 'tag tag--muted', 'мін.'));
+      }
+      row.appendChild(value);
+      list.appendChild(row);
+    });
+    section.appendChild(list);
+    return section;
+  }
+
+  function renderRemarks(variant) {
+    var section = el('div', 'card-section card-section--divided');
+    section.appendChild(el('span', 'field-label', 'Персонний аудит'));
+    var list = el('div', 'remark-list');
+    var dotClass = { 'критично': 'critical', 'помірно': 'moderate', 'незначно': 'minor' };
+    variant.remarks.forEach(function (remark) {
+      var item = el('div', 'remark');
+      item.appendChild(el('span', 'remark__dot remark__dot--' + dotClass[remark.level]));
+      var body = el('div', 'remark__body');
+      body.appendChild(el('span', 'field-caption', remark.level));
+      body.appendChild(el('p', 'remark__text', remark.text));
+      item.appendChild(body);
+      list.appendChild(item);
+    });
+    section.appendChild(list);
+    return section;
+  }
+
+  function renderConclusion(variant) {
+    var section = el('div', 'card-section card-section--divided conclusion');
+    section.appendChild(el('span', 'field-label', 'Висновок'));
+    section.appendChild(el('p', 'conclusion__text', variant.conclusion));
+    return section;
+  }
+
+  function renderVariants() {
+    var mins = metricMinimums();
+    variantsGrid.innerHTML = '';
+
+    currentRun.result.variants.forEach(function (variant) {
+      var card = el('article', 'variant-card');
+
+      /* місце під бейдж зайняте в усіх трьох картках, інакше заголовки
+         стоять на різній висоті й картки важче зіставляти поглядом */
+      var badge = el('span', 'tag tag--green-soft', 'чистий за обома перевірками');
+      if (!variant.clean) { badge.classList.add('variant-card__badge--empty'); }
+      card.appendChild(badge);
+
+      var head = el('div', 'variant-card__head');
+      head.appendChild(el('h2', 'variant-card__title', variant.title));
+      head.appendChild(el('p', 'variant-card__subtitle', variant.subtitle));
+      card.appendChild(head);
+
+      card.appendChild(renderFlow(variant));
+      card.appendChild(renderAxes(variant));
+      card.appendChild(renderMetrics(variant, mins));
+      card.appendChild(renderRemarks(variant));
+      card.appendChild(renderConclusion(variant));
+
+      variantsGrid.appendChild(card);
+    });
+  }
+
+  function renderDivergence() {
+    divergenceBody.innerHTML = '';
+    currentRun.result.divergence.forEach(function (row) {
+      var tr = document.createElement('tr');
+      [row.variant, row.code, row.persona, row.meaning].forEach(function (text) {
+        tr.appendChild(el('td', null, text));
+      });
+      divergenceBody.appendChild(tr);
+    });
+  }
+
+  /* увесь звіт одним простим текстом — і для буфера, і для файлу */
+  function buildReportText() {
+    var state = currentRun.input;
+    var lines = [];
+
+    lines.push('UX SANDBOX · ' + state.category);
+    lines.push('');
+    lines.push('ВХІДНИЙ ОПИС');
+    lines.push('Категорія продукту: ' + state.category);
+    lines.push('Чим підкріплюється діяльність: ' + state.support);
+    state.audiences.forEach(function (a) {
+      lines.push('Цільова аудиторія: ' + a.value + ' · ' + a.type);
+    });
+    lines.push('Бізнес-ціль: ' + state.goal);
+    var tasks = state.tasks.filter(function (t) { return t.trim() !== ''; });
+    if (tasks.length) {
+      lines.push('Top Tasks: ' + tasks.join('; '));
+    }
+    /* наявна структура — лише заповнені джерела */
+    if (state.structureLink.trim()) {
+      lines.push('Посилання на сторінку: ' + state.structureLink);
+    }
+    if (state.structureBlocks.trim()) {
+      lines.push('Перелік блоків: ' + state.structureBlocks.split('\n').map(function (b) {
+        return b.trim();
+      }).filter(Boolean).join('; '));
+    }
+    if (state.structureFileName) {
+      lines.push('Скріншот: ' + state.structureFileName);
+    }
+
+    var mins = metricMinimums();
+    currentRun.result.variants.forEach(function (variant) {
+      lines.push('');
+      lines.push('— — —');
+      lines.push('');
+      lines.push(variant.title.toUpperCase() + ' · ' + variant.subtitle);
+      if (variant.clean) {
+        lines.push('Чистий за обома перевірками.');
+      }
+      lines.push('');
+      lines.push('Потік блоків:');
+      lines.push(variant.flow.map(function (block, index) {
+        return (index + 1) + '. ' + block.name + (block.action ? ' (точка дії)' : '');
+      }).join(' → '));
+      lines.push('');
+      lines.push('Осі:');
+      variant.axes.forEach(function (axis) {
+        lines.push('  ' + axis.name + ': ' + axis.value);
+      });
+      lines.push('');
+      lines.push('Порівняльні метрики (порогів немає — показують різницю між варіантами, не оцінку):');
+      variant.metrics.forEach(function (metric) {
+        lines.push('  ' + metric.name + ': ' + metric.value + (metric.value === mins[metric.name] ? ' (мін.)' : ''));
+      });
+      lines.push('');
+      lines.push('Персонний аудит:');
+      variant.remarks.forEach(function (remark) {
+        lines.push('  [' + remark.level + '] ' + remark.text);
+      });
+      lines.push('');
+      lines.push('Висновок:');
+      lines.push(variant.conclusion);
+    });
+
+    lines.push('');
+    lines.push('— — —');
+    lines.push('');
+    lines.push('РОЗХОДЖЕННЯ: КОД ↔ ПЕРСОНА');
+    currentRun.result.divergence.forEach(function (row) {
+      lines.push('');
+      lines.push(row.variant);
+      lines.push('  Код: ' + row.code);
+      lines.push('  Персона: ' + row.persona);
+      lines.push('  Що це означає: ' + row.meaning);
+    });
+
+    return lines.join('\n');
+  }
+
+  function reportFileName() {
+    var category = currentRun.input.category.toLowerCase().trim();
+    var slug = category
+      .replace(/[^\wа-яїієґё\s-]/gi, '')
+      .replace(/\s+/g, '-')
+      .replace(/-+/g, '-');
+    var now = new Date();
+    var date = now.getFullYear() + '-' +
+      String(now.getMonth() + 1).padStart(2, '0') + '-' +
+      String(now.getDate()).padStart(2, '0');
+    return (slug || 'ux-sandbox') + '-' + date + '.txt';
+  }
+
+  /* Некритична дія — повідомлення після неї. Одне місце, зникає саме.
+     Помилка збереження лишається окремою плашкою: вона зникати не має. */
+  function showToast(text, withLink) {
+    toastText.textContent = text;
+    toastLink.hidden = !withLink;
+    toast.hidden = false;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { toast.hidden = true; }, 4000);
+  }
+
+  /* ---------- прогони ---------- */
+
+  function formatRunDate(iso) {
+    var d = new Date(iso);
+    var pad = function (n) { return String(n).padStart(2, '0'); };
+    return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) +
+      ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+  }
+
+  /* Номер зберігається в записі, а не рахується при показі: інакше після
+     видалення першого прогону другий став би першим, і людина, яка на нього
+     посилалась, побачила б інший номер. Новий = максимальний у цій категорії + 1. */
+  function nextSeq(category) {
+    var max = 0;
+    runs.forEach(function (run) {
+      if (run.category === category && run.seq > max) { max = run.seq; }
+    });
+    return max + 1;
+  }
+
+  /* своя назва показується без номера; порожня — автоматична з номером */
+  function runTitle(run) {
+    return run.title ? run.title : run.category + ' · прогін ' + run.seq;
+  }
+
+  function renderRuns() {
+    runsBody.innerHTML = '';
+
+    if (!runs.length) {
+      runsBody.appendChild(el('p', 'runs-empty', 'Збережених прогонів поки немає.'));
+      return;
+    }
+
+    var list = el('div', 'runs-list');
+    runs.forEach(function (run) {
+      var row = el('div', 'run-row');
+      row.appendChild(el('span', 'run-row__date', formatRunDate(run.date)));
+
+      /* клік по назві відкриває прогін */
+      var titleBtn = el('button', 'run-row__title', runTitle(run));
+      titleBtn.type = 'button';
+      titleBtn.addEventListener('click', function () { openRun(run.id); });
+      row.appendChild(titleBtn);
+
+      var actions = el('span', 'run-row__actions');
+
+      /* видалення назавжди — підтвердження до дії, як у решті критичних */
+      var delBtn = el('button', 'text-action', 'Видалити');
+      delBtn.type = 'button';
+      delBtn.addEventListener('click', function () {
+        if (delBtn.dataset.armed !== 'yes') {
+          delBtn.dataset.armed = 'yes';
+          delBtn.textContent = 'Точно видалити?';
+          return;
+        }
+        runs = runs.filter(function (r) { return r.id !== run.id; });
+        saveState();
+        renderRuns();
+      });
+      actions.appendChild(delBtn);
+
+      row.appendChild(actions);
+      list.appendChild(row);
+    });
+    runsBody.appendChild(list);
+  }
+
+  function renderCurrentRun() {
+    /* вузол живе між прогонами: без цього раз розгорнутий блок
+       лишався б розгорнутим і на наступному запуску */
+    inputSummary.open = false;
+    disarmReset();
+    disarmEdit();
+    disarmDeleteRun();
+    renderSummary();
+    renderVariants();
+    renderDivergence();
+    formScreen.hidden = true;
+    runsScreen.hidden = true;
+    resultScreen.hidden = false;
+    window.scrollTo(0, 0);
+  }
+
+  /* Запуск із форми: критична дія лише тоді, коли створюється новий запис.
+     Якщо опис не змінювався з останнього прогону — записувати нема чого,
+     показуємо той самий прогін і нічого не питаємо. */
+  function requestRun() {
+    if (runs.length && JSON.stringify(runs[0].input) === JSON.stringify(collectState())) {
+      openRun(runs[0].id);
+      return;
+    }
+    if (!runs.length) {
+      runAnalysis();
+      return;
+    }
+    /* панель стає на місце ряду кнопок, а не додається до нього:
+       інакше на екрані одночасно «Запустити» і «Запустити аналіз» */
+    formActions.hidden = true;
+    runConfirm.hidden = false;
+  }
+
+  function runAnalysis() {
+    runConfirm.hidden = true;
+    formActions.hidden = false;
+    /* новий прогін закриває режим редагування — попередження більше не про що */
+    editingRun = null;
+    updateEditNotice();
+
+    var category = document.getElementById('category').value;
+    currentRun = {
+      id: String(Date.now()) + '-' + Math.random().toString(36).slice(2, 8),
+      date: new Date().toISOString(),
+      category: category,
+      seq: nextSeq(category),
+      title: '',
+      input: collectState(),
+      /* копія, а не посилання: пізніше результат прийде від моделі
+         і буде різним для кожного прогону */
+      result: JSON.parse(JSON.stringify(MOCK_RESULT))
+    };
+    runs.unshift(currentRun);
+
+    /* провал запису більше не мовчить; успіх — коротке повідомлення */
+    var saved = saveState();
+    saveNotice.hidden = saved;
+    renderCurrentRun();
+    if (saved) { showToast('Прогін збережено в ', true); }
+  }
+
+  function openRun(id) {
+    var run = runs.filter(function (r) { return r.id === id; })[0];
+    if (!run) { return; }
+    currentRun = run;
+    saveNotice.hidden = true;
+    renderCurrentRun();
+  }
+
+  function showRuns() {
+    formScreen.hidden = true;
+    resultScreen.hidden = true;
+    runsScreen.hidden = false;
+    disarmReset();
+    disarmEdit();
+    renderRuns();
+    window.scrollTo(0, 0);
+  }
+
+  function showForm() {
+    resultScreen.hidden = true;
+    runsScreen.hidden = true;
+    formScreen.hidden = false;
+    window.scrollTo(0, 0);
+    /* показаний результат скидається: наступний — тільки після «Запустити аналіз» */
+    summaryBody.innerHTML = '';
+    variantsGrid.innerHTML = '';
+    divergenceBody.innerHTML = '';
+    disarmReset();
+    disarmEdit();
+    runConfirm.hidden = true;
+    formActions.hidden = false;
+    /* поки екран був прихований, textarea не мали висоти */
+    autoGrowAll();
+  }
+
+  /* очищення форми: перший клік по «Новий прогін» лише озброює кнопку,
+     виконує другий — підтвердження живе в самій кнопці, без нативного діалогу.
+     Знімається з обох кнопок одразу, щоб не лишалось двох озброєних */
+  function disarmReset() {
+    resetButtons.forEach(function (btn) {
+      btn.dataset.armed = '';
+      btn.textContent = 'Новий прогін';
+    });
+  }
+
+  function disarmDeleteRun() {
+    deleteRunBtn.dataset.armed = '';
+    deleteRunBtn.textContent = 'Видалити прогін';
+  }
+
+  function disarmEdit() {
+    editBtn.dataset.armed = '';
+    editBtn.textContent = 'Змінити опис';
+  }
+
+  function isDraftEmpty() {
+    var s = collectState();
+    var filled = [s.category, s.support, s.goal, s.constraints, s.structureLink, s.structureBlocks]
+      .some(function (v) { return v.trim() !== ''; });
+    return !filled &&
+      !s.audiences.some(function (a) { return a.value.trim() !== ''; }) &&
+      !s.tasks.some(function (t) { return t.trim() !== ''; });
+  }
+
+  /* «Змінити опис» показує вхід відкритого прогону — інакше людина
+     редагувала б чужі поля. Чернетку не затираємо мовчки: якщо в ній щось є
+     і воно відрізняється, перший клік лише перепитує */
+  function editDescription() {
+    if (!currentRun) { return; }
+    var runInput = currentRun.input;
+    var differs = JSON.stringify(collectState()) !== JSON.stringify(runInput);
+
+    if (differs && !isDraftEmpty() && editBtn.dataset.armed !== 'yes') {
+      editBtn.dataset.armed = 'yes';
+      editBtn.textContent = 'Замінити поля прогоном?';
+      return;
+    }
+
+    editingRun = currentRun;
+    applyFormState(runInput);
+    updateSubmitState();
+    saveState();
+    updateEditNotice();
+    showForm();
+  }
+
+  /* попередження показується, лише поки форма справді розходиться з прогоном:
+     зайти подивитись можна без нього, а якщо повернути введене як було —
+     воно зникне саме */
+  function updateEditNotice() {
+    editNotice.hidden = !editingRun ||
+      JSON.stringify(collectState()) === JSON.stringify(editingRun.input);
+
+    /* закріплена панель лягає поверх нижнього ряду кнопок — звільняємо їй місце.
+       Висоту міряємо, бо текст переноситься по-різному й фіксоване число
+       рано чи пізно розійшлося б із реальністю */
+    formScreen.style.paddingBottom = editNotice.hidden
+      ? ''
+      : (editNotice.offsetHeight + 24) + 'px';
+  }
+
+  /* набране в полях втрачається — питаємо до дії */
+  function revertToRun() {
+    if (!editingRun) { return; }
+    if (revertBtn.dataset.armed !== 'yes') {
+      revertBtn.dataset.armed = 'yes';
+      revertBtn.textContent = 'Точно скасувати?';
+      return;
+    }
+    revertBtn.dataset.armed = '';
+    revertBtn.textContent = 'Скасувати зміни';
+    applyFormState(editingRun.input);
+    updateSubmitState();
+    saveState();
+    /* editingRun лишається: якщо після скасування знову щось змінити,
+       попередження має з'явитись удруге */
+    updateEditNotice();
+  }
+
+  function clearForm() {
+    document.getElementById('category').value = '';
+    document.getElementById('support').value = '';
+    document.getElementById('goal').value = '';
+    document.getElementById('constraints').value = '';
+    document.getElementById('structure-link-input').value = '';
+    document.getElementById('structure-blocks-input').value = '';
+    fileInput.value = '';
+    currentFileName = '';
+
+    audienceList.innerHTML = '';
+    addAudienceRow('', 'головна');
+    taskList.innerHTML = '';
+
+    updateScreenshotHint();
+    refreshFieldUi();
+    autoGrowAll();
+    saveState();
+    updateSubmitState();
+    /* порівнювати вже нема з чим */
+    editingRun = null;
+    updateEditNotice();
+  }
+
+  /* ---------- обробники ---------- */
+
+  submitBtn.addEventListener('click', requestRun);
+  confirmRunBtn.addEventListener('click', runAnalysis);
+  cancelRunBtn.addEventListener('click', function () {
+    runConfirm.hidden = true;
+    formActions.hidden = false;
+  });
+
+  editBtn.addEventListener('click', editDescription);
+
+  /* та сама дія, що в списку: запис зникає назавжди, тому підтвердження до неї */
+  deleteRunBtn.addEventListener('click', function () {
+    if (!currentRun) { return; }
+    if (deleteRunBtn.dataset.armed !== 'yes') {
+      deleteRunBtn.dataset.armed = 'yes';
+      deleteRunBtn.textContent = 'Точно видалити?';
+      return;
+    }
+    runs = runs.filter(function (r) { return r.id !== currentRun.id; });
+    /* посилання на вилучений запис не мають лишатись: інакше банер
+       «Опис змінено» порівнював би форму з прогоном, якого вже немає */
+    if (editingRun && editingRun.id === currentRun.id) { editingRun = null; }
+    currentRun = null;
+    saveState();
+    updateEditNotice();
+    showRuns();
+  });
+
+  revertBtn.addEventListener('click', revertToRun);
+  rerunBtn.addEventListener('click', runAnalysis);
+
+  logoBtn.addEventListener('click', showForm);
+  runsBtn.addEventListener('click', showRuns);
+  toastLink.addEventListener('click', function () {
+    toast.hidden = true;
+    showRuns();
+  });
+  /* «Увійти» поки заглушка — кнопка є, дії за нею немає */
+
+  filePickBtn.addEventListener('click', function () { fileInput.click(); });
+
+  resetButtons.forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      if (btn.dataset.armed !== 'yes') {
+        disarmReset();
+        btn.dataset.armed = 'yes';
+        btn.textContent = 'Точно очистити?';
+        return;
+      }
+      var onResult = !resultScreen.hidden;
+      clearForm();
+      /* з форми екран не перемикаємо — ми вже на ній */
+      if (onResult) { showForm(); } else { disarmReset(); }
+    });
+  });
+
+  /* копіювання звіту: без мережі, лише буфер обміну браузера */
+  copyReportBtn.addEventListener('click', function () {
+    /* при відкритті через file:// navigator.clipboard може бути відсутнім —
+       без цієї перевірки виклик кидає помилку синхронно, повз обробник нижче */
+    if (!navigator.clipboard || !navigator.clipboard.writeText) { return; }
+    navigator.clipboard.writeText(buildReportText()).then(function () {
+      showToast('Звіт скопійовано', false);
+    }, function () {
+      /* браузер може відмовити в доступі до буфера — напис лишається без змін */
+    });
+  });
+
+  /* збереження — локальний Blob, без мережі й без бекенду */
+  saveReportBtn.addEventListener('click', function () {
+    var blob = new Blob([buildReportText()], { type: 'text/plain;charset=utf-8' });
+    var url = URL.createObjectURL(blob);
+    var link = document.createElement('a');
+    link.href = url;
+    link.download = reportFileName();
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+    showToast('Файл збережено', false);
+  });
+
+  addAudienceBtn.addEventListener('click', function () {
+    if (audienceList.querySelectorAll('.audience-row').length >= MAX_AUDIENCES) { return; }
+    addAudienceRow('', 'головна');
+    saveState();
+    updateSubmitState();
+    updateEditNotice();
+  });
+
+  addTaskBtn.addEventListener('click', function () {
+    addTaskRow('');
+    saveState();
+    updateSubmitState();
+    updateEditNotice();
+  });
+
+  fileInput.addEventListener('change', function () {
+    currentFileName = fileInput.files && fileInput.files[0] ? fileInput.files[0].name : '';
+    updateScreenshotHint();
+  });
+
+  /* кнопка очищення не зберігає сама: вона ставить порожнє значення й віддає
+     подію input тому самому делегованому обробнику, що й звичайний ввід */
+  form.addEventListener('click', function (event) {
+    var clearBtn = event.target.closest('.field-clear');
+    if (!clearBtn) { return; }
+    var input = clearBtn.closest('.field-wrap').querySelector('.field-input');
+    input.value = '';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    input.focus();
+  });
+
+  form.addEventListener('input', function (event) {
+    if (event.target.tagName === 'TEXTAREA') {
+      autoGrow(event.target);
+    }
+    refreshFieldUi();
+    saveState();
+    updateSubmitState();
+    updateEditNotice();
+  });
+
+  form.addEventListener('change', function () {
+    saveState();
+    updateSubmitState();
+    updateEditNotice();
+  });
+
+  /* поки блок «Додатково» закритий, textarea всередині не мають висоти —
+     перераховуємо при відкритті */
+  document.querySelector('.advanced').addEventListener('toggle', autoGrowAll);
+
+  loadState();
+  updateSubmitState();
+})();
+</script>
+
+</body>
+</html>
