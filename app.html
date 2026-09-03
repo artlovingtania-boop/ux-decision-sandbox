@@ -1079,15 +1079,18 @@ textarea.field-input {
 
     <div class="form-group">
       <label class="field-label" for="login-email">Email</label>
-      <div class="field">
+      <div class="field field-wrap">
         <input class="field-input" type="email" id="login-email" autocomplete="email" required>
       </div>
     </div>
 
     <div class="form-group">
       <label class="field-label" for="login-password">Пароль</label>
-      <div class="field">
+      <div class="field field-wrap">
         <input class="field-input" type="password" id="login-password" autocomplete="current-password" required>
+      </div>
+      <div class="form-actions">
+        <button type="button" id="login-reset" class="text-action">Забули пароль?</button>
       </div>
       <p class="field-caption">Вхід через Firebase Authentication — email і пароль зберігаються в Google, не в цьому застосунку.</p>
     </div>
@@ -1302,14 +1305,13 @@ textarea.field-input {
 <script src="https://www.gstatic.com/firebasejs/12.17.1/firebase-auth-compat.js"></script>
 
 <script>
-// ВСТАВ СВІЙ КОНФІГ З FIREBASE STUDIO
 const firebaseConfig = {
-  apiKey: '',
-  authDomain: '',
-  projectId: '',
-  storageBucket: '',
-  messagingSenderId: '',
-  appId: ''
+  apiKey: 'AIzaSyDhJnLNosTtMNShD3huN8mjLkpjTIBVBw8',
+  authDomain: 'ux-sandbox-8d605.firebaseapp.com',
+  projectId: 'ux-sandbox-8d605',
+  storageBucket: 'ux-sandbox-8d605.firebasestorage.app',
+  messagingSenderId: '99296912608',
+  appId: '1:99296912608:web:f3355af207b7a4513cdc85'
 };
 
 /* На відміну від ключа Gemini, який лишається на сервері, apiKey у firebaseConfig
@@ -1487,6 +1489,7 @@ firebase.initializeApp(firebaseConfig);
   var loginPassword = document.getElementById('login-password');
   var loginSubmitBtn = document.getElementById('login-submit-btn');
   var loginToggleBtn = document.getElementById('login-toggle-mode');
+  var loginResetBtn = document.getElementById('login-reset');
   var loginError = document.getElementById('login-error');
   var loginBtn = document.getElementById('login-btn');
   /* режим форми входу: 'signin' або 'signup' */
@@ -2257,6 +2260,7 @@ firebase.initializeApp(firebaseConfig);
       ? 'Вже є акаунт? Увійти'
       : 'Немає акаунта? Зареєструватись';
     loginPassword.setAttribute('autocomplete', signup ? 'new-password' : 'current-password');
+    loginResetBtn.hidden = signup;
   }
 
   function showLogin() {
@@ -2449,6 +2453,41 @@ firebase.initializeApp(firebaseConfig);
     clearLoginError();
   });
 
+  /* третя гілка поруч зі входом і реєстрацією: лист для скидання пароля.
+     Успіх іде в showToast — у .notice нейтрального стану немає, він завжди
+     жовтий, а новий модифікатор заборонений розділом «Плани» в CLAUDE.md */
+  loginResetBtn.addEventListener('click', function () {
+    clearLoginError();
+
+    var email = loginEmail.value.trim();
+    if (!email) {
+      showLoginError('Спочатку введи email');
+      return;
+    }
+
+    loginResetBtn.disabled = true;
+
+    var request;
+    try {
+      request = firebase.auth().sendPasswordResetEmail(email);
+    } catch (e) {
+      loginResetBtn.disabled = false;
+      showLoginError(LOGIN_ERRORS[e.code] || e.message);
+      return;
+    }
+
+    request
+      .then(function () {
+        showToast('Лист для скидання пароля надіслано на ' + email, false);
+      })
+      .catch(function (error) {
+        showLoginError(LOGIN_ERRORS[error.code] || error.message);
+      })
+      .finally(function () {
+        loginResetBtn.disabled = false;
+      });
+  });
+
   loginForm.addEventListener('submit', function (event) {
     event.preventDefault();
     clearLoginError();
@@ -2600,6 +2639,7 @@ firebase.initializeApp(firebaseConfig);
     showLoginError('Firebase не налаштований — вставте конфіг у firebaseConfig. Вхід недоступний.');
     loginSubmitBtn.disabled = true;
     loginToggleBtn.disabled = true;
+    loginResetBtn.disabled = true;
     loginBtn.disabled = true;
   }
 })();
