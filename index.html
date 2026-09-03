@@ -1,0 +1,1329 @@
+<!doctype html>
+<html lang="uk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>UX Sandbox</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400&family=DM+Sans:opsz,wght@9..40,400;9..40,700;9..40,900&display=swap" rel="stylesheet">
+<style>
+/* ---------- tokens ---------- */
+:root {
+  --surface-page: #faf9f5;
+  --surface-card: #f4f4f0;
+
+  --text-primary: #1a1714;
+  --text-secondary: #8a857e;
+  --text-on-dark: #f6f4f0;
+
+  --border-medium: #d9d9d9;
+  --border-default: #ddd9d2;
+  --border-card: #dfe1dc;
+
+  --accent-yellow: #fbdc42;
+  --accent-yellow-light: #ffe26a;
+  --accent-green: #52d68a;
+  --accent-green-soft: #a8e8c0;
+
+  --radius-md: 4px;
+  --radius-ml: 8px;
+  --radius-lg: 12px;
+  --radius-pill: 9999px;
+
+  --spacing-4: 4px;
+  --spacing-8: 8px;
+  --spacing-12: 12px;
+  --spacing-16: 16px;
+  --spacing-20: 20px;
+  --spacing-24: 24px;
+  --spacing-32: 32px;
+  --spacing-40: 40px;
+  --spacing-48: 48px;
+  --spacing-80: 80px;
+}
+
+/* ---------- reset ---------- */
+*, *::before, *::after { box-sizing: border-box; }
+
+body,
+h1, h2, h3, h4, h5, h6,
+p, ul, ol, figure {
+  margin: 0;
+  padding: 0;
+}
+
+ul, ol { list-style: none; }
+
+/* У стилях заголовків Figma стоїть Wrap style: Balance, але CSS-балансування
+   працює за іншим алгоритмом. Глобально воно ламає переноси Hero H1 і кроку 3,
+   тому вмикається поелементно — тільки де відтворює макет. Див. BUGS.md */
+
+img { display: block; max-width: 100%; }
+
+a { color: inherit; text-decoration: none; }
+
+body {
+  /* сторінка зафіксована під ширину макета, мобільної версії немає */
+  min-width: 1200px;
+  background: var(--surface-page);
+  color: var(--text-primary);
+  font-family: 'DM Sans', sans-serif;
+  font-weight: 400;
+  font-size: 16px;
+  line-height: 1.5;
+  font-variation-settings: 'opsz' 14;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ---------- layout ---------- */
+.container {
+  width: 100%;
+  max-width: 1200px;
+  margin-inline: auto;
+  padding-inline: var(--spacing-40);
+}
+
+/* ---------- header ---------- */
+.header {
+  width: 100%;
+  background: var(--surface-page);
+  border-bottom: 1px solid var(--border-medium);
+}
+
+.header__inner {
+  display: flex;
+  height: 58px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.header__left {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-16);
+}
+
+.logo {
+  font-weight: 900;
+  font-size: 18px;
+  line-height: 1.15;
+  letter-spacing: -0.936px;
+  color: var(--text-primary);
+}
+
+.nav {
+  display: flex;
+  gap: 2px;
+}
+
+.nav-link {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-8);
+  height: 32px;
+  padding: var(--spacing-4) var(--spacing-16) var(--spacing-4) var(--spacing-12);
+  font-weight: 400;
+  font-size: 16px;
+  line-height: 1.5;
+  color: var(--text-primary);
+  white-space: nowrap;
+}
+
+.header__right {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-20);
+}
+
+/* ---------- button ---------- */
+.button {
+  display: flex;
+  align-items: center;
+  border-radius: var(--radius-pill);
+  font-weight: 700;
+  font-size: 16px;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.button--dark {
+  gap: var(--spacing-8);
+  padding: var(--spacing-8) var(--spacing-24);
+  background: var(--text-primary);
+  color: var(--text-on-dark);
+}
+
+.button--primary {
+  gap: var(--spacing-4);
+  padding: var(--spacing-12) var(--spacing-24);
+  background: var(--accent-yellow);
+  color: var(--text-primary);
+}
+
+.button__icon {
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+}
+
+/* ---------- tag ---------- */
+.tag {
+  padding: 6px var(--spacing-16);
+  border-radius: var(--radius-pill);
+  font-family: 'DM Mono', monospace;
+  font-weight: 400;
+  font-size: 14px;
+  line-height: 1.2;
+  letter-spacing: 0.6px;
+  color: var(--text-primary);
+  white-space: nowrap;
+}
+
+.tag--green-soft {
+  background: var(--accent-green-soft);
+}
+
+.tag--muted {
+  background: var(--surface-card);
+  border: 1px solid var(--border-card);
+}
+
+/* ---------- hero ---------- */
+.hero {
+  width: 100%;
+  background: var(--surface-page);
+}
+
+.hero__inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--spacing-80);
+  padding-block: var(--spacing-80);
+}
+
+.hero__content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--spacing-24);
+  width: 760px;
+  max-width: 760px;
+}
+
+.hero__tags {
+  display: flex;
+  justify-content: center;
+  gap: var(--spacing-8);
+  width: 100%;
+}
+
+.hero__title {
+  width: 100%;
+  padding-top: var(--spacing-24);
+  font-weight: 700;
+  font-size: 62px;
+  line-height: 1.1;
+  letter-spacing: -1.364px;
+  text-align: center;
+  color: var(--text-primary);
+}
+
+.hero__lead {
+  width: 580px;
+  font-weight: 400;
+  font-size: 18px;
+  line-height: 1.4;
+  text-align: center;
+  color: var(--text-secondary);
+}
+
+.hero__media {
+  width: 100%;
+  height: 548px;
+  background: var(--surface-card);
+  border-radius: var(--radius-ml);
+  overflow: hidden;
+}
+
+.hero__media img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* ---------- problem ---------- */
+.problem {
+  width: 100%;
+  padding-block: var(--spacing-80);
+}
+
+.problem__row {
+  display: flex;
+  align-items: center;
+}
+
+.problem__text {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--spacing-40);
+  flex: 1;
+  min-width: 0;
+  padding: var(--spacing-48);
+}
+
+.problem__title {
+  width: 478px;
+  font-weight: 700;
+  font-size: 48px;
+  line-height: 1.1;
+  letter-spacing: -1.056px;
+  color: var(--text-primary);
+}
+
+.problem__body {
+  width: 420px;
+  font-weight: 400;
+  font-size: 18px;
+  line-height: 1.4;
+  color: var(--text-secondary);
+}
+
+.problem__media {
+  flex-shrink: 0;
+  width: 560px;
+  padding: var(--spacing-40) var(--spacing-80);
+}
+
+.problem__media img {
+  width: 400px;
+  height: 512px;
+}
+
+/* ---------- process ---------- */
+.process {
+  width: 100%;
+  padding-block: var(--spacing-80);
+}
+
+.process__inner {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-80);
+}
+
+.process__head {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  align-items: end;
+}
+
+.process__head-cell {
+  padding: var(--spacing-40) var(--spacing-48);
+}
+
+.process__title {
+  /* у файлі 462px + Wrap style: Balance, що дає 3 рядки (висота 159px).
+     CSS text-wrap: balance цього не відтворює — він не додає рядків,
+     тому ширину звужено до 427px. Див. BUGS.md */
+  width: 427px;
+  font-weight: 700;
+  font-size: 48px;
+  line-height: 1.1;
+  letter-spacing: -1.056px;
+  color: var(--text-primary);
+}
+
+.process__lead {
+  width: 463px;
+  font-weight: 400;
+  font-size: 18px;
+  line-height: 1.4;
+  color: var(--text-secondary);
+}
+
+.process__steps {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+}
+
+.step {
+  display: flex;
+  flex-direction: column;
+}
+
+.step__header {
+  display: flex;
+  align-items: flex-start;
+}
+
+.step__icon {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  padding: var(--spacing-8);
+  background: var(--text-primary);
+}
+
+.step__icon img {
+  width: 32px;
+  height: 32px;
+}
+
+.step__badge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  height: 48px;
+  padding: var(--spacing-12) var(--spacing-16);
+  overflow: hidden;
+  background: var(--surface-page);
+  border-top: 1px solid var(--border-default);
+  border-right: 1px solid var(--border-default);
+  font-family: 'DM Mono', monospace;
+  font-weight: 400;
+  font-size: 14px;
+  line-height: 1.2;
+  letter-spacing: 0.6px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.step__body {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--spacing-16);
+  flex: 1;
+  min-height: 0;
+  padding: var(--spacing-40);
+  background: var(--surface-page);
+  border: 1px solid var(--border-default);
+}
+
+/* картки стоять впритул і ділять межу — інакше на стиках виходить 2px */
+.step:not(:last-child) .step__body {
+  border-right: 0;
+}
+
+.step__title {
+  width: 100%;
+  font-weight: 700;
+  font-size: 20px;
+  line-height: 1.15;
+  letter-spacing: -0.44px;
+  color: var(--text-primary);
+}
+
+.step__text {
+  width: 100%;
+  font-weight: 400;
+  font-size: 16px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+/* ---------- three variants ---------- */
+.variants {
+  width: 100%;
+  padding-block: var(--spacing-80);
+}
+
+.variants__grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  align-items: start;
+}
+
+.variants__head {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  /* 52px колонки + 8px обгортки заголовка з макета */
+  padding: 60px;
+  border-top: 1px solid var(--border-medium);
+  border-bottom: 1px solid var(--border-medium);
+  border-left: 1px solid var(--border-medium);
+}
+
+.variants__title {
+  /* єдиний заголовок, де CSS-балансування збігається з Figma:
+     дає «Три варіанти, / а не одна / відповідь» */
+  text-wrap: balance;
+  width: 391px;
+  font-weight: 700;
+  font-size: 48px;
+  line-height: 1.1;
+  letter-spacing: -1.056px;
+  color: var(--text-primary);
+}
+
+.variants__cards {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  /* сирий hex із файлу, не --border-medium */
+  border: 1px solid #d4d2ca;
+}
+
+.feature {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--spacing-16);
+  width: 558px;
+  padding: var(--spacing-40);
+  border-bottom: 1px solid var(--border-default);
+}
+
+.feature--1 { height: 193px; }
+.feature--2 { height: 217px; }
+.feature--3 { height: 241px; }
+
+.feature__header {
+  display: flex;
+  align-items: flex-end;
+  flex-shrink: 0;
+}
+
+.feature__icon {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  padding: var(--spacing-8);
+  background: var(--text-primary);
+}
+
+.feature__icon img {
+  width: 32px;
+  height: 32px;
+}
+
+.feature__label {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  /* декоративне маркерне підкреслення — обгортає текст, а не фіксовані 242px */
+  width: fit-content;
+  height: 41px;
+  padding-inline: var(--spacing-12);
+  font-weight: 700;
+  font-size: 36px;
+  line-height: 1.15;
+  letter-spacing: -0.792px;
+  color: var(--text-primary);
+  white-space: nowrap;
+}
+
+.feature__label--yellow { background: var(--accent-yellow-light); }
+.feature__label--green { background: var(--accent-green); }
+
+.feature__text {
+  width: 100%;
+  font-weight: 400;
+  font-size: 16px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+/* ---------- comparison ---------- */
+.comparison {
+  width: 100%;
+  padding-block: var(--spacing-80);
+}
+
+/* ця секція має 48px відступу, а не 40px як решта */
+.comparison__inner {
+  padding-inline: var(--spacing-48);
+}
+
+.comparison__head {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+}
+
+.comparison__head-title {
+  align-self: end;
+  padding: var(--spacing-40);
+}
+
+.comparison__head-lead {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-self: stretch;
+  padding: var(--spacing-40);
+}
+
+.comparison__title {
+  width: 462px;
+  font-weight: 700;
+  font-size: 36px;
+  line-height: 1.15;
+  letter-spacing: -0.792px;
+  color: var(--text-primary);
+}
+
+.comparison__lead {
+  width: 463px;
+  font-weight: 400;
+  font-size: 18px;
+  line-height: 1.4;
+  color: var(--text-secondary);
+}
+
+.comparison__boxes {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+}
+
+.cbox {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  flex: 1;
+  min-width: 0;
+  /* 112 шапки + 3 ряди по 176 + 2px межі; було 654 при тексті 18px */
+  height: 642px;
+  background: var(--surface-page);
+  border-radius: var(--radius-md);
+}
+
+.cbox__header {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-8);
+  width: 100%;
+  padding: var(--spacing-32);
+}
+
+.cbox__header img {
+  width: 48px;
+  height: 48px;
+  flex-shrink: 0;
+}
+
+.cbox__title {
+  padding-inline: var(--spacing-8);
+  font-weight: 700;
+  font-size: 30px;
+  line-height: 1.15;
+  letter-spacing: -0.66px;
+  color: var(--text-primary);
+  white-space: nowrap;
+}
+
+.cbox__body {
+  width: 100%;
+  border: 1px solid var(--border-card);
+}
+
+/* Права коробка накладається на ліву на 1px: середня лінія лишається
+   одинарною, але обидві коробки мають усі чотири межі й однакову
+   геометрію — ряди по 550, текст по 470, відступи 40 від межі з усіх боків.
+   У файлі права коробка просто без лівої межі, через що її ряди були 551,
+   а текст стояв на 1px ближче до середини. */
+.cbox__body--shared-edge {
+  width: calc(100% + 1px);
+  margin-left: -1px;
+}
+
+.cbox__row {
+  /* 40 + 4 рядки по 24 + 40; у макеті було 180 під рядки по 25.2 */
+  height: 176px;
+  padding: var(--spacing-40);
+  border-bottom: 1px solid var(--border-card);
+}
+
+.cbox__row:last-child {
+  border-bottom: 0;
+}
+
+/* ---------- footer ---------- */
+.footer {
+  width: 100%;
+  background: var(--surface-card);
+  border: 1px solid var(--border-medium);
+}
+
+.footer__inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-block: var(--spacing-20);
+}
+
+.footer__copy,
+.footer__links a {
+  display: block;
+  font-family: 'DM Mono', monospace;
+  font-weight: 400;
+  font-size: 14px;
+  line-height: 1.2;
+  letter-spacing: 0.6px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.footer__links {
+  display: flex;
+  gap: var(--spacing-24);
+}
+
+/* ---------- final access ---------- */
+.final {
+  width: 100%;
+  padding-block: var(--spacing-80);
+  background: var(--surface-card);
+}
+
+.final__grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  border-bottom: 1px solid var(--border-medium);
+}
+
+.final__brand {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: var(--spacing-40);
+  /* у файлі саме цей відтінок, не --border-medium як праворуч */
+  border-top: 1px solid var(--border-default);
+  border-bottom: 1px solid var(--border-default);
+  border-left: 1px solid var(--border-default);
+}
+
+.final__logo {
+  font-weight: 900;
+  font-size: 54px;
+  line-height: 1.1;
+  letter-spacing: -1.188px;
+  color: var(--text-primary);
+  white-space: nowrap;
+}
+
+.final__icons {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  width: 100%;
+}
+
+.final__icons-group {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-4);
+}
+
+.final__icons-group img {
+  /* у файлі висоти гуляють 62–65 через неквадратні viewBox; вирівняно в 64 */
+  width: 64px;
+  height: 64px;
+  flex-shrink: 0;
+}
+
+.final__access {
+  border: 1px solid var(--border-medium);
+}
+
+.final__access-head {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--spacing-24);
+  padding: var(--spacing-40);
+  background: var(--border-default);
+}
+
+.final__access-text {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-8);
+  width: 100%;
+}
+
+.final__access-title {
+  font-weight: 700;
+  font-size: 30px;
+  line-height: 1.15;
+  letter-spacing: -0.66px;
+  color: var(--text-primary);
+  white-space: nowrap;
+}
+
+.final__access-note {
+  font-weight: 400;
+  font-size: 16px;
+  line-height: 1.5;
+  color: var(--text-primary);
+  opacity: 0.7;
+  white-space: nowrap;
+}
+
+.final__links {
+  display: grid;
+  /* у файлі колонки жорстко по 280px, разом 560 при контейнері 558 */
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 173.5px 146.5px;
+}
+
+.final__cell {
+  padding: var(--spacing-32) var(--spacing-40);
+}
+
+.final__cell--br {
+  border-right: 1px solid var(--border-medium);
+}
+
+.final__cell--bb {
+  border-bottom: 1px solid var(--border-medium);
+}
+
+.final__cell h3 {
+  font-weight: 700;
+  font-size: 16px;
+  line-height: 1.2;
+  color: var(--text-primary);
+}
+
+.final__cell ul {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-8);
+  padding-top: var(--spacing-16);
+}
+
+.final__cell a {
+  /* блок, щоб line-height нижче задавав висоту рядка, а не спадкові 1.5 з body */
+  display: block;
+  font-family: 'DM Mono', monospace;
+  font-weight: 400;
+  font-size: 14px;
+  line-height: 1.2;
+  letter-spacing: 0.6px;
+  color: var(--text-secondary);
+}
+
+/* ---------- faq ---------- */
+.faq {
+  width: 100%;
+  padding-block: var(--spacing-80);
+}
+
+.faq__grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  align-items: start;
+}
+
+.faq__head {
+  padding: var(--spacing-40);
+  border-top: 1px solid var(--border-medium);
+  border-bottom: 1px solid var(--border-medium);
+  border-left: 1px solid var(--border-medium);
+}
+
+.faq__title {
+  width: 359px;
+  font-weight: 700;
+  font-size: 48px;
+  line-height: 1.1;
+  letter-spacing: -1.056px;
+  color: var(--text-primary);
+}
+
+.faq__list {
+  border: 1px solid var(--border-medium);
+}
+
+.faq__item {
+  border-bottom: 1px solid var(--border-default);
+}
+
+.faq__item:last-child {
+  border-bottom: 0;
+}
+
+.faq__q {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--spacing-24) var(--spacing-40);
+  cursor: pointer;
+  list-style: none;
+}
+
+/* прибрати нативний трикутник */
+.faq__q::-webkit-details-marker {
+  display: none;
+}
+
+.faq__item[open] .faq__q {
+  background: var(--surface-card);
+}
+
+.faq__q h3 {
+  flex: 1;
+  min-width: 0;
+  font-weight: 700;
+  font-size: 20px;
+  line-height: 1.15;
+  letter-spacing: -0.44px;
+  color: var(--text-primary);
+}
+
+.faq__icon {
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+}
+
+.faq__icon--minus,
+.faq__item[open] .faq__icon--plus {
+  display: none;
+}
+
+.faq__item[open] .faq__icon--minus {
+  display: block;
+}
+
+.faq__a {
+  display: flex;
+  flex-direction: column;
+  /* у макеті багатоабзацних відповідей немає; 16px — той самий gap,
+     що між блоками тексту 16px кегля в картках кроків і фіче-картках */
+  gap: var(--spacing-16);
+  padding: var(--spacing-24) var(--spacing-40) var(--spacing-40);
+  background: var(--surface-page);
+}
+
+.faq__a p {
+  font-weight: 400;
+  font-size: 16px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+/* ---------- cta banner ---------- */
+.cta {
+  width: 100%;
+  padding-block: var(--spacing-80);
+}
+
+.cta__banner {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-48);
+  width: 100%;
+  padding: 64px;
+  background: var(--accent-yellow-light);
+  border: 1px solid var(--border-medium);
+}
+
+.cta__title {
+  flex-shrink: 0;
+  width: 540px;
+  max-width: 540px;
+  font-weight: 700;
+  font-size: 36px;
+  line-height: 1.15;
+  letter-spacing: -0.792px;
+  color: var(--text-primary);
+}
+
+/* на банері кнопка займає весь залишок ряду, стрілка йде до правого краю */
+.button--stretch {
+  flex: 1;
+  min-width: 0;
+  justify-content: space-between;
+}
+
+.cbox__row p {
+  font-weight: 400;
+  font-size: 16px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+</style>
+</head>
+<body>
+
+<header class="header">
+  <div class="container header__inner">
+    <div class="header__left">
+      <a class="logo" href="#">UX Sandbox</a>
+      <nav class="nav">
+        <a class="nav-link" href="#">Як працює</a>
+        <a class="nav-link" href="#">Три варіанти</a>
+        <a class="nav-link" href="#">FAQ</a>
+      </nav>
+    </div>
+    <div class="header__right">
+      <a class="nav-link" href="#">Увійти</a>
+      <a class="button button--dark" href="#">
+        Отримати доступ
+        <img class="button__icon" src="assets/arrow-icon-light-text.svg" alt="" width="24" height="24">
+      </a>
+    </div>
+  </div>
+</header>
+
+<section class="hero">
+  <div class="container hero__inner">
+    <div class="hero__content">
+      <div class="hero__tags">
+        <span class="tag tag--green-soft">BETA ACCESS</span>
+        <span class="tag tag--muted">UX RESEARCH TOOL</span>
+      </div>
+      <h1 class="hero__title">Обґрунтуй структуру сторінки на підставах, а не на смаку </h1>
+      <p class="hero__lead">Опиши продукт — отримай три варіанти структури з розбором і аргументами для розмови зі стейкхолдерами.</p>
+      <a class="button button--primary" href="#">
+        Отримати доступ
+        <img class="button__icon" src="assets/arrow-icon-dark-text.svg" alt="" width="24" height="24">
+      </a>
+    </div>
+    <div class="hero__media">
+      <img src="assets/hero-illust.png" alt="" width="1120" height="548">
+    </div>
+  </div>
+</section>
+
+<section class="problem">
+  <div class="container problem__row">
+    <div class="problem__text">
+      <h2 class="problem__title">Структуру сторінки складно захищати</h2>
+      <p class="problem__body">Ви переставили блоки, і стало краще. Питання «чому саме так» лишається без відповіді, яку можна показати іншим. Референси не аргумент: у них інша аудиторія й інша задача.</p>
+    </div>
+    <div class="problem__media">
+      <img src="assets/chat-illustr.png" alt="" width="400" height="512">
+    </div>
+  </div>
+  <div class="container problem__row">
+    <div class="problem__media">
+      <img src="assets/options-img.png" alt="" width="400" height="512">
+    </div>
+    <div class="problem__text">
+      <p class="problem__body">Sandbox будує три варіанти на одному наборі блоків і показує, чим вони відрізняються — скільки підстав людина отримує до точки дії, як довго йде до своєї задачі, де блок перевантажений. Кожен показник із поясненням, звідки він узявся.</p>
+    </div>
+  </div>
+</section>
+
+<section class="process">
+  <div class="container process__inner">
+    <div class="process__head">
+      <div class="process__head-cell">
+        <h2 class="process__title">Від опису продукту до трьох структур</h2>
+      </div>
+      <div class="process__head-cell">
+        <p class="process__lead">Мовчазного виведення немає: усе, що система додумала, показується окремо, перш ніж піти в роботу.</p>
+      </div>
+    </div>
+    <div class="process__steps">
+      <article class="step">
+        <div class="step__header">
+          <div class="step__icon"><img src="assets/icon-number-1.svg" alt="" width="32" height="32"></div>
+          <div class="step__badge">ПЕРЕВІРКА</div>
+        </div>
+        <div class="step__body">
+          <h3 class="step__title">Опишіть продукт</h3>
+          <p class="step__text">Категорія, аудиторія, ціль і головне — чим підкріплюється діяльність. Перше, що перевіряє система — чи тип сторінки взагалі підходить.</p>
+        </div>
+      </article>
+      <article class="step">
+        <div class="step__header">
+          <div class="step__icon"><img src="assets/icon-number-2.svg" alt="" width="32" height="32"></div>
+          <div class="step__badge">ПІДТВЕРДЖЕННЯ</div>
+        </div>
+        <div class="step__body">
+          <h3 class="step__title">Підтвердьте виведене</h3>
+          <p class="step__text">Система покаже задачі, блоки й зв'язок між ними. Якщо чогось бракує — підкаже, чого саме, і почекає виправлення перед генерацією.</p>
+        </div>
+      </article>
+      <article class="step">
+        <div class="step__header">
+          <div class="step__icon"><img src="assets/icon-number-3.svg" alt="" width="32" height="32"></div>
+          <div class="step__badge">ГЕНЕРАЦІЯ</div>
+        </div>
+        <div class="step__body">
+          <h3 class="step__title">Отримайте три варіанти</h3>
+          <p class="step__text">Однаковий набір блоків, однакові тези. Різниця тільки в організації — за типом контенту, за задачею або за етапом знайомства.</p>
+        </div>
+      </article>
+      <article class="step">
+        <div class="step__header">
+          <div class="step__icon"><img src="assets/icon-number-4.svg" alt="" width="32" height="32"></div>
+          <div class="step__badge">РЕЗУЛЬТАТ</div>
+        </div>
+        <div class="step__body">
+          <h3 class="step__title">Читайте аудит</h3>
+          <p class="step__text">Код рахує показники, персона оцінює з боку читача. Без загального балу, з джерелом для кожного твердження.</p>
+        </div>
+      </article>
+    </div>
+  </div>
+</section>
+
+<section class="variants">
+  <div class="container">
+    <div class="variants__grid">
+      <div class="variants__head">
+        <h2 class="variants__title">Три варіанти, а не одна відповідь</h2>
+      </div>
+      <div class="variants__cards">
+        <article class="feature feature--1">
+          <div class="feature__header">
+            <div class="feature__icon"><img src="assets/icon-shapes.svg" alt="" width="32" height="32"></div>
+            <div class="feature__label feature__label--yellow">подвійний аудит</div>
+          </div>
+          <p class="feature__text">Виявляє дефекти структури: заглиблену точку дії, перевантажені блоки, задачі без місця в макеті.</p>
+        </article>
+        <article class="feature feature--2">
+          <div class="feature__header">
+            <div class="feature__icon"><img src="assets/icon-checkmark.svg" alt="" width="32" height="32"></div>
+            <div class="feature__label feature__label--green">доказовість</div>
+          </div>
+          <p class="feature__text">Показує джерело кожного показника. Наприклад: «7 елементів у блоці — задане вами» або «крок до задачі — пораховано без порога, лише для порівняння варіантів».</p>
+        </article>
+        <article class="feature feature--3">
+          <div class="feature__header">
+            <div class="feature__icon"><img src="assets/icon-arguments.svg" alt="" width="32" height="32"></div>
+            <div class="feature__label feature__label--yellow">аргументи</div>
+          </div>
+          <p class="feature__text">Не каже, який варіант кращий взагалі — бо «краще» залежить від контексту, якого немає в структурному описі. Вибір, гібрид або новий запуск — за вами. Система нічого не відсіює сама.</p>
+        </article>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="comparison">
+  <div class="container comparison__inner">
+    <div class="comparison__head">
+      <div class="comparison__head-title">
+        <h2 class="comparison__title">Дві перевірки одного аспекту</h2>
+      </div>
+      <div class="comparison__head-lead">
+        <p class="comparison__lead">Якщо код і персона розходяться — це не помилка системи, а найцінніший сигнал.</p>
+      </div>
+    </div>
+    <div class="comparison__boxes">
+      <div class="cbox">
+        <div class="cbox__header">
+          <img src="assets/icon-filter.svg" alt="" width="48" height="48">
+          <div class="cbox__title">перевірка кодом</div>
+        </div>
+        <div class="cbox__body">
+          <div class="cbox__row">
+            <p>Машинна частина рахується кодом, не мовною моделлю. Результат не залежить від стану моделі й порядку варіантів.</p>
+          </div>
+          <div class="cbox__row">
+            <p>Три закони з порогами: Міллер — однорідних елементів у блоці, серійна позиція — де стоїть блок пріоритетної задачі, Джейкоб — відхилення від конвенційного порядку.</p>
+          </div>
+          <div class="cbox__row">
+            <p>Порівняльні показники без порогів: кроки до задачі, доказова база до дії, розкид між задачами й між аудиторіями.</p>
+          </div>
+        </div>
+      </div>
+      <div class="cbox">
+        <div class="cbox__header">
+          <img src="assets/icon-persone.svg" alt="" width="48" height="48">
+          <div class="cbox__title">перевірка ШІ персоною</div>
+        </div>
+        <div class="cbox__body cbox__body--shared-edge">
+          <div class="cbox__row">
+            <p>Ші персона оцінює те саме з боку читача: чи зрозуміло, куди потрапив, на якій секції з'являється підстава довіряти. </p>
+          </div>
+          <div class="cbox__row">
+            <p>Порогів для них у літературі немає — ніхто не встановлював, на якій секції має стояти точка дії. Вони показують різницю між варіантами без оцінки «добре / погано». Це заявлена межа, не недоробка.</p>
+          </div>
+          <div class="cbox__row">
+            <p>Розходження між кодом і персоною — найінформативніше. Три різнотипні розгорнуті блоки поспіль не порушують жодного порога, і персона все одно фіксує навантаження.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="cta">
+  <div class="container">
+    <div class="cta__banner">
+      <h2 class="cta__title">Твоя структура отримає аргументи,<br>не здогадки</h2>
+      <a class="button button--dark button--stretch" href="#">
+        Отримати доступ
+        <img class="button__icon" src="assets/arrow-icon-light-text.svg" alt="" width="24" height="24">
+      </a>
+    </div>
+  </div>
+</section>
+
+<section class="faq">
+  <div class="container">
+    <div class="faq__grid">
+      <div class="faq__head">
+        <h2 class="faq__title">Часті запитання</h2>
+      </div>
+      <div class="faq__list">
+        <details class="faq__item" open>
+          <summary class="faq__q">
+            <h3>Чи можна довіряти результату?</h3>
+            <img class="faq__icon faq__icon--plus" src="assets/icon-plus.svg" alt="" width="24" height="24">
+            <img class="faq__icon faq__icon--minus" src="assets/icon-minus.svg" alt="" width="24" height="24">
+          </summary>
+          <div class="faq__a">
+            <p>Частково — і система показує, якій саме частині. Кожне твердження має джерело: задане вами, виведене системою, пораховане з порогом або без.</p>
+          </div>
+        </details>
+        <details class="faq__item">
+          <summary class="faq__q">
+            <h3>Що інструмент не робить?</h3>
+            <img class="faq__icon faq__icon--plus" src="assets/icon-plus.svg" alt="" width="24" height="24">
+            <img class="faq__icon faq__icon--minus" src="assets/icon-minus.svg" alt="" width="24" height="24">
+          </summary>
+          <div class="faq__a">
+            <p>Не працює на застосунках, дашбордах, багатокрокових флоу, e-commerce з каталогом. Осі описують довгу сторінку з лінійним переглядом.</p>
+            <p>На коротких структурах — менше 6 блоків або менше 2 задач — не генерує три варіанти. Замість цього попереджає на вході й пропонує аудит: наявна структура плюс одна альтернатива для порівняння.</p>
+            <p>Не оцінює візуал, текст і бренд. Готовий код не потрібен — аудит виконується на структурному описі.</p>
+            <p>Персона калібрована під конкретний клас читача. Для іншого класу потрібен новий цикл калібрування — це умова використання, не рекомендація.</p>
+          </div>
+        </details>
+        <details class="faq__item">
+          <summary class="faq__q">
+            <h3>Як перевірено UX-Sandbox?</h3>
+            <img class="faq__icon faq__icon--plus" src="assets/icon-plus.svg" alt="" width="24" height="24">
+            <img class="faq__icon faq__icon--minus" src="assets/icon-minus.svg" alt="" width="24" height="24">
+          </summary>
+          <div class="faq__a">
+            <p>На свідомо зламаному варіанті 3 критичні зауваження з 4, на робочих — нуль.</p>
+            <p>Другий прогін із переставленим порядком у новій сесії дав ті самі висновки.</p>
+            <p>Персона реагує на структуру, а не на позицію.</p>
+          </div>
+        </details>
+        <details class="faq__item">
+          <summary class="faq__q">
+            <h3>А якщо на моїй сторінці це не спрацює?</h3>
+            <img class="faq__icon faq__icon--plus" src="assets/icon-plus.svg" alt="" width="24" height="24">
+            <img class="faq__icon faq__icon--minus" src="assets/icon-minus.svg" alt="" width="24" height="24">
+          </summary>
+          <div class="faq__a">
+            <p>Система скаже про це на вході. Застосунки й багатокрокові флоу — поза межами. Короткі структури не дадуть трьох варіантів, але дадуть аудит із однією альтернативою для порівняння.</p>
+          </div>
+        </details>
+        <details class="faq__item">
+          <summary class="faq__q">
+            <h3>З чого почати?</h3>
+            <img class="faq__icon faq__icon--plus" src="assets/icon-plus.svg" alt="" width="24" height="24">
+            <img class="faq__icon faq__icon--minus" src="assets/icon-minus.svg" alt="" width="24" height="24">
+          </summary>
+          <div class="faq__a">
+            <p>З опису продукту й переліку того, чим підкріплюється діяльність. Макет не потрібен.</p>
+          </div>
+        </details>
+        <details class="faq__item">
+          <summary class="faq__q">
+            <h3>А якщо це просто генератор зауважень?</h3>
+            <img class="faq__icon faq__icon--plus" src="assets/icon-plus.svg" alt="" width="24" height="24">
+            <img class="faq__icon faq__icon--minus" src="assets/icon-minus.svg" alt="" width="24" height="24">
+          </summary>
+          <div class="faq__a">
+            <p>Калібрування: на свідомо зламаному варіанті — 3 критичні зауваження з 4, на робочих — нуль. Другий прогін із переставленим порядком у новій сесії дав ті самі висновки. Персона реагує на структуру, а не на позицію.</p>
+          </div>
+        </details>
+        <details class="faq__item">
+          <summary class="faq__q">
+            <h3>Що таке новий цикл калібрування?</h3>
+            <img class="faq__icon faq__icon--plus" src="assets/icon-plus.svg" alt="" width="24" height="24">
+            <img class="faq__icon faq__icon--minus" src="assets/icon-minus.svg" alt="" width="24" height="24">
+          </summary>
+          <div class="faq__a">
+            <p>Один прогін на свідомо зламаному варіанті й один на робочому, з перевіркою незалежності від порядку. Одноразова дія перед першим використанням для нової аудиторії.</p>
+          </div>
+        </details>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="final">
+  <div class="container">
+    <div class="final__grid">
+      <div class="final__brand">
+        <p class="final__logo">UX Sandbox</p>
+        <div class="final__icons">
+          <div class="final__icons-group">
+            <img src="assets/icon-compare.svg" alt="" width="64" height="64">
+            <img src="assets/footer-icon-1.svg" alt="" width="64" height="64">
+            <img src="assets/icon-corner-radius.svg" alt="" width="64" height="64">
+          </div>
+          <div class="final__icons-group">
+            <img src="assets/icon-capsule.svg" alt="" width="64" height="64">
+            <img src="assets/footer-icon-2.svg" alt="" width="64" height="64">
+            <img src="assets/icon-rhombus.svg" alt="" width="64" height="64">
+            <img src="assets/footer-icon-3.svg" alt="" width="64" height="64">
+          </div>
+        </div>
+      </div>
+      <div class="final__access">
+        <div class="final__access-head">
+          <div class="final__access-text">
+            <h2 class="final__access-title">Спробувати на своїй сторінці</h2>
+            <p class="final__access-note">Надсилаємо доступ одразу після реєстрації.</p>
+          </div>
+          <a class="button button--dark" href="#">
+            Отримати доступ
+            <img class="button__icon" src="assets/arrow-icon-light-text.svg" alt="" width="24" height="24">
+          </a>
+        </div>
+        <div class="final__links">
+          <div class="final__cell final__cell--br final__cell--bb">
+            <h3>Інструмент</h3>
+            <ul>
+              <li><a href="#">Як працює</a></li>
+              <li><a href="#">Три варіанти</a></li>
+              <li><a href="#">FAQ</a></li>
+            </ul>
+          </div>
+          <div class="final__cell final__cell--bb">
+            <h3>Доступ</h3>
+            <ul>
+              <li><a href="#">Отримати доступ</a></li>
+              <li><a href="#">Увійти</a></li>
+            </ul>
+          </div>
+          <div class="final__cell final__cell--br">
+            <h3>Документи</h3>
+            <ul>
+              <li><a href="#">Privacy Policy</a></li>
+              <li><a href="#">Terms of Service</a></li>
+            </ul>
+          </div>
+          <div class="final__cell">
+            <h3>Зв'язок</h3>
+            <ul>
+              <li><a href="#">hello@sandbox.so</a></li>
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer class="footer">
+  <div class="container footer__inner">
+    <p class="footer__copy">© 2026 Sandbox</p>
+    <div class="footer__links">
+      <a href="#">Privacy Policy</a>
+      <a href="#">Terms of Service</a>
+    </div>
+  </div>
+</footer>
+
+</body>
+</html>
