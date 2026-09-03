@@ -1069,7 +1069,41 @@ textarea.field-input {
   </div>
 </header>
 
-<div id="form-screen">
+<div id="login-screen" hidden>
+<div class="container">
+  <header class="app-head">
+    <h1 class="app-head__title">Вхід</h1>
+  </header>
+
+  <form id="login-form" class="app-form" novalidate>
+
+    <div class="form-group">
+      <label class="field-label" for="login-email">Email</label>
+      <div class="field">
+        <input class="field-input" type="email" id="login-email" autocomplete="email" required>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label class="field-label" for="login-password">Пароль</label>
+      <div class="field">
+        <input class="field-input" type="password" id="login-password" autocomplete="current-password" required>
+      </div>
+      <p class="field-caption">Вхід через Firebase Authentication — email і пароль зберігаються в Google, не в цьому застосунку.</p>
+    </div>
+
+    <p class="notice notice--row" id="login-error" hidden></p>
+
+    <div class="form-actions">
+      <button type="submit" id="login-submit-btn" class="button button--primary">Увійти</button>
+      <button type="button" id="login-toggle-mode" class="text-action">Немає акаунта? Зареєструватись</button>
+    </div>
+
+  </form>
+</div>
+</div>
+
+<div id="form-screen" hidden>
 <div class="container">
   <header class="app-head">
     <h1 class="app-head__title">Опис сторінки</h1>
@@ -1262,6 +1296,28 @@ textarea.field-input {
   </span>
 </div>
 
+<!-- Firebase SDK, compat-версія: дає глобальний firebase.* без збірки й модулів,
+     що відповідає стеку проєкту — жодного npm і жодного бандлера -->
+<script src="https://www.gstatic.com/firebasejs/12.17.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/12.17.1/firebase-auth-compat.js"></script>
+
+<script>
+// ВСТАВ СВІЙ КОНФІГ З FIREBASE STUDIO
+const firebaseConfig = {
+  apiKey: '',
+  authDomain: '',
+  projectId: '',
+  storageBucket: '',
+  messagingSenderId: '',
+  appId: ''
+};
+
+/* На відміну від ключа Gemini, який лишається на сервері, apiKey у firebaseConfig
+   публічний за задумом Firebase: захист тримається на Security Rules і списку
+   дозволених доменів, а не на прихованні ключа. */
+firebase.initializeApp(firebaseConfig);
+</script>
+
 <script>
 (function () {
   var STORAGE_KEY = 'ux-sandbox-app-state';
@@ -1424,6 +1480,18 @@ textarea.field-input {
   var logoBtn = document.getElementById('logo-btn');
   var filePickBtn = document.getElementById('file-pick-btn');
   var fileNameLabel = document.getElementById('file-name');
+
+  var loginScreen = document.getElementById('login-screen');
+  var loginForm = document.getElementById('login-form');
+  var loginEmail = document.getElementById('login-email');
+  var loginPassword = document.getElementById('login-password');
+  var loginSubmitBtn = document.getElementById('login-submit-btn');
+  var loginToggleBtn = document.getElementById('login-toggle-mode');
+  var loginError = document.getElementById('login-error');
+  var loginBtn = document.getElementById('login-btn');
+  /* режим форми входу: 'signin' або 'signup' */
+  var loginMode = 'signin';
+  var isLoggedIn = false;
 
   var editNotice = document.getElementById('edit-notice');
   var revertBtn = document.getElementById('revert-btn');
@@ -2035,6 +2103,7 @@ textarea.field-input {
     renderDivergence();
     formScreen.hidden = true;
     runsScreen.hidden = true;
+    loginScreen.hidden = true;
     resultScreen.hidden = false;
     window.scrollTo(0, 0);
   }
@@ -2150,6 +2219,7 @@ textarea.field-input {
   function showRuns() {
     formScreen.hidden = true;
     resultScreen.hidden = true;
+    loginScreen.hidden = true;
     runsScreen.hidden = false;
     disarmReset();
     disarmEdit();
@@ -2157,9 +2227,53 @@ textarea.field-input {
     window.scrollTo(0, 0);
   }
 
+  /* ---------- вхід ---------- */
+
+  /* короткі українські формулювання для типових кодів Firebase;
+     усе інше показуємо сирим текстом, щоб нічого не губилось мовчки */
+  var LOGIN_ERRORS = {
+    'auth/invalid-credential': 'Невірний email або пароль',
+    'auth/wrong-password': 'Невірний email або пароль',
+    'auth/user-not-found': 'Акаунта з таким email не існує',
+    'auth/email-already-in-use': 'Акаунт із таким email вже існує',
+    'auth/weak-password': 'Пароль надто короткий — мінімум 6 символів',
+    'auth/invalid-email': 'Перевірте формат email'
+  };
+
+  function showLoginError(text) {
+    loginError.textContent = text;
+    loginError.hidden = false;
+  }
+
+  function clearLoginError() {
+    loginError.textContent = '';
+    loginError.hidden = true;
+  }
+
+  function updateLoginModeUi() {
+    var signup = loginMode === 'signup';
+    loginSubmitBtn.textContent = signup ? 'Зареєструватись' : 'Увійти';
+    loginToggleBtn.textContent = signup
+      ? 'Вже є акаунт? Увійти'
+      : 'Немає акаунта? Зареєструватись';
+    loginPassword.setAttribute('autocomplete', signup ? 'new-password' : 'current-password');
+  }
+
+  function showLogin() {
+    formScreen.hidden = true;
+    resultScreen.hidden = true;
+    runsScreen.hidden = true;
+    loginScreen.hidden = false;
+    /* пароль не лишаємо в полі між показами екрана */
+    loginPassword.value = '';
+    clearLoginError();
+    window.scrollTo(0, 0);
+  }
+
   function showForm() {
     resultScreen.hidden = true;
     runsScreen.hidden = true;
+    loginScreen.hidden = true;
     formScreen.hidden = false;
     window.scrollTo(0, 0);
     /* показаний результат скидається: наступний — тільки після «Запустити аналіз» */
@@ -2320,7 +2434,51 @@ textarea.field-input {
     toast.hidden = true;
     showRuns();
   });
-  /* «Увійти» поки заглушка — кнопка є, дії за нею немає */
+  /* у топбарі одна кнопка на два стани: текст їй ставить onAuthStateChanged */
+  loginBtn.addEventListener('click', function () {
+    if (isLoggedIn) {
+      firebase.auth().signOut();
+      return;
+    }
+    showLogin();
+  });
+
+  loginToggleBtn.addEventListener('click', function () {
+    loginMode = loginMode === 'signup' ? 'signin' : 'signup';
+    updateLoginModeUi();
+    clearLoginError();
+  });
+
+  loginForm.addEventListener('submit', function (event) {
+    event.preventDefault();
+    clearLoginError();
+
+    var email = loginEmail.value.trim();
+    var password = loginPassword.value;
+
+    loginSubmitBtn.disabled = true;
+
+    var request;
+    try {
+      request = loginMode === 'signup'
+        ? firebase.auth().createUserWithEmailAndPassword(email, password)
+        : firebase.auth().signInWithEmailAndPassword(email, password);
+    } catch (e) {
+      /* сюди потрапляємо, коли конфіг не заданий і firebase.auth() кидає одразу */
+      loginSubmitBtn.disabled = false;
+      showLoginError(LOGIN_ERRORS[e.code] || e.message);
+      return;
+    }
+
+    request
+      .catch(function (error) {
+        showLoginError(LOGIN_ERRORS[error.code] || error.message);
+      })
+      .finally(function () {
+        loginSubmitBtn.disabled = false;
+      });
+    /* успіх окремо не обробляємо: екран перемкне onAuthStateChanged */
+  });
 
   filePickBtn.addEventListener('click', function () { fileInput.click(); });
 
@@ -2418,6 +2576,32 @@ textarea.field-input {
 
   loadState();
   updateSubmitState();
+  updateLoginModeUi();
+
+  /* Єдине джерело істини для того, який екран показано. До появи входу це
+     вирішувала сама розмітка: #form-screen був без hidden, решта з ним, і
+     жоден рядок JS у це не втручався. Тепер приховані всі чотири екрани,
+     і показує один із них тільки цей колбек. */
+  try {
+    firebase.auth().onAuthStateChanged(function (user) {
+      isLoggedIn = !!user;
+      loginBtn.textContent = user ? 'Вийти' : 'Увійти';
+      if (user) {
+        showForm();
+      } else {
+        showLogin();
+      }
+    });
+  } catch (e) {
+    /* Конфіг Firebase не заданий — firebase.auth() кидає auth/invalid-api-key.
+       Провал закритий: гейт лишається на місці, а не зникає. Зворотний варіант
+       означав би, що зламаний конфіг на бойовому сервері відкриває доступ усім. */
+    showLogin();
+    showLoginError('Firebase не налаштований — вставте конфіг у firebaseConfig. Вхід недоступний.');
+    loginSubmitBtn.disabled = true;
+    loginToggleBtn.disabled = true;
+    loginBtn.disabled = true;
+  }
 })();
 </script>
 
