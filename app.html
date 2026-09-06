@@ -1093,27 +1093,21 @@ textarea.field-input {
   <form id="login-form" class="app-form" novalidate>
 
     <div class="form-group">
-      <label class="field-label" for="login-email">Email</label>
-      <div class="field field-wrap">
-        <input class="field-input" type="email" id="login-email" autocomplete="email" required>
-      </div>
+      <sl-input type="email" id="login-email" label="Email" autocomplete="email" required></sl-input>
     </div>
 
     <div class="form-group">
-      <label class="field-label" for="login-password">Пароль</label>
-      <div class="field field-wrap">
-        <input class="field-input" type="password" id="login-password" autocomplete="current-password" required>
-      </div>
+      <sl-input type="password" id="login-password" label="Пароль" autocomplete="current-password" required password-toggle></sl-input>
       <div class="form-actions">
-        <button type="button" id="login-reset" class="text-action">Забули пароль?</button>
+        <sl-button type="button" id="login-reset" variant="text" size="small">Забули пароль?</sl-button>
       </div>
     </div>
 
     <p class="notice notice--row" id="login-error" hidden></p>
 
     <div class="form-actions">
-      <button type="submit" id="login-submit-btn" class="button button--primary">Увійти</button>
-      <button type="button" id="login-toggle-mode" class="text-action">Немає акаунта? Зареєструватись</button>
+      <sl-button type="submit" id="login-submit-btn" variant="primary">Увійти</sl-button>
+      <sl-button type="button" id="login-toggle-mode" variant="text" size="small">Немає акаунта? Зареєструватись</sl-button>
     </div>
 
   </form>
