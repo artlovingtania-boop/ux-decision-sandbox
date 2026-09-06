@@ -510,6 +510,18 @@ textarea.field-input {
   padding-bottom: var(--spacing-40);
 }
 
+/* заголовок над "Додатково" на Екрані 1: та сама типографіка, що
+   .advanced__summary, але без cursor:pointer і justify-content —
+   тут немає ні кліку, ні іконок, це статичний підпис, не акордеон */
+.advanced__title {
+  padding-block: var(--spacing-24);
+  font-weight: 700;
+  font-size: 20px;
+  line-height: 1.15;
+  letter-spacing: -0.44px;
+  color: var(--text-primary);
+}
+
 .form-actions {
   display: flex;
   gap: var(--spacing-12);
@@ -1243,6 +1255,7 @@ sl-button[variant="text"]::part(label):hover {
     </div>
 
     <div class="advanced">
+      <p class="advanced__title">Додатково · необов'язково</p>
       <div class="advanced__body">
 
         <div class="form-group">
