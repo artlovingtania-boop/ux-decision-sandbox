@@ -366,13 +366,60 @@ textarea.field-input {
   min-width: 0;
 }
 
+/* ---------- перелік блоків ---------- */
+.block-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-12);
+}
+
+.block-item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-4);
+}
+
+.block-row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--spacing-12);
+}
+
+.block-row .field-wrap {
+  flex: 1;
+  min-width: 0;
+}
+
+/* "опис" блоку: одиниця, своя одиниця (тільки при "інше"), кількість */
+.block-desc-row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--spacing-12);
+}
+
+.block-desc-row .block-unit {
+  width: 240px;
+  flex-shrink: 0;
+}
+
+.block-desc-row .block-unit-other {
+  flex: 1;
+  min-width: 0;
+}
+
+.block-desc-row .block-count {
+  width: 120px;
+  flex-shrink: 0;
+}
+
 /* Видалення рядка — значок, видимий завжди: показ лише при наведенні робив
    кнопку невидимою доти, доки на неї не наведеш, тобто про можливість видалити
    рядок не було звідки дізнатись.
    Від хрестика очищення відрізняється розміром (18 проти 14), місцем (поза
    полем, не всередині) і відступом 24px — gap рядка 12 плюс ці 12. */
 .task-remove,
-.audience-remove {
+.audience-remove,
+.block-remove {
   flex-shrink: 0;
   align-self: center;
   background: none;
@@ -451,14 +498,6 @@ textarea.field-input {
   flex-direction: column;
   gap: var(--spacing-40);
   padding-bottom: var(--spacing-40);
-}
-
-/* ---------- наявна структура ---------- */
-/* три джерела різної точності підряд, а не три режими на вибір */
-.structure-group {
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-24);
 }
 
 .form-actions {
@@ -707,33 +746,6 @@ textarea.field-input {
   border-radius: 0;
   padding-block: var(--spacing-12);
   padding-inline: var(--spacing-40);
-}
-
-/* ---------- вибір файлу ---------- */
-/* нативний input лишається в DOM, але прихований: кнопка українською
-   і кнопкою, а не <label> — лейбл не отримує фокус з клавіатури */
-.file-input-hidden {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip: rect(0 0 0 0);
-  white-space: nowrap;
-}
-
-.file-picker {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-16);
-}
-
-.file-name {
-  font-family: 'DM Mono', monospace;
-  font-size: 14px;
-  letter-spacing: 0.6px;
-  color: var(--text-secondary);
-  min-width: 0;
-  overflow-wrap: anywhere;
 }
 
 /* ---------- звіт унизу екрана ---------- */
@@ -1151,12 +1163,13 @@ textarea.field-input {
       <span class="field-counter"></span>
     </div>
 
-    <details class="advanced">
-      <summary class="advanced__summary">
-        <span>Додатково · необов'язково</span>
-        <img class="advanced__icon advanced__icon--plus" src="assets/icon-plus.svg" alt="" width="24" height="24">
-        <img class="advanced__icon advanced__icon--minus" src="assets/icon-minus.svg" alt="" width="24" height="24">
-      </summary>
+    <div class="form-group">
+      <label class="field-label">Перелік блоків</label>
+      <div id="block-list" class="block-list"></div>
+      <button type="button" id="add-block" class="field-add-btn">+ Додати блок</button>
+    </div>
+
+    <div class="advanced">
       <div class="advanced__body">
 
         <div class="form-group">
@@ -1176,41 +1189,8 @@ textarea.field-input {
           <p class="field-caption">Що вже вирішено або обмежено ззовні: законом, домовленостями, наявними каналами, ризиками для людей.</p>
         </div>
 
-        <div class="form-group">
-          <label class="field-label">Наявна структура</label>
-          <p class="field-caption">Заповніть те, що є. Перелік і посилання дають точні показники, скріншот — приблизні.</p>
-
-          <div class="structure-group">
-            <div class="form-group">
-              <label class="field-label" for="structure-link-input">Посилання на сторінку</label>
-              <div class="field field-wrap">
-                <input class="field-input" type="url" id="structure-link-input" placeholder="https://">
-                <button type="button" class="field-clear" aria-label="Очистити поле">✕</button>
-              </div>
-            </div>
-
-            <div class="form-group">
-              <label class="field-label" for="structure-blocks-input">Перелік блоків</label>
-              <div class="field field-wrap">
-                <textarea class="field-input" id="structure-blocks-input" rows="3" placeholder="назви секцій по одній на рядок"></textarea>
-                <button type="button" class="field-clear" aria-label="Очистити поле">✕</button>
-              </div>
-            </div>
-
-            <div class="form-group">
-              <label class="field-label" for="structure-file-input">Скріншот</label>
-              <input class="file-input-hidden" type="file" id="structure-file-input" accept="image/*">
-              <div class="file-picker">
-                <button type="button" id="file-pick-btn" class="button button--secondary">Вибрати файл</button>
-                <span class="file-name" id="file-name">файл не обрано</span>
-              </div>
-              <p class="field-caption" id="screenshot-hint" hidden>Файл обирався раніше, але не зберігається між сеансами — виберіть його ще раз.</p>
-            </div>
-          </div>
-        </div>
-
       </div>
-    </details>
+    </div>
 
     <div class="confirm" id="run-confirm" hidden>
       <p class="confirm__text">Опис змінено. Це буде новий прогін, попередній лишиться в історії</p>
@@ -1457,10 +1437,10 @@ firebase.initializeApp(firebaseConfig);
   var form = document.getElementById('app-form');
   var audienceList = document.getElementById('audience-list');
   var taskList = document.getElementById('task-list');
+  var blockList = document.getElementById('block-list');
   var addAudienceBtn = document.getElementById('add-audience');
   var addTaskBtn = document.getElementById('add-task');
-  var fileInput = document.getElementById('structure-file-input');
-  var screenshotHint = document.getElementById('screenshot-hint');
+  var addBlockBtn = document.getElementById('add-block');
   var submitBtn = document.getElementById('submit-btn');
 
   var formScreen = document.getElementById('form-screen');
@@ -1483,8 +1463,6 @@ firebase.initializeApp(firebaseConfig);
   var runsBtn = document.getElementById('runs-btn');
   var pageDescBtn = document.getElementById('page-desc-btn');
   var logoBtn = document.getElementById('logo-btn');
-  var filePickBtn = document.getElementById('file-pick-btn');
-  var fileNameLabel = document.getElementById('file-name');
 
   var loginScreen = document.getElementById('login-screen');
   var loginForm = document.getElementById('login-form');
@@ -1511,7 +1489,6 @@ firebase.initializeApp(firebaseConfig);
   var toastLink = document.getElementById('toast-link');
   var toastTimer = null;
 
-  var currentFileName = '';
   /* збережені прогони; наповнюється в loadState(), пишеться в saveState() */
   var runs = [];
   /* прогін, який зараз показано: новий або відкритий зі списку */
@@ -1537,9 +1514,14 @@ firebase.initializeApp(firebaseConfig);
         return input.value;
       }),
       constraints: document.getElementById('constraints').value,
-      structureLink: document.getElementById('structure-link-input').value,
-      structureBlocks: document.getElementById('structure-blocks-input').value,
-      structureFileName: currentFileName
+      structureBlocks: Array.from(blockList.querySelectorAll('.block-item')).map(function (item) {
+        return {
+          name: item.querySelector('.block-name').value,
+          unit: item.querySelector('.block-unit').value,
+          unitOther: item.querySelector('.block-unit-other').value,
+          count: item.querySelector('.block-count').value
+        };
+      })
     };
   }
 
@@ -1596,8 +1578,6 @@ firebase.initializeApp(firebaseConfig);
     document.getElementById('support').value = state.support || '';
     document.getElementById('goal').value = state.goal || '';
     document.getElementById('constraints').value = state.constraints || '';
-    document.getElementById('structure-link-input').value = state.structureLink || '';
-    document.getElementById('structure-blocks-input').value = state.structureBlocks || '';
 
     audienceList.innerHTML = '';
     /* у сховищі може лежати більше двох аудиторій, збережених до введення обмеження */
@@ -1609,8 +1589,13 @@ firebase.initializeApp(firebaseConfig);
     taskList.innerHTML = '';
     (state.tasks || []).forEach(function (t) { addTaskRow(t); });
 
-    currentFileName = state.structureFileName || '';
-    updateScreenshotHint();
+    blockList.innerHTML = '';
+    /* стара форма зберігала рядок, не масив — не мігруємо, просто ігноруємо */
+    var blocks = (Array.isArray(state.structureBlocks) && state.structureBlocks.length)
+      ? state.structureBlocks
+      : [{ name: '', unit: '', unitOther: '', count: '' }];
+    blocks.forEach(function (b) { addBlockRow(b.name, b.unit, b.unitOther, b.count); });
+
     refreshFieldUi();
     autoGrowAll();
   }
@@ -1680,6 +1665,94 @@ firebase.initializeApp(firebaseConfig);
     refreshFieldUi();
   }
 
+  /* значення = value, підпис = label; список фіксований, редагується тут одним місцем */
+  var BLOCK_UNITS = [
+    { value: 'абзац', label: 'абзац' },
+    { value: 'логотип', label: 'логотип' },
+    { value: 'картка', label: 'картка (фото/зображення)' },
+    { value: 'пункт-списку', label: 'пункт списку' },
+    { value: 'цифра/показник', label: 'цифра/показник' },
+    { value: 'рядок-таблиці', label: 'рядок таблиці' },
+    { value: 'відгук/цитата', label: 'відгук/цитата' },
+    { value: 'крок/етап', label: 'крок/етап' },
+    { value: 'питання-відповідь', label: 'питання-відповідь' },
+    { value: 'посилання', label: 'посилання' },
+    { value: 'поле-форми', label: 'поле форми' },
+    { value: 'документ/файл', label: 'документ/файл' },
+    { value: 'відео', label: 'відео' },
+    { value: 'фотографія', label: 'фотографія (без картки)' },
+    { value: 'тариф/пакет', label: 'тариф/пакет' },
+    { value: 'інше', label: 'інше (вільний ввід)' }
+  ];
+
+  /* "опис" необов'язковий на рівні блоку: якщо одиниця не обрана і кількість
+     порожня — підпис каже це прямо, а не мовчить і не підставляє число */
+  function updateBlockCaption(item) {
+    var unit = item.querySelector('.block-unit').value;
+    var count = item.querySelector('.block-count').value;
+    item.querySelector('.block-caption').hidden = !(unit === '' && count === '');
+  }
+
+  function addBlockRow(name, unit, unitOther, count) {
+    var item = document.createElement('div');
+    item.className = 'block-item';
+
+    var unitOptions = BLOCK_UNITS.map(function (u) {
+      return '<sl-option value="' + u.value + '">' + u.label + '</sl-option>';
+    }).join('');
+
+    item.innerHTML =
+      '<div class="block-row">' +
+      '<div class="field field-wrap">' +
+      '<input class="field-input block-name" type="text" data-limit="80" placeholder="назва блоку">' +
+      '<button type="button" class="field-clear" aria-label="Очистити поле">✕</button>' +
+      '</div>' +
+      '<button type="button" class="block-remove" aria-label="Видалити блок">✕</button>' +
+      '</div>' +
+      '<span class="field-counter"></span>' +
+      '<div class="block-desc-row">' +
+      '<sl-select class="block-unit" placeholder="одиниця" clearable>' + unitOptions + '</sl-select>' +
+      '<sl-input class="block-unit-other" placeholder="своя назва одиниці" hidden></sl-input>' +
+      '<sl-input class="block-count" type="number" min="0" step="1" placeholder="кількість"></sl-input>' +
+      '</div>' +
+      '<p class="field-caption block-caption">не визначено — можна пропустити</p>';
+
+    item.querySelector('.block-name').value = name || '';
+    item.querySelector('.block-unit').value = unit || '';
+    item.querySelector('.block-unit-other').value = unitOther || '';
+    item.querySelector('.block-unit-other').hidden = (unit || '') !== 'інше';
+    item.querySelector('.block-count').value = count || '';
+
+    item.querySelector('.block-remove').addEventListener('click', function () {
+      item.remove();
+      saveState();
+      updateSubmitState();
+      updateEditNotice();
+    });
+
+    /* повернення з "інше" на будь-яку іншу одиницю очищає вільний ввід —
+       інакше стара вільна назва підставилась би сама при випадковому поверненні на "інше" */
+    item.querySelector('.block-unit').addEventListener('sl-change', function (event) {
+      var isOther = event.target.value === 'інше';
+      var otherInput = item.querySelector('.block-unit-other');
+      otherInput.hidden = !isOther;
+      if (!isOther) { otherInput.value = ''; }
+      updateBlockCaption(item);
+    });
+
+    item.querySelector('.block-unit-other').addEventListener('sl-input', function () {
+      updateBlockCaption(item);
+    });
+
+    item.querySelector('.block-count').addEventListener('sl-input', function () {
+      updateBlockCaption(item);
+    });
+
+    blockList.appendChild(item);
+    updateBlockCaption(item);
+    refreshFieldUi();
+  }
+
   /* ---------- ріст textarea, лічильники, очищення ---------- */
 
   function autoGrow(textarea) {
@@ -1701,7 +1774,7 @@ firebase.initializeApp(firebaseConfig);
         clearBtn.classList.toggle('field-clear--hidden', input.value.length === 0);
       }
 
-      var group = input.closest('.form-group, .audience-item, .task-item');
+      var group = input.closest('.form-group, .audience-item, .task-item, .block-item');
       var counter = group ? group.querySelector(':scope > .field-counter') : null;
       if (counter && input.dataset.limit) {
         var limit = Number(input.dataset.limit);
@@ -1712,20 +1785,16 @@ firebase.initializeApp(firebaseConfig);
     });
   }
 
-  function updateScreenshotHint() {
-    var hasStoredName = !!currentFileName;
-    var hasLiveFile = fileInput.files && fileInput.files.length > 0;
-    screenshotHint.hidden = !(hasStoredName && !hasLiveFile);
-    fileNameLabel.textContent = currentFileName || 'файл не обрано';
-  }
-
   function updateSubmitState() {
     var category = document.getElementById('category').value.trim();
     var support = document.getElementById('support').value.trim();
     var firstAudienceInput = audienceList.querySelector('.audience-input');
     var audience = firstAudienceInput ? firstAudienceInput.value.trim() : '';
     var goal = document.getElementById('goal').value.trim();
-    var ready = !!(category && support && audience && goal);
+    var hasBlock = Array.from(blockList.querySelectorAll('.block-name')).some(function (input) {
+      return input.value.trim() !== '';
+    });
+    var ready = !!(category && support && audience && goal && hasBlock);
     submitBtn.disabled = !ready;
     /* з банера теж не можна запустити аналіз на неповному описі */
     rerunBtn.disabled = !ready;
@@ -1783,16 +1852,19 @@ firebase.initializeApp(firebaseConfig);
       summaryBody.appendChild(taskRow);
     }
 
-    /* наявна структура: три джерела різної точності, виводимо лише заповнені —
-       якщо аналіз спирався на них, це має бути видно */
-    if (state.structureLink.trim()) {
-      summaryBody.appendChild(summaryRow('Посилання на сторінку', state.structureLink));
-    }
-    if (state.structureBlocks.trim()) {
-      summaryBody.appendChild(summaryRow('Перелік блоків', state.structureBlocks));
-    }
-    if (state.structureFileName) {
-      summaryBody.appendChild(summaryRow('Скріншот', state.structureFileName));
+    /* перелік блоків: рядок лише якщо є хоч один блок із назвою */
+    var namedBlocks = (state.structureBlocks || []).filter(function (b) { return b.name.trim() !== ''; });
+    if (namedBlocks.length) {
+      var blockRow = el('div', 'summary-row');
+      blockRow.appendChild(el('span', 'field-caption', 'Перелік блоків'));
+      var blockValues = el('div', 'summary-list');
+      namedBlocks.forEach(function (b) {
+        var unitLabel = b.unit === 'інше' ? b.unitOther : b.unit;
+        var desc = unitLabel ? (' — ' + unitLabel + (b.count ? ' × ' + b.count : '')) : '';
+        blockValues.appendChild(el('p', 'summary-row__value', b.name + desc));
+      });
+      blockRow.appendChild(blockValues);
+      summaryBody.appendChild(blockRow);
     }
   }
 
@@ -1945,17 +2017,13 @@ firebase.initializeApp(firebaseConfig);
     if (tasks.length) {
       lines.push('Top Tasks: ' + tasks.join('; '));
     }
-    /* наявна структура — лише заповнені джерела */
-    if (state.structureLink.trim()) {
-      lines.push('Посилання на сторінку: ' + state.structureLink);
-    }
-    if (state.structureBlocks.trim()) {
-      lines.push('Перелік блоків: ' + state.structureBlocks.split('\n').map(function (b) {
-        return b.trim();
-      }).filter(Boolean).join('; '));
-    }
-    if (state.structureFileName) {
-      lines.push('Скріншот: ' + state.structureFileName);
+    var namedBlocks = (state.structureBlocks || []).filter(function (b) { return b.name.trim() !== ''; });
+    if (namedBlocks.length) {
+      lines.push('Перелік блоків: ' + namedBlocks.map(function (b) {
+        var unitLabel = b.unit === 'інше' ? b.unitOther : b.unit;
+        var desc = unitLabel ? (' — ' + unitLabel + (b.count ? ' × ' + b.count : '')) : '';
+        return b.name + desc;
+      }).join('; '));
     }
 
     var mins = metricMinimums();
@@ -2320,11 +2388,12 @@ firebase.initializeApp(firebaseConfig);
 
   function isDraftEmpty() {
     var s = collectState();
-    var filled = [s.category, s.support, s.goal, s.constraints, s.structureLink, s.structureBlocks]
+    var filled = [s.category, s.support, s.goal, s.constraints]
       .some(function (v) { return v.trim() !== ''; });
     return !filled &&
       !s.audiences.some(function (a) { return a.value.trim() !== ''; }) &&
-      !s.tasks.some(function (t) { return t.trim() !== ''; });
+      !s.tasks.some(function (t) { return t.trim() !== ''; }) &&
+      !s.structureBlocks.some(function (b) { return b.name.trim() !== ''; });
   }
 
   /* «Змінити опис» показує вхід відкритого прогону — інакше людина
@@ -2387,16 +2456,13 @@ firebase.initializeApp(firebaseConfig);
     document.getElementById('support').value = '';
     document.getElementById('goal').value = '';
     document.getElementById('constraints').value = '';
-    document.getElementById('structure-link-input').value = '';
-    document.getElementById('structure-blocks-input').value = '';
-    fileInput.value = '';
-    currentFileName = '';
 
     audienceList.innerHTML = '';
     addAudienceRow('', 'головна');
     taskList.innerHTML = '';
+    blockList.innerHTML = '';
+    addBlockRow('', '', '', '');
 
-    updateScreenshotHint();
     refreshFieldUi();
     autoGrowAll();
     saveState();
@@ -2528,8 +2594,6 @@ firebase.initializeApp(firebaseConfig);
     /* успіх окремо не обробляємо: екран перемкне onAuthStateChanged */
   });
 
-  filePickBtn.addEventListener('click', function () { fileInput.click(); });
-
   resetButtons.forEach(function (btn) {
     btn.addEventListener('click', function () {
       if (btn.dataset.armed !== 'yes') {
@@ -2586,9 +2650,11 @@ firebase.initializeApp(firebaseConfig);
     updateEditNotice();
   });
 
-  fileInput.addEventListener('change', function () {
-    currentFileName = fileInput.files && fileInput.files[0] ? fileInput.files[0].name : '';
-    updateScreenshotHint();
+  addBlockBtn.addEventListener('click', function () {
+    addBlockRow('', '', '', '');
+    saveState();
+    updateSubmitState();
+    updateEditNotice();
   });
 
   /* кнопка очищення не зберігає сама: вона ставить порожнє значення й віддає
@@ -2618,9 +2684,19 @@ firebase.initializeApp(firebaseConfig);
     updateEditNotice();
   });
 
-  /* поки блок «Додатково» закритий, textarea всередині не мають висоти —
-     перераховуємо при відкритті */
-  document.querySelector('.advanced').addEventListener('toggle', autoGrowAll);
+  /* Shoelace-компоненти не спливають нативними input/change, лише власними
+     sl-input/sl-change — перелік блоків читається тим самим шляхом, що решта форми */
+  form.addEventListener('sl-input', function () {
+    saveState();
+    updateSubmitState();
+    updateEditNotice();
+  });
+
+  form.addEventListener('sl-change', function () {
+    saveState();
+    updateSubmitState();
+    updateEditNotice();
+  });
 
   loadState();
   updateSubmitState();
