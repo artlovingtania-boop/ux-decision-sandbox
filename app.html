@@ -25,6 +25,12 @@
   --accent-yellow-light: #ffe26a;
   --accent-green: #52d68a;
   --accent-green-soft: #a8e8c0;
+  /* той самий тон/насиченість, що --accent-yellow, темніша яскравість —
+     для WCAG 1.4.11 на фокус-індикаторах (accent-yellow дає 1.24:1) */
+  --accent-yellow-focus: #8c7503;
+  /* той самий hue/saturation, темніша яскравість — для WCAG 1.4.3 на
+     тексті sl-button[variant="text"] (accent-yellow там дає 1.29:1) */
+  --accent-yellow-text: #826d03;
 
   --radius-md: 4px;
   --radius-ml: 8px;
@@ -259,7 +265,8 @@ textarea.field-input {
 
 .field:focus-within {
   outline: none;
-  border-color: var(--accent-yellow);
+  border-color: var(--accent-yellow-focus);
+  border-width: 2px;
 }
 
 .field-clear {
@@ -1070,6 +1077,75 @@ textarea.field-input {
 </style>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.20.1/cdn/themes/light.css">
 <script type="module" src="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.20.1/cdn/shoelace-autoloader.js"></script>
+<style>
+/* ---------- перефарбування теми Shoelace під токени лендінгу ---------- */
+:root, .sl-theme-light {
+  --sl-font-sans: 'DM Sans', sans-serif;
+  --sl-font-weight-semibold: 700;
+
+  --sl-color-primary-500: var(--accent-yellow-light);
+  --sl-color-primary-600: var(--accent-yellow);
+  --sl-color-primary-700: color-mix(in srgb, var(--accent-yellow) 80%, black);
+
+  --sl-input-background-color: var(--surface-card);
+  --sl-input-background-color-hover: var(--surface-card);
+  --sl-input-background-color-focus: var(--surface-card);
+  --sl-input-border-color: var(--border-card);
+  --sl-input-border-color-hover: var(--border-medium);
+  --sl-input-border-color-focus: var(--accent-yellow-focus);
+  --sl-input-color: var(--text-primary);
+  --sl-input-color-hover: var(--text-primary);
+  --sl-input-color-focus: var(--text-primary);
+  --sl-input-placeholder-color: var(--text-secondary);
+  --sl-input-font-family: var(--sl-font-sans);
+  --sl-input-focus-ring-color: transparent;
+  --sl-input-border-radius-small: var(--radius-md);
+  --sl-input-border-radius-medium: var(--radius-md);
+  --sl-input-border-radius-large: var(--radius-md);
+
+  --sl-focus-ring-color: var(--accent-yellow-focus);
+}
+
+/* товща рамка тільки на фокусі (WCAG 1.4.11) — не через --sl-input-border-width,
+   бо та потовщила б рамку завжди, не лише при фокусі */
+sl-input:focus-within::part(base),
+sl-select:focus-within::part(combobox) {
+  border-width: 2px;
+}
+
+/* контраст тексту виділеного (не наведеного мишею) пункту в sl-select:
+   .option--current стоїть на --sl-color-neutral-0 (білий) поверх
+   --sl-color-primary-600 (тепер жовтий) — 1.36:1. Скоуп лише на sl-select,
+   щоб не займати --sl-color-neutral-0 в інших компонентах (button, dialog тощо) */
+sl-select {
+  --sl-color-neutral-0: var(--text-primary);
+}
+
+/* та сама проблема контрасту (1.36:1), тут — на тексті sl-button variant="primary"
+   ("Увійти"). Скоуп саме на [variant="primary"], не на весь sl-button:
+   --sl-color-neutral-0 водночас задає ФОН варіанту "default"
+   (.button--standard.button--default { background-color: var(--sl-color-neutral-0) }),
+   тож глобальний оверрайд зламав би його, якби він десь з'явився */
+sl-button[variant="primary"] {
+  --sl-color-neutral-0: var(--text-primary);
+}
+
+/* контраст тексту sl-button variant="text" ("Забули пароль?",
+   "Немає акаунта? Зареєструватись") на фоні сторінки: .button--text бере
+   колір з --sl-color-primary-600 (звичайний стан), -500 (hover/focus-visible),
+   -700 (active) — усі три тепер = --accent-yellow, контраст 1.29:1.
+   Свідомо один темний колір на всі три стани, без світлішого hover-відтінку —
+   він був би на межі 4.5:1. Замість кольорової зміни на hover — підкреслення. */
+sl-button[variant="text"] {
+  --sl-color-primary-500: var(--accent-yellow-text);
+  --sl-color-primary-600: var(--accent-yellow-text);
+  --sl-color-primary-700: var(--accent-yellow-text);
+}
+
+sl-button[variant="text"]::part(label):hover {
+  text-decoration: underline;
+}
+</style>
 </head>
 <body>
 
@@ -1099,15 +1175,15 @@ textarea.field-input {
     <div class="form-group">
       <sl-input type="password" id="login-password" label="Пароль" autocomplete="current-password" required password-toggle></sl-input>
       <div class="form-actions">
-        <sl-button type="button" id="login-reset" variant="text" size="small">Забули пароль?</sl-button>
+        <sl-button type="button" id="login-reset" variant="text" size="small" pill>Забули пароль?</sl-button>
       </div>
     </div>
 
     <p class="notice notice--row" id="login-error" hidden></p>
 
     <div class="form-actions">
-      <sl-button type="submit" id="login-submit-btn" variant="primary">Увійти</sl-button>
-      <sl-button type="button" id="login-toggle-mode" variant="text" size="small">Немає акаунта? Зареєструватись</sl-button>
+      <sl-button type="submit" id="login-submit-btn" variant="primary" pill>Увійти</sl-button>
+      <sl-button type="button" id="login-toggle-mode" variant="text" size="small" pill>Немає акаунта? Зареєструватись</sl-button>
     </div>
 
   </form>
