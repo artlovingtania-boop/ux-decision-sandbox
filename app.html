@@ -226,7 +226,10 @@ body {
   background: var(--surface-card);
   border: 1px solid var(--border-card);
   border-radius: var(--radius-md);
-  padding: var(--spacing-12) var(--spacing-16);
+  /* 7px не з токена: точний розрахунок під висоту 40px, яку дає
+     Shoelace-поле (--sl-input-height-medium), щоб нативні й sl-input/
+     sl-select поля в одній формі мали однакову висоту */
+  padding: 7px var(--spacing-16);
   font-family: 'DM Sans', sans-serif;
   font-size: 16px;
   line-height: 1.5;
