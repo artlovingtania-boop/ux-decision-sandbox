@@ -1688,6 +1688,25 @@ firebase.initializeApp(firebaseConfig);
 
   /* ---------- динамічні рядки ---------- */
 
+  /* sl-select мовчки не приймає .value одразу після підключення до DOM.
+     Причина подвійна: (1) на першому showForm() класи sl-select/sl-option
+     ще не зареєстровані — Shoelace autoloader асинхронний і спрацьовує
+     пізніше за цей скрипт, тож .updateComplete в цей момент — undefined,
+     і Promise.all з undefined миттєво "резолвиться", нічого не чекаючи;
+     (2) навіть після реєстрації класів — sl-select дізнається про свої
+     sl-option лише після updateComplete кожного з них. Тому чекаємо
+     обидва рівні по черзі, а не покладаємось на сам факт appendChild. */
+  function setSlSelectValue(select, value) {
+    return Promise.all([customElements.whenDefined('sl-select'), customElements.whenDefined('sl-option')])
+      .then(function () {
+        var options = Array.from(select.querySelectorAll('sl-option'));
+        return Promise.all([select.updateComplete].concat(options.map(function (o) { return o.updateComplete; })));
+      })
+      .then(function () {
+        select.value = value;
+      });
+  }
+
   function addAudienceRow(value, type) {
     var item = document.createElement('div');
     item.className = 'audience-item';
@@ -1697,15 +1716,14 @@ firebase.initializeApp(firebaseConfig);
       '<input class="field-input audience-input" type="text" data-limit="120" placeholder="хто читає сторінку і в якому стані приходить">' +
       '<button type="button" class="field-clear" aria-label="Очистити поле">✕</button>' +
       '</div>' +
-      '<select class="field audience-select">' +
-      '<option value="головна">головна</option>' +
-      '<option value="другорядна">другорядна</option>' +
-      '</select>' +
+      '<sl-select class="audience-select">' +
+      '<sl-option value="головна">головна</sl-option>' +
+      '<sl-option value="другорядна">другорядна</sl-option>' +
+      '</sl-select>' +
       '<button type="button" class="audience-remove" aria-label="Видалити аудиторію">✕</button>' +
       '</div>' +
       '<span class="field-counter"></span>';
     item.querySelector('.audience-input').value = value || '';
-    item.querySelector('.audience-select').value = type || 'головна';
     item.querySelector('.audience-remove').addEventListener('click', function () {
       item.remove();
       updateAudienceControls();
@@ -1714,6 +1732,7 @@ firebase.initializeApp(firebaseConfig);
       updateEditNotice();
     });
     audienceList.appendChild(item);
+    setSlSelectValue(item.querySelector('.audience-select'), type || 'головна');
     updateAudienceControls();
     refreshFieldUi();
   }
@@ -1804,10 +1823,6 @@ firebase.initializeApp(firebaseConfig);
       '<p class="field-caption block-caption">не визначено — можна пропустити</p>';
 
     item.querySelector('.block-name').value = name || '';
-    item.querySelector('.block-unit').value = unit || '';
-    item.querySelector('.block-unit-other').value = unitOther || '';
-    item.querySelector('.block-unit-other').hidden = (unit || '') !== 'інше';
-    item.querySelector('.block-count').value = count || '';
 
     item.querySelector('.block-remove').addEventListener('click', function () {
       item.remove();
@@ -1835,7 +1850,17 @@ firebase.initializeApp(firebaseConfig);
     });
 
     blockList.appendChild(item);
-    updateBlockCaption(item);
+    /* sl-input (на відміну від sl-select) приймає .value одразу після
+       appendChild — підключення до DOM для нього досить */
+    item.querySelector('.block-unit-other').value = unitOther || '';
+    item.querySelector('.block-unit-other').hidden = (unit || '') !== 'інше';
+    item.querySelector('.block-count').value = count || '';
+    /* підпис "не визначено" залежить від значення block-unit, а воно
+       встановлюється асинхронно (див. setSlSelectValue) — тому рахуємо
+       підпис тільки після реального встановлення, а не одразу */
+    setSlSelectValue(item.querySelector('.block-unit'), unit || '').then(function () {
+      updateBlockCaption(item);
+    });
     refreshFieldUi();
   }
 
