@@ -1153,6 +1153,15 @@ sl-select:focus-within::part(combobox) {
   border-width: 2px;
 }
 
+/* --sl-color-primary-500 всередині sl-input використовується рівно один раз —
+   у -webkit-text-fill-color для автозаповненого браузером тексту (не фарба,
+   а колір символів). Глобально це --accent-yellow-light (для заливок), тут
+   та сама змінна означає колір тексту — автозаповнені email/пароль виходили
+   жовтими. Скоуп лише на sl-input, глобальне значення для заливок не займаємо */
+sl-input {
+  --sl-color-primary-500: var(--text-primary);
+}
+
 /* контраст тексту виділеного (не наведеного мишею) пункту в sl-select:
    .option--current стоїть на --sl-color-neutral-0 (білий) поверх
    --sl-color-primary-600 (тепер жовтий) — 1.36:1. Скоуп лише на sl-select,
