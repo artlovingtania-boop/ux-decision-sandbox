@@ -20,17 +20,12 @@
   --border-medium: #d9d9d9;
   --border-default: #ddd9d2;
   --border-card: #dfe1dc;
+  --border-focus: #1a1714;
 
   --accent-yellow: #fbdc42;
   --accent-yellow-light: #ffe26a;
   --accent-green: #52d68a;
   --accent-green-soft: #a8e8c0;
-  /* той самий тон/насиченість, що --accent-yellow, темніша яскравість —
-     для WCAG 1.4.11 на фокус-індикаторах (accent-yellow дає 1.24:1) */
-  --accent-yellow-focus: #8c7503;
-  /* той самий hue/saturation, темніша яскравість — для WCAG 1.4.3 на
-     тексті sl-button[variant="text"] (accent-yellow там дає 1.29:1) */
-  --accent-yellow-text: #826d03;
 
   --radius-md: 4px;
   --radius-ml: 8px;
@@ -268,7 +263,7 @@ textarea.field-input {
 
 .field:focus-within {
   outline: none;
-  border-color: var(--accent-yellow-focus);
+  border-color: var(--border-focus);
   border-width: 2px;
 }
 
@@ -945,7 +940,7 @@ textarea.field-input {
    рамка без заливки. Зелений лишився тільки бейджу «чистий за обома перевірками» */
 .flow__item--action {
   background: transparent;
-  border-color: var(--text-primary);
+  border-color: var(--border-focus);
 }
 
 .flow__note {
@@ -1098,16 +1093,24 @@ textarea.field-input {
   --sl-font-sans: 'DM Sans', sans-serif;
   --sl-font-weight-semibold: 700;
 
+  --sl-color-primary-50: color-mix(in srgb, var(--accent-yellow) 10%, white);
+  --sl-color-primary-100: color-mix(in srgb, var(--accent-yellow) 20%, white);
+  --sl-color-primary-200: color-mix(in srgb, var(--accent-yellow) 35%, white);
+  --sl-color-primary-300: color-mix(in srgb, var(--accent-yellow) 55%, white);
+  --sl-color-primary-400: color-mix(in srgb, var(--accent-yellow) 80%, white);
   --sl-color-primary-500: var(--accent-yellow-light);
   --sl-color-primary-600: var(--accent-yellow);
-  --sl-color-primary-700: color-mix(in srgb, var(--accent-yellow) 80%, black);
+  --sl-color-primary-700: var(--text-primary);
+  --sl-color-primary-800: var(--text-primary);
+  --sl-color-primary-900: var(--text-primary);
+  --sl-color-primary-950: var(--text-primary);
 
   --sl-input-background-color: var(--surface-card);
   --sl-input-background-color-hover: var(--surface-card);
   --sl-input-background-color-focus: var(--surface-card);
   --sl-input-border-color: var(--border-card);
   --sl-input-border-color-hover: var(--border-medium);
-  --sl-input-border-color-focus: var(--accent-yellow-focus);
+  --sl-input-border-color-focus: var(--border-focus);
   --sl-input-color: var(--text-primary);
   --sl-input-color-hover: var(--text-primary);
   --sl-input-color-focus: var(--text-primary);
@@ -1118,7 +1121,7 @@ textarea.field-input {
   --sl-input-border-radius-medium: var(--radius-md);
   --sl-input-border-radius-large: var(--radius-md);
 
-  --sl-focus-ring-color: var(--accent-yellow-focus);
+  --sl-focus-ring-color: var(--border-focus);
 }
 
 /* товща рамка тільки на фокусі (WCAG 1.4.11) — не через --sl-input-border-width,
@@ -1134,6 +1137,8 @@ sl-select:focus-within::part(combobox) {
    щоб не займати --sl-color-neutral-0 в інших компонентах (button, dialog тощо) */
 sl-select {
   --sl-color-neutral-0: var(--text-primary);
+  --sl-color-neutral-700: var(--text-primary);
+  --sl-color-neutral-1000: var(--text-primary);
 }
 
 /* та сама проблема контрасту (1.36:1), тут — на тексті sl-button variant="primary"
@@ -1148,13 +1153,13 @@ sl-button[variant="primary"] {
 /* контраст тексту sl-button variant="text" ("Забули пароль?",
    "Немає акаунта? Зареєструватись") на фоні сторінки: .button--text бере
    колір з --sl-color-primary-600 (звичайний стан), -500 (hover/focus-visible),
-   -700 (active) — усі три тепер = --accent-yellow, контраст 1.29:1.
+   -700 (active) — усі три тепер = --text-primary, найтемніший доступний токен.
    Свідомо один темний колір на всі три стани, без світлішого hover-відтінку —
    він був би на межі 4.5:1. Замість кольорової зміни на hover — підкреслення. */
 sl-button[variant="text"] {
-  --sl-color-primary-500: var(--accent-yellow-text);
-  --sl-color-primary-600: var(--accent-yellow-text);
-  --sl-color-primary-700: var(--accent-yellow-text);
+  --sl-color-primary-500: var(--text-primary);
+  --sl-color-primary-600: var(--text-primary);
+  --sl-color-primary-700: var(--text-primary);
 }
 
 sl-button[variant="text"]::part(label):hover {
