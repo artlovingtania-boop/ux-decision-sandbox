@@ -148,6 +148,7 @@ body {
   font-size: 14px;
   line-height: 1.2;
   letter-spacing: 0.6px;
+  text-transform: uppercase;
   color: var(--text-primary);
   white-space: nowrap;
 }
@@ -210,6 +211,13 @@ body {
 }
 
 .field-label {
+  font-weight: 700;
+  font-size: 14px;
+  line-height: 1.2;
+  color: var(--text-primary);
+}
+
+.section-label {
   font-weight: 700;
   font-size: 14px;
   line-height: 1.2;
@@ -291,6 +299,15 @@ textarea.field-input {
   font-size: 14px;
   line-height: 1.4;
   letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.field-hint {
+  font-family: 'DM Sans', sans-serif;
+  font-weight: 400;
+  font-size: 14px;
+  line-height: 1.4;
   color: var(--text-secondary);
 }
 
@@ -308,6 +325,7 @@ textarea.field-input {
   font-size: 14px;
   line-height: 1.4;
   letter-spacing: 0.6px;
+  text-transform: uppercase;
   color: var(--text-secondary);
   white-space: nowrap;
 }
@@ -604,6 +622,7 @@ textarea.field-input {
   font-family: 'DM Mono', monospace;
   font-size: 14px;
   letter-spacing: 0.6px;
+  text-transform: uppercase;
   color: var(--text-secondary);
 }
 
@@ -635,6 +654,7 @@ textarea.field-input {
   font-family: 'DM Mono', monospace;
   font-size: 14px;
   letter-spacing: 0.6px;
+  text-transform: uppercase;
   color: var(--text-secondary);
   cursor: pointer;
   white-space: nowrap;
@@ -792,6 +812,7 @@ textarea.field-input {
   font-family: 'DM Mono', monospace;
   font-size: 14px;
   letter-spacing: 0.6px;
+  text-transform: uppercase;
   color: var(--text-secondary);
 }
 
@@ -933,6 +954,7 @@ textarea.field-input {
   font-family: 'DM Mono', monospace;
   font-size: 14px;
   letter-spacing: 0.6px;
+  text-transform: uppercase;
   color: var(--text-secondary);
 }
 
@@ -947,6 +969,7 @@ textarea.field-input {
   font-family: 'DM Mono', monospace;
   font-size: 14px;
   letter-spacing: 0.6px;
+  text-transform: uppercase;
   color: var(--text-secondary);
 }
 
@@ -1013,6 +1036,12 @@ textarea.field-input {
   flex-direction: column;
   gap: var(--spacing-4);
   min-width: 0;
+}
+
+.metric-label {
+  font-size: 16px;
+  line-height: 1.5;
+  color: var(--text-secondary);
 }
 
 .remark__text {
@@ -1091,7 +1120,10 @@ textarea.field-input {
 /* ---------- перефарбування теми Shoelace під токени лендінгу ---------- */
 :root, .sl-theme-light {
   --sl-font-sans: 'DM Sans', sans-serif;
-  --sl-font-weight-semibold: 700;
+
+  --sl-button-font-size-medium: 16px;
+  --sl-button-font-size-small: 14px;
+  --sl-input-label-font-size-medium: 14px;
 
   --sl-color-primary-50: color-mix(in srgb, var(--accent-yellow) 10%, white);
   --sl-color-primary-100: color-mix(in srgb, var(--accent-yellow) 20%, white);
@@ -1139,6 +1171,19 @@ sl-select {
   --sl-color-neutral-0: var(--text-primary);
   --sl-color-neutral-700: var(--text-primary);
   --sl-color-neutral-1000: var(--text-primary);
+}
+
+sl-button::part(base) {
+  font-weight: 700;
+}
+
+sl-option::part(base) {
+  line-height: 1.5;
+}
+
+sl-input::part(form-control-label),
+sl-select::part(form-control-label) {
+  font-weight: 700;
 }
 
 /* та сама проблема контрасту (1.36:1), тут — на тексті sl-button variant="primary"
@@ -1235,7 +1280,7 @@ sl-button[variant="text"]::part(label):hover {
         <button type="button" class="field-clear" aria-label="Очистити поле">✕</button>
       </div>
       <span class="field-counter"></span>
-      <p class="field-caption">Без цього поля система виведе шаблонний список секцій — професійний на вигляд, але без блоків, що несуть задачі.</p>
+      <p class="field-hint">Без цього поля система виведе шаблонний список секцій — професійний на вигляд, але без блоків, що несуть задачі.</p>
     </div>
 
     <div class="form-group">
@@ -1267,7 +1312,7 @@ sl-button[variant="text"]::part(label):hover {
           <label class="field-label">Top Tasks</label>
           <div id="task-list" class="task-list"></div>
           <button type="button" id="add-task" class="field-add-btn">+ Додати задачу</button>
-          <p class="field-caption">Якщо не заповните — система виведе сама з аудиторії й бізнес-цілі. Формат: дієслово + об'єкт.</p>
+          <p class="field-hint">Якщо не заповните — система виведе сама з аудиторії й бізнес-цілі. Формат: дієслово + об'єкт.</p>
         </div>
 
         <div class="form-group">
@@ -1277,7 +1322,7 @@ sl-button[variant="text"]::part(label):hover {
             <button type="button" class="field-clear" aria-label="Очистити поле">✕</button>
           </div>
           <span class="field-counter"></span>
-          <p class="field-caption">Що вже вирішено або обмежено ззовні: законом, домовленостями, наявними каналами, ризиками для людей.</p>
+          <p class="field-hint">Що вже вирішено або обмежено ззовні: законом, домовленостями, наявними каналами, ризиками для людей.</p>
         </div>
 
       </div>
@@ -1825,7 +1870,7 @@ firebase.initializeApp(firebaseConfig);
       '<sl-input class="block-unit-other" placeholder="своя назва одиниці" hidden></sl-input>' +
       '<sl-input class="block-count" type="number" min="0" step="1" placeholder="кількість"></sl-input>' +
       '</div>' +
-      '<p class="field-caption block-caption">не визначено — можна пропустити</p>';
+      '<p class="field-hint block-caption">не визначено — можна пропустити</p>';
 
     item.querySelector('.block-name').value = name || '';
 
@@ -2000,7 +2045,7 @@ firebase.initializeApp(firebaseConfig);
 
   function renderFlow(variant) {
     var section = el('div', 'card-section');
-    section.appendChild(el('span', 'field-label', 'Потік блоків'));
+    section.appendChild(el('span', 'section-label', 'Потік блоків'));
 
     var flow = el('div', 'flow');
     variant.flow.forEach(function (block, index) {
@@ -2018,7 +2063,7 @@ firebase.initializeApp(firebaseConfig);
 
   function renderAxes(variant) {
     var section = el('div', 'card-section card-section--divided');
-    section.appendChild(el('span', 'field-label', 'Осі'));
+    section.appendChild(el('span', 'section-label', 'Осі'));
     var list = el('div', 'axis-list');
     variant.axes.forEach(function (axis) {
       var row = el('div', 'summary-row');
@@ -2032,13 +2077,13 @@ firebase.initializeApp(firebaseConfig);
 
   function renderMetrics(variant, mins) {
     var section = el('div', 'card-section card-section--divided');
-    section.appendChild(el('span', 'field-label', 'Порівняльні метрики'));
-    section.appendChild(el('p', 'field-caption', 'порогів немає — метрики показують різницю між варіантами, не оцінку'));
+    section.appendChild(el('span', 'section-label', 'Порівняльні метрики'));
+    section.appendChild(el('p', 'field-hint', 'порогів немає — метрики показують різницю між варіантами, не оцінку'));
 
     var list = el('div', 'metric-list');
     variant.metrics.forEach(function (metric) {
       var row = el('div', 'metric-row');
-      row.appendChild(el('span', 'remark__text', metric.name));
+      row.appendChild(el('span', 'metric-label', metric.name));
       var value = el('span', 'metric-row__value');
       value.appendChild(el('span', null, String(metric.value)));
       if (metric.value === mins[metric.name]) {
@@ -2053,7 +2098,7 @@ firebase.initializeApp(firebaseConfig);
 
   function renderRemarks(variant) {
     var section = el('div', 'card-section card-section--divided');
-    section.appendChild(el('span', 'field-label', 'Персонний аудит'));
+    section.appendChild(el('span', 'section-label', 'Персонний аудит'));
     var list = el('div', 'remark-list');
     var dotClass = { 'критично': 'critical', 'помірно': 'moderate', 'незначно': 'minor' };
     variant.remarks.forEach(function (remark) {
@@ -2071,7 +2116,7 @@ firebase.initializeApp(firebaseConfig);
 
   function renderConclusion(variant) {
     var section = el('div', 'card-section card-section--divided conclusion');
-    section.appendChild(el('span', 'field-label', 'Висновок'));
+    section.appendChild(el('span', 'section-label', 'Висновок'));
     section.appendChild(el('p', 'conclusion__text', variant.conclusion));
     return section;
   }
