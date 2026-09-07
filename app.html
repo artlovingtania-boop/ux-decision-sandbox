@@ -729,25 +729,6 @@ textarea.field-input {
   color: var(--text-secondary);
 }
 
-/* спільна плашка повідомлень: незбережений прогін на результаті
-   і змінений опис на формі */
-.notice {
-  padding: var(--spacing-12) var(--spacing-16);
-  background: var(--accent-yellow);
-  border-radius: var(--radius-md);
-  font-size: 16px;
-  line-height: 1.5;
-  color: var(--text-primary);
-}
-
-/* варіант із діями: текст ліворуч, кнопки праворуч */
-.notice--row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--spacing-24);
-}
-
 .notice__text {
   min-width: 0;
 }
@@ -777,12 +758,21 @@ textarea.field-input {
 }
 
 /* нутро широке (1280): при 760 тексту лишалось 277px і він ставав у три рядки.
-   Падінги задані явно: .container несе padding-block: 80px, у смузі це дало б 160 */
-.notice--pinned .notice {
-  background: none;
-  border-radius: 0;
-  padding-block: var(--spacing-12);
+   sl-alert має display:contents — класи .container/.container--wide на самому
+   тезі нічого не дають, тож ширину й падінги задаємо через ::part(base) */
+#edit-notice-alert::part(base) {
+  max-width: 1280px;
+  margin-inline: auto;
   padding-inline: var(--spacing-40);
+}
+
+/* текст ліворуч, кнопки праворуч — те саме, що раніше .notice--row,
+   тепер на ::part(message), з тієї ж причини display:contents */
+#edit-notice-alert::part(message) {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-24);
 }
 
 /* ---------- звіт унизу екрана ---------- */
@@ -1173,6 +1163,13 @@ sl-select {
   --sl-color-neutral-1000: var(--text-primary);
 }
 
+/* та сама протічка --sl-color-neutral-700 (холодний сірий) на тексті sl-alert.
+   Фон/рамка (--sl-panel-*) і колір верхньої смужки (danger/warning/neutral-600)
+   лишаються дефолтними Shoelace — займаємо тільки текст */
+sl-alert {
+  --sl-color-neutral-700: var(--text-primary);
+}
+
 sl-button::part(base) {
   font-weight: 700;
 }
@@ -1244,7 +1241,7 @@ sl-button[variant="text"]::part(label):hover {
       </div>
     </div>
 
-    <p class="notice notice--row" id="login-error" hidden></p>
+    <sl-alert variant="danger" id="login-error"></sl-alert>
 
     <div class="form-actions">
       <sl-button type="submit" id="login-submit-btn" variant="primary" pill>Увійти</sl-button>
@@ -1345,13 +1342,13 @@ sl-button[variant="text"]::part(label):hover {
 </div>
 
 <div class="notice--pinned" id="edit-notice" hidden>
-  <div class="container container--wide notice notice--row">
+  <sl-alert variant="neutral" id="edit-notice-alert">
     <span class="notice__text">Опис змінено. Попередній результат більше не відповідає введеному — запустіть аналіз заново</span>
     <span class="notice__actions">
       <button type="button" id="rerun-btn" class="button button--primary">Запустити заново</button>
       <button type="button" id="revert-btn" class="button button--text">Скасувати зміни</button>
     </span>
-  </div>
+  </sl-alert>
 </div>
 </div>
 
@@ -1365,7 +1362,7 @@ sl-button[variant="text"]::part(label):hover {
 <div id="result-screen" hidden>
   <div class="container container--wide result">
 
-    <p class="notice" id="save-notice" hidden>Прогін не збережено: сховище браузера недоступне або переповнене.</p>
+    <sl-alert variant="warning" id="save-notice">Прогін не збережено: сховище браузера недоступне або переповнене.</sl-alert>
 
     <details class="advanced" id="input-summary">
       <summary class="advanced__summary">
@@ -1614,6 +1611,7 @@ firebase.initializeApp(firebaseConfig);
   var isLoggedIn = false;
 
   var editNotice = document.getElementById('edit-notice');
+  var editNoticeAlert = document.getElementById('edit-notice-alert');
   var revertBtn = document.getElementById('revert-btn');
   var rerunBtn = document.getElementById('rerun-btn');
   var runConfirm = document.getElementById('run-confirm');
@@ -2389,7 +2387,7 @@ firebase.initializeApp(firebaseConfig);
 
       /* провал запису більше не мовчить; успіх — коротке повідомлення */
       var saved = saveState();
-      saveNotice.hidden = saved;
+      saveNotice.open = !saved;
       renderCurrentRun();
       if (saved) { showToast('Прогін збережено в ', true); }
     }
@@ -2448,7 +2446,7 @@ firebase.initializeApp(firebaseConfig);
     var run = runs.filter(function (r) { return r.id === id; })[0];
     if (!run) { return; }
     currentRun = run;
-    saveNotice.hidden = true;
+    saveNotice.open = false;
     renderCurrentRun();
   }
 
@@ -2479,12 +2477,12 @@ firebase.initializeApp(firebaseConfig);
 
   function showLoginError(text) {
     loginError.textContent = text;
-    loginError.hidden = false;
+    loginError.open = true;
   }
 
   function clearLoginError() {
     loginError.textContent = '';
-    loginError.hidden = true;
+    loginError.open = false;
   }
 
   function updateLoginModeUi() {
@@ -2582,9 +2580,26 @@ firebase.initializeApp(firebaseConfig);
   /* попередження показується, лише поки форма справді розходиться з прогоном:
      зайти подивитись можна без нього, а якщо повернути введене як було —
      воно зникне саме */
-  function updateEditNotice() {
-    editNotice.hidden = !editingRun ||
-      JSON.stringify(collectState()) === JSON.stringify(editingRun.input);
+  async function updateEditNotice() {
+    var show = !!editingRun &&
+      JSON.stringify(collectState()) !== JSON.stringify(editingRun.input);
+
+    /* .open + updateComplete не годиться: sl-alert виставляє внутрішній
+       hidden лише всередині власної show/hide-анімації, вже після рендер-циклу
+       Lit, тож updateComplete встигає резолвитись раніше. .show()/.hide()
+       чекають на sl-after-show/sl-after-hide — саме той момент, коли
+       внутрішній стан і висота вже остаточні.
+       Порядок з обгорткою навмисний: показ — спершу відкрити обгортку,
+       потім .show(), щоб анімація була видима; приховування — навпаки,
+       спершу дочекатись .hide(), потім сховати обгортку, інакше анімація
+       програється всередині вже прихованого батька й пропадає. */
+    if (show) {
+      editNotice.hidden = false;
+      await editNoticeAlert.show();
+    } else {
+      await editNoticeAlert.hide();
+      editNotice.hidden = true;
+    }
 
     /* закріплена панель лягає поверх нижнього ряду кнопок — звільняємо їй місце.
        Висоту міряємо, бо текст переноситься по-різному й фіксоване число
