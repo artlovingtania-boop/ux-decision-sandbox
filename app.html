@@ -1345,6 +1345,7 @@ sl-button[variant="text"]::part(label):hover {
     <div class="form-actions" id="form-actions">
       <button type="button" id="submit-btn" class="button button--primary" disabled>Запустити аналіз</button>
       <button type="button" id="form-reset-btn" class="button button--secondary">Новий прогін</button>
+      <button type="button" id="load-example-btn" class="button button--text">Завантажити приклад</button>
     </div>
 
   </form>
@@ -1639,6 +1640,7 @@ firebase.initializeApp(firebaseConfig);
   var addTaskBtn = document.getElementById('add-task');
   var addBlockBtn = document.getElementById('add-block');
   var submitBtn = document.getElementById('submit-btn');
+  var loadExampleBtn = document.getElementById('load-example-btn');
 
   var formScreen = document.getElementById('form-screen');
   var resultScreen = document.getElementById('result-screen');
@@ -2673,6 +2675,7 @@ firebase.initializeApp(firebaseConfig);
     divergenceBody.innerHTML = '';
     disarmReset();
     disarmEdit();
+    disarmLoadExample();
     runConfirm.hidden = true;
     formActions.hidden = false;
     /* поки екран був прихований, textarea не мали висоти */
@@ -3012,6 +3015,11 @@ firebase.initializeApp(firebaseConfig);
     editBtn.textContent = 'Змінити опис';
   }
 
+  function disarmLoadExample() {
+    loadExampleBtn.dataset.armed = '';
+    loadExampleBtn.textContent = 'Завантажити приклад';
+  }
+
   function isDraftEmpty() {
     var s = collectState();
     var filled = [s.category, s.support, s.goal, s.constraints]
@@ -3250,6 +3258,26 @@ firebase.initializeApp(firebaseConfig);
       /* з форми екран не перемикаємо — ми вже на ній */
       if (onResult) { showForm(); } else { disarmReset(); }
     });
+  });
+
+  /* той самий патерн дворазового озброєння, що в «Новий прогін»: не
+     деструктивно в сенсі даних застосунку (нічого на сервері), але так само
+     тихо заміняє чернетку — підтвердження для узгодженості з сусідньою дією */
+  loadExampleBtn.addEventListener('click', function () {
+    if (loadExampleBtn.dataset.armed !== 'yes') {
+      disarmReset();
+      disarmEdit();
+      loadExampleBtn.dataset.armed = 'yes';
+      loadExampleBtn.textContent = 'Точно завантажити приклад?';
+      return;
+    }
+    disarmLoadExample();
+    /* той самий шлях, що для будь-якого іншого стану: migrateState()
+       піднімає старий формат EXAMPLE_STATE (tasks-рядки, audiences без id),
+       applyFormState() перемальовує форму */
+    applyFormState(migrateState(EXAMPLE_STATE));
+    saveState();
+    updateSubmitState();
   });
 
   /* копіювання звіту: без мережі, лише буфер обміну браузера */
