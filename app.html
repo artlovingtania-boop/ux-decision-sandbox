@@ -1678,10 +1678,6 @@ firebase.initializeApp(firebaseConfig);
           { name: 'Принцип групування', value: 'за типом контенту' },
           { name: 'Розподіл ваги', value: 'рівний' }
         ],
-        metrics: [
-          { name: 'Кроків до задачі', value: 5 },
-          { name: 'Розкид кроків', value: 3 }
-        ],
         remarks: [
           { level: 'критично', text: 'Спосіб допомогти стоїть п’ятим. Людина, яка прийшла вже готовою переказати кошти, проходить чотири блоки, що її не переконують, — вона вже переконана.' },
           { level: 'помірно', text: 'Звіти й партнери стоять поруч і читаються як один довгий блок доказів: погляд не має за що зачепитись.' }
@@ -1706,10 +1702,6 @@ firebase.initializeApp(firebaseConfig);
           { name: 'Принцип групування', value: 'за задачею' },
           { name: 'Розподіл ваги', value: 'TT1' }
         ],
-        metrics: [
-          { name: 'Кроків до задачі', value: 2 },
-          { name: 'Розкид кроків', value: 1 }
-        ],
         remarks: [
           { level: 'незначно', text: 'Події стоять останніми — той, хто шукає найближчу подію, гортає всю сторінку.' }
         ],
@@ -1732,10 +1724,6 @@ firebase.initializeApp(firebaseConfig);
           { name: 'Доказова база до дії', value: 'повна' },
           { name: 'Принцип групування', value: 'за етапом знайомства' },
           { name: 'Розподіл ваги', value: 'TT2' }
-        ],
-        metrics: [
-          { name: 'Кроків до задачі', value: 4 },
-          { name: 'Розкид кроків', value: 1 }
         ],
         remarks: [
           { level: 'помірно', text: 'Три блоки поспіль пояснюють і доводять. Читач, який уже вирішив допомогти, змушений пройти їх усі, перш ніж побачить, як саме це зробити.' },
@@ -2336,18 +2324,20 @@ firebase.initializeApp(firebaseConfig);
     }
   }
 
-  /* мінімум рахується по трьох варіантах окремо для кожної метрики;
-     якщо мінімум спільний, позначку отримують усі, хто його ділить */
+  /* Найменший "До найдальшої задачі" серед трьох варіантів — єдина
+     метрика в картці, тож єдине число, не мапа по назвах. Варіанти без
+     задач (variant.metrics === null) пропускаються. null, якщо жоден
+     варіант метрик не має. Спільний мінімум — тег дістають усі, хто
+     його ділить (звірка на рівність нижче, у renderMetrics()). */
   function metricMinimums() {
-    var mins = {};
+    var min = null;
     currentRun.result.variants.forEach(function (variant) {
-      variant.metrics.forEach(function (metric) {
-        if (mins[metric.name] === undefined || metric.value < mins[metric.name]) {
-          mins[metric.name] = metric.value;
-        }
-      });
+      if (!variant.metrics) { return; }
+      if (min === null || variant.metrics.max.section < min) {
+        min = variant.metrics.max.section;
+      }
     });
-    return mins;
+    return min;
   }
 
   function renderFlow(variant) {
@@ -2382,24 +2372,36 @@ firebase.initializeApp(firebaseConfig);
     return section;
   }
 
-  function renderMetrics(variant, mins) {
+  /* Секції нема, якщо задач немає взагалі (variant.metrics === null) —
+     computeVariantMetrics() тоді повертає null уніфіковано для всіх
+     трьох варіантів разом (той самий стан state.tasks для кожного
+     виклику), тож 7-рядковий subgrid карток не розсинхронізується. */
+  function renderMetrics(variant, minSection) {
+    if (!variant.metrics) { return null; }
+
     var section = el('div', 'card-section card-section--divided');
     section.appendChild(el('span', 'section-label', 'Порівняльні метрики'));
-    section.appendChild(el('p', 'field-hint', 'порогів немає — метрики показують різницю між варіантами, не оцінку'));
+    section.appendChild(el('p', 'field-hint', 'порогу немає — число показує різницю між варіантами, не оцінку'));
 
-    var list = el('div', 'metric-list');
-    variant.metrics.forEach(function (metric) {
-      var row = el('div', 'metric-row');
-      row.appendChild(el('span', 'metric-label', metric.name));
-      var value = el('span', 'metric-row__value');
-      value.appendChild(el('span', null, String(metric.value)));
-      if (metric.value === mins[metric.name]) {
-        value.appendChild(el('span', 'tag tag--muted', 'мін.'));
-      }
-      row.appendChild(value);
-      list.appendChild(row);
-    });
-    section.appendChild(list);
+    var row = el('div', 'metric-row');
+    row.appendChild(el('span', 'metric-label', 'До найдальшої задачі'));
+    row.appendChild(el('span', 'metric-row__value', String(variant.metrics.max.section)));
+    section.appendChild(row);
+
+    section.appendChild(el('p', 'field-caption',
+      '«' + variant.metrics.max.task + '» — вперше на секції ' + variant.metrics.max.section + ' з ' + variant.flow.length));
+
+    /* тег — окремим рядком, не в одному рядку з підписом metric-row: довше
+       за старе "мін.", ламало підпис зліва на три рядки. Місце під нього
+       зайняте в усіх картках (variant-card__badge--empty), той самий
+       прийом, що для бейджа "чистий за обома перевірками" вище в картці —
+       інакше висота секції різна й картки не вирівнюються поглядом. */
+    var shortestTag = el('span', 'tag tag--muted', 'найкоротше');
+    if (variant.metrics.max.section !== minSection) {
+      shortestTag.classList.add('variant-card__badge--empty');
+    }
+    section.appendChild(shortestTag);
+
     return section;
   }
 
@@ -2448,7 +2450,8 @@ firebase.initializeApp(firebaseConfig);
 
       card.appendChild(renderFlow(variant));
       card.appendChild(renderAxes(variant));
-      card.appendChild(renderMetrics(variant, mins));
+      var metricsSection = renderMetrics(variant, mins);
+      if (metricsSection) { card.appendChild(metricsSection); }
       card.appendChild(renderRemarks(variant));
       card.appendChild(renderConclusion(variant));
 
@@ -2494,7 +2497,6 @@ firebase.initializeApp(firebaseConfig);
       }).join('; '));
     }
 
-    var mins = metricMinimums();
     currentRun.result.variants.forEach(function (variant) {
       lines.push('');
       lines.push('— — —');
@@ -2513,11 +2515,14 @@ firebase.initializeApp(firebaseConfig);
       variant.axes.forEach(function (axis) {
         lines.push('  ' + axis.name + ': ' + axis.value);
       });
-      lines.push('');
-      lines.push('Порівняльні метрики (порогів немає — показують різницю між варіантами, не оцінку):');
-      variant.metrics.forEach(function (metric) {
-        lines.push('  ' + metric.name + ': ' + metric.value + (metric.value === mins[metric.name] ? ' (мін.)' : ''));
-      });
+      if (variant.metrics) {
+        lines.push('');
+        lines.push('Порівняльні метрики (порогу немає — число показує різницю між варіантами, не оцінку):');
+        variant.metrics.tasks.forEach(function (t) {
+          lines.push('  ' + t.task + ' — секція ' + t.section);
+        });
+        lines.push('  Розкид: ' + (variant.metrics.max.section - variant.metrics.min.section));
+      }
       lines.push('');
       lines.push('Персонний аудит:');
       variant.remarks.forEach(function (remark) {
@@ -2769,15 +2774,55 @@ firebase.initializeApp(firebaseConfig);
     });
 
     return Promise.all(requests).then(function (orders) {
-      return buildGenerateResult(orders, axesCombos);
+      return buildGenerateResult(orders, axesCombos, state);
     });
   }
 
-  /* Структура результату не змінюється — тільки flow/axes/subtitle реальні
-     (з order і заданої комбінації), metrics/remarks/conclusion/clean/
-     divergence лишаються з MOCK_RESULT: реальні метрики — наступний крок,
-     не цей. */
-  function buildGenerateResult(orders, axesCombos) {
+  /* Метрика варіанта: для кожної задачі — номер секції (1-based індекс
+     найпершого блоку в order, що прив'язаний до неї через links). Задача
+     без жодного блоку в order пропускається — Екран 2 такого не пропустить
+     (генерація заблокована, поки є непокрита задача), але код не падає.
+     Нічия за max — перша задача за порядком у state.tasks (не оновлюємо
+     max/min на рівність, лише на строге >/<). null, якщо задач немає
+     взагалі — тоді секцію метрик не рендеримо. */
+  function computeVariantMetrics(order, state) {
+    var blockByName = {};
+    state.structureBlocks.forEach(function (b) { blockByName[b.name] = b; });
+
+    var sections = [];
+    state.tasks
+      .filter(function (t) { return t.value.trim() !== ''; })
+      .forEach(function (t) {
+        var sectionNumber = null;
+        for (var i = 0; i < order.length; i++) {
+          var block = blockByName[order[i]];
+          var links = block && Array.isArray(block.links) ? block.links : [];
+          if (links.some(function (l) { return l.taskId === t.id; })) {
+            sectionNumber = i + 1;
+            break;
+          }
+        }
+        if (sectionNumber === null) { return; }
+        sections.push({ task: t.value, section: sectionNumber });
+      });
+
+    if (!sections.length) { return null; }
+
+    var max = sections[0];
+    var min = sections[0];
+    sections.forEach(function (s) {
+      if (s.section > max.section) { max = s; }
+      if (s.section < min.section) { min = s; }
+    });
+
+    return { max: max, min: min, tasks: sections };
+  }
+
+  /* Структура результату: flow/axes/subtitle/metrics реальні (з order,
+     заданої комбінації й computeVariantMetrics() відповідно) — не з
+     MOCK_RESULT. remarks/conclusion/clean/divergence поки лишаються
+     моковими: реальний розрахунок — наступний крок, не цей. */
+  function buildGenerateResult(orders, axesCombos, state) {
     return {
       variants: orders.map(function (order, i) {
         var variant = JSON.parse(JSON.stringify(MOCK_RESULT.variants[i]));
@@ -2788,6 +2833,7 @@ firebase.initializeApp(firebaseConfig);
           { name: 'Принцип групування', value: axesCombos[i].grouping },
           { name: 'Розподіл ваги', value: axesCombos[i].weight }
         ];
+        variant.metrics = computeVariantMetrics(order, state);
         return variant;
       }),
       divergence: JSON.parse(JSON.stringify(MOCK_RESULT.divergence))
