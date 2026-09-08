@@ -2385,7 +2385,7 @@ firebase.initializeApp(firebaseConfig);
     if (!taskItems.length) { return null; }
 
     var blockByName = {};
-    state.structureBlocks.forEach(function (b) { blockByName[b.name] = b; });
+    (state.structureBlocks || []).forEach(function (b) { blockByName[b.name] = b; });
 
     var sections = [];
     taskItems.forEach(function (t) {
