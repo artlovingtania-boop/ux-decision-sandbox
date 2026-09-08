@@ -2807,6 +2807,10 @@ firebase.initializeApp(firebaseConfig);
     generateBtn.textContent = 'Генеруємо…';
     generateErrorText = null;
 
+    /* Другий аргумент .then(), не .catch() після — помилка тут має ловити
+       тільки провал самого generateVariants(), не будь-яку помилку в
+       обробнику успіху нижче (запис прогону вже відбувся б, а на екрані
+       з'явилось би "не вдалось згенерувати" — неправдива діагностика). */
     generateVariants(finalState).then(function (result) {
       currentRun = {
         id: genId(),
@@ -2824,7 +2828,7 @@ firebase.initializeApp(firebaseConfig);
       saveNotice.open = !saved;
       renderCurrentRun();
       if (saved) { showToast('Прогін збережено в ', true); }
-    }).catch(function () {
+    }, function () {
       generateErrorText = 'Не вдалось згенерувати варіанти — спробуйте ще раз.';
       updateMissingSection();
     }).finally(function () {
