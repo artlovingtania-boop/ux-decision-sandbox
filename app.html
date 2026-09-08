@@ -3038,6 +3038,46 @@ firebase.initializeApp(firebaseConfig);
     return linkRow;
   }
 
+  /* Порожній рядок-чернетка: живе тільки в DOM, у links не пишеться.
+     Без linkIndex — це і є ознака "чернетка" для обробників нижче.
+     Задача — обов'язковий плейсхолдер; аудиторія (якщо є) теж порожня,
+     а не "усі аудиторії" за замовчуванням — дизайнер ще нічого не обрав. */
+  function buildDraftLinkRow(blockItem, taskItems, audienceItems, showAudienceSelect) {
+    var linkRow = el('div', 'confirm-link-row');
+    linkRow.blockItemRef = blockItem;
+
+    var taskSelect = document.createElement('sl-select');
+    taskSelect.className = 'confirm-link-task-select';
+    taskSelect.setAttribute('placeholder', 'оберіть задачу');
+    taskItems.forEach(function (taskItem) {
+      taskSelect.appendChild(makeOption(taskItem.dataset.id, taskItem.querySelector('.task-input').value));
+    });
+    linkRow.appendChild(taskSelect);
+
+    if (showAudienceSelect) {
+      linkRow.appendChild(el('span', 'field-hint', 'для'));
+
+      var audienceSelect = document.createElement('sl-select');
+      audienceSelect.className = 'confirm-link-audience-select';
+      audienceSelect.setAttribute('placeholder', 'оберіть аудиторію');
+      audienceSelect.appendChild(makeOption(AUDIENCE_ALL_VALUE, 'усі аудиторії'));
+      audienceSelect.appendChild(document.createElement('sl-divider'));
+      audienceItems.forEach(function (audienceItem) {
+        audienceSelect.appendChild(makeOption(audienceItem.dataset.id, audienceItem.querySelector('.audience-input').value));
+      });
+      linkRow.appendChild(audienceSelect);
+    }
+
+    var removeBtn = document.createElement('button');
+    removeBtn.type = 'button';
+    removeBtn.className = 'confirm-link-remove';
+    removeBtn.setAttribute('aria-label', "Прибрати рядок");
+    removeBtn.textContent = '✕';
+    linkRow.appendChild(removeBtn);
+
+    return linkRow;
+  }
+
   /* Картки Екрана 2 — власна розмітка, будується наново при кожному
      showConfirm(). Джерело істини лишається одне: dataset.links на
      самому .block-item з #block-list — картка тримає лише живе
@@ -3120,6 +3160,31 @@ firebase.initializeApp(firebaseConfig);
     if (target.classList.contains('confirm-link-task-select')) {
       var linkRow = target.closest('.confirm-link-row');
       if (!linkRow) { return; }
+
+      if (linkRow.linkIndex === undefined) {
+        /* чернетка: вибір задачі перетворює рядок на реальну пару.
+           Аудиторія — та, що вже обрана в цьому ж рядку (select.value
+           сам це пам'ятає, навіть якщо в links ще нічого не писали),
+           інакше той самий дефолт, що раніше ставив клік "+" */
+        var draftAudienceSelect = linkRow.querySelector('.confirm-link-audience-select');
+        var chosenAudienceId = draftAudienceSelect && draftAudienceSelect.value ? draftAudienceSelect.value : null;
+
+        var liveAudienceItemsForDraft = Array.from(audienceList.querySelectorAll('.audience-item')).filter(function (item) {
+          return item.querySelector('.audience-input').value.trim() !== '';
+        });
+        if (!chosenAudienceId && !liveAudienceItemsForDraft.length) { return; }
+        var newAudienceId = chosenAudienceId
+          || (liveAudienceItemsForDraft.length > 1 ? AUDIENCE_ALL_VALUE : liveAudienceItemsForDraft[0].dataset.id);
+
+        var draftLinks = JSON.parse(linkRow.blockItemRef.dataset.links || 'null');
+        if (!Array.isArray(draftLinks)) { draftLinks = []; }
+        draftLinks.push({ taskId: target.value, audienceId: newAudienceId });
+        linkRow.blockItemRef.dataset.links = JSON.stringify(draftLinks);
+        saveState();
+        renderConfirmBlocks();
+        return;
+      }
+
       var links = JSON.parse(linkRow.blockItemRef.dataset.links || 'null');
       if (!Array.isArray(links)) { return; }
       links[linkRow.linkIndex].taskId = target.value;
@@ -3132,11 +3197,19 @@ firebase.initializeApp(firebaseConfig);
     if (target.classList.contains('confirm-link-audience-select')) {
       var linkRow2 = target.closest('.confirm-link-row');
       if (!linkRow2) { return; }
+
+      target.classList.toggle('confirm-audience-select--all', target.value === AUDIENCE_ALL_VALUE);
+
+      if (linkRow2.linkIndex === undefined) {
+        /* чернетка без задачі: значення вже "запам'яталось" у самому
+           select.value — writing в links тільки коли обрано задачу */
+        return;
+      }
+
       var links2 = JSON.parse(linkRow2.blockItemRef.dataset.links || 'null');
       if (!Array.isArray(links2)) { return; }
       links2[linkRow2.linkIndex].audienceId = target.value;
       linkRow2.blockItemRef.dataset.links = JSON.stringify(links2);
-      target.classList.toggle('confirm-audience-select--all', target.value === AUDIENCE_ALL_VALUE);
       saveState();
       updateMissingSection();
       return;
@@ -3161,8 +3234,6 @@ firebase.initializeApp(firebaseConfig);
       var blockRow = addBtn.closest('.confirm-block');
       if (!blockRow || !blockRow.blockItemRef) { return; }
       var blockItem = blockRow.blockItemRef;
-      var links = JSON.parse(blockItem.dataset.links || 'null');
-      if (!Array.isArray(links)) { links = []; }
 
       var liveTaskItems = Array.from(taskList.querySelectorAll('.task-item')).filter(function (item) {
         return item.querySelector('.task-input').value.trim() !== '';
@@ -3172,16 +3243,11 @@ firebase.initializeApp(firebaseConfig);
       });
       if (!liveTaskItems.length) { return; }
 
-      /* новий рядок одразу валідний — задача за замовчуванням перша
-         наявна (дизайнер одразу її поміняє), аудиторія — усі поточні
-         або єдина наявна. Ніколи не додаємо пару з порожнім taskId. */
-      links.push({
-        taskId: liveTaskItems[0].dataset.id,
-        audienceId: liveAudienceItems.length > 1 ? AUDIENCE_ALL_VALUE : liveAudienceItems[0].dataset.id
-      });
-      blockItem.dataset.links = JSON.stringify(links);
-      saveState();
-      renderConfirmBlocks();
+      /* нічого не пишемо в links — тільки порожній рядок у DOM, з
+         плейсхолдером "оберіть задачу". Пара з'явиться, коли дизайнер
+         справді щось обере (sl-change на .confirm-link-task-select) */
+      var draftRow = buildDraftLinkRow(blockItem, liveTaskItems, liveAudienceItems, liveAudienceItems.length > 1);
+      blockRow.insertBefore(draftRow, addBtn);
       return;
     }
 
@@ -3189,6 +3255,13 @@ firebase.initializeApp(firebaseConfig);
     if (removeBtn) {
       var linkRow = removeBtn.closest('.confirm-link-row');
       if (!linkRow || !linkRow.blockItemRef) { return; }
+
+      if (linkRow.linkIndex === undefined) {
+        /* чернетка ще не в links — просто прибрати з DOM */
+        linkRow.remove();
+        return;
+      }
+
       var links2 = JSON.parse(linkRow.blockItemRef.dataset.links || 'null');
       if (!Array.isArray(links2)) { return; }
       links2.splice(linkRow.linkIndex, 1);
