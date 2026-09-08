@@ -884,6 +884,19 @@ textarea.field-input {
   flex-wrap: wrap;
 }
 
+/* Активний стан — темна заливка/рамка (.button--dark), не жовтий Shoelace
+   за замовчуванням. Звірено з джерела sl-radio-button 2.20.1: чекнутий
+   стан керується правилом .button--outline.button--default.button--checked
+   у стилях button.styles.ts, де і рамка, і фон — --sl-color-primary-600,
+   текст — --sl-color-neutral-0; нечекнута рамка — --sl-input-border-color.
+   Той самий прийом скоупингу кастомних властивостей, що для
+   sl-button[variant="primary"] нижче — тільки на ці кнопки, не глобально. */
+.audience-switcher__group {
+  --sl-color-primary-600: var(--text-primary);
+  --sl-color-neutral-0: var(--text-on-dark);
+  --sl-input-border-color: var(--border-default);
+}
+
 /* ---------- базова смуга ---------- */
 /* заливка --surface-card, не --surface-page (як картки варіантів) — точка
    відліку читається окремо від трьох альтернатив, не як четверта */
@@ -1045,6 +1058,15 @@ textarea.field-input {
   align-items: center;
   justify-content: space-between;
   gap: var(--spacing-8);
+}
+
+/* .tag не має власного display — як прямий флекс-дочірній .card-section
+   (align-items: stretch за замовчуванням) розтягується в смугу на всю
+   ширину картки замість пігулки. Бейдж "чистий за обома перевірками" це
+   не зачіпає: він живе прямо в .variant-card (grid, justify-items: start),
+   інший контейнер, інша поведінка за замовчуванням. */
+.card-section > .tag {
+  align-self: flex-start;
 }
 
 .metric-row__value {
@@ -2534,10 +2556,10 @@ firebase.initializeApp(firebaseConfig);
       var diffText = diff > 0 ? ('на ' + diff + ' коротше за твій')
         : diff < 0 ? ('на ' + (-diff) + ' довше за твій')
         : 'так само, як у твоєму';
-      section.appendChild(el('p', 'field-caption', diffText));
+      section.appendChild(el('p', 'field-hint', diffText));
     }
 
-    section.appendChild(el('p', 'field-caption',
+    section.appendChild(el('p', 'field-hint',
       '«' + metrics.max.task + '» — вперше на секції ' + metrics.max.section + ' з ' + flowLength));
 
     /* тег — окремим рядком, не в одному рядку з підписом metric-row: довше
@@ -2613,7 +2635,7 @@ firebase.initializeApp(firebaseConfig);
     right.appendChild(el('span', 'metric-label', 'До найдальшої задачі'));
     if (metrics.max) {
       right.appendChild(el('p', 'baseline-strip__value', String(metrics.max.section)));
-      right.appendChild(el('p', 'field-caption',
+      right.appendChild(el('p', 'field-hint',
         '«' + metrics.max.task + '» — вперше на секції ' + metrics.max.section + ' з ' + order.length));
     } else {
       right.appendChild(el('p', 'field-caption', 'жодна задача не прив’язана до цієї аудиторії'));
