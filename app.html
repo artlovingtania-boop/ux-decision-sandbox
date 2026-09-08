@@ -293,14 +293,24 @@ textarea.field-input {
   visibility: hidden;
 }
 
+/* легший за значення під ним — це підпис, не сам вміст. Стиль (DM Mono,
+   uppercase, letter-spacing) навмисний, лишається — тільки розмір і
+   прозорість. opacity замість нового кольору: --text-secondary той самий
+   токен, не вигадане значення — але opacity успадковується множенням:
+   якщо колись усередині .field-caption з'явиться вкладений елемент зі
+   своєю opacity, вони перемножаться, підпис стане тьмянішим, ніж тут
+   заявлено. Зміна розміру зачіпає .remark__dot нижче (центрування крапки
+   перераховано під новий line-height, дивись там) і .summary-hint —
+   та сама формула, звірена вручну, значення продубльовані свідомо */
 .field-caption {
   font-family: 'DM Mono', monospace;
   font-weight: 400;
-  font-size: 14px;
+  font-size: 12px;
   line-height: 1.4;
   letter-spacing: 0.6px;
   text-transform: uppercase;
   color: var(--text-secondary);
+  opacity: 0.85;
 }
 
 .field-hint {
@@ -798,12 +808,18 @@ textarea.field-input {
 
 /* ---------- вхідний опис ---------- */
 /* категорія поруч із заголовком: видно, що всередині, поки блок згорнутий */
+/* та сама формула, що .field-caption (звірено: розмір, line-height,
+   opacity) — два різні класи для різних контекстів (підпис поля проти
+   міток у заголовках), значення навмисно однакові */
 .summary-hint {
   font-family: 'DM Mono', monospace;
-  font-size: 14px;
+  font-weight: 400;
+  font-size: 12px;
+  line-height: 1.4;
   letter-spacing: 0.6px;
   text-transform: uppercase;
   color: var(--text-secondary);
+  opacity: 0.85;
 }
 
 #input-summary[open] .summary-hint {
@@ -1012,8 +1028,9 @@ textarea.field-input {
   flex-shrink: 0;
   width: 8px;
   height: 8px;
-  /* центр крапки на середині першого рядка підпису (14px × 1.4 = 19.6) */
-  margin-top: 6px;
+  /* центр крапки на середині першого рядка підпису .field-caption
+     (12px × 1.4 = 16.8 → (16.8-8)/2 = 4.4, округлено) */
+  margin-top: 4px;
   border-radius: var(--radius-pill);
 }
 
@@ -1105,10 +1122,75 @@ textarea.field-input {
 }
 
 /* ---------- екран 2: картки блоків ---------- */
-/* без width обидва sl-select стискались до вмісту: порожній — до самої
-   каретки, з чипами аудиторії — на всю ширину. Одна ширина під обидва. */
-.confirm-block sl-select {
+/* назва, обсяг, ряд селектів — щільніше за типовий .confirm (16px),
+   картка тут не форма-запитання, а компактний перегляд+прив'язка */
+.confirm-block {
+  gap: var(--spacing-8);
+}
+
+/* задача й аудиторія в один рядок, по половині ширини; на вузькому
+   вмісті — flex-wrap, не медіа-запит (CLAUDE.md: жодних медіазапитів) */
+.confirm-block-selects {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-12);
   width: 100%;
+}
+
+/* 220px — поріг, з якого починається перенос; без нього порожній sl-select
+   стискається до самої каретки (та сама причина, що раніше вирішував width:100%) */
+.confirm-block-selects sl-select {
+  flex: 1 1 220px;
+}
+
+/* заголовок "Задачі" і мітка джерела під ним — не в одному рядку,
+   тому мітка не читається як частина заголовка. Той самий gap-4, що
+   в .summary-row між підписом і значенням */
+.confirm-tasks-heading {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-4);
+}
+
+/* "Задачі" — заголовок + мітка джерела разом важать більше, ніж голий
+   h2 у "З твоїх слів", тож той самий .result-section gap (24) до списку
+   під ними відчувається задовге. Тут — 16, той самий крок, що вже
+   розділяє пари в #confirm-summary-body */
+.result-section--tight {
+  gap: var(--spacing-16);
+}
+
+/* "Блоки" — єдина робоча секція Екрана 2 (решта — тільки перегляд),
+   візуально важча за той самий .result-section__title. 900 — наявна
+   вага DM Sans, уже використана в .topbar__logo, нових значень нема */
+.result-section__title--heavy {
+  font-weight: 900;
+}
+
+/* "З твоїх слів" і "Задачі" — тільки перегляд, рамка без заливки
+   (--surface-page — той самий колір, що фон сторінки, тобто візуально
+   без фону; "Блоки" лишається на --surface-card із заливкою — контраст
+   переглядове/робоче). Значення — ті самі, що вже дає .variant-card на
+   result-screen, тут без grid/subgrid, які там специфічні до сітки варіантів */
+.result-section--card {
+  padding: var(--spacing-16);
+  background: var(--surface-page);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-ml);
+}
+
+/* тільки Екран 2 — .result спільний з result-screen, де 48px між великими
+   секціями (вхідний опис/картки варіантів/розходження) лишається доречним */
+#confirm-screen .result {
+  gap: var(--spacing-24);
+}
+
+/* тільки "З твоїх слів": пари лейбл-значення мають читатись групами.
+   4px усередині пари (.summary-row, поріг шкали — менше нема) лишається,
+   тут — розрив МІЖ парами, навмисно далі від нього, а не той самий .summary-rows,
+   що на result-screen (там інша розкладка — grid-колонки, не стос) */
+#confirm-summary-body {
+  gap: var(--spacing-16);
 }
 </style>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.20.1/cdn/themes/light.css">
@@ -1372,25 +1454,32 @@ sl-button[variant="text"]::part(label):hover {
 <div id="confirm-screen" hidden>
 <div class="container">
   <header class="app-head">
+    <button type="button" id="confirm-back-btn" class="button button--text">← Назад до форми</button>
     <h1 class="app-head__title">Підтвердження перед генерацією</h1>
   </header>
 
-  <div class="form-actions">
-    <button type="button" id="confirm-back-btn" class="button button--text">← Назад до форми</button>
-  </div>
+  <div class="result">
 
-  <section class="result-section">
+  <section class="result-section result-section--card">
     <h2 class="result-section__title">З твоїх слів</h2>
     <div class="summary-rows" id="confirm-summary-body"></div>
   </section>
 
-  <section class="result-section">
-    <h2 class="result-section__title">Задачі <span class="summary-hint" id="confirm-tasks-source"></span></h2>
+  <section class="result-section result-section--card result-section--tight">
+    <div class="confirm-tasks-heading">
+      <h2 class="result-section__title">Задачі</h2>
+      <span class="summary-hint" id="confirm-tasks-source"></span>
+    </div>
     <div class="summary-list" id="confirm-tasks-body"></div>
   </section>
 
+  <section class="result-section result-section--card">
+    <h2 class="result-section__title">Обмеження</h2>
+    <div id="confirm-constraints-body"></div>
+  </section>
+
   <section class="result-section">
-    <h2 class="result-section__title">Блоки</h2>
+    <h2 class="result-section__title result-section__title--heavy">Блоки</h2>
     <div class="block-list" id="confirm-blocks-body"></div>
   </section>
 
@@ -1404,6 +1493,8 @@ sl-button[variant="text"]::part(label):hover {
 
   <div class="form-actions">
     <button type="button" id="generate-btn" class="button button--primary" disabled>Згенерувати</button>
+  </div>
+
   </div>
 
 </div>
@@ -1675,6 +1766,7 @@ firebase.initializeApp(firebaseConfig);
   var confirmSummaryBody = document.getElementById('confirm-summary-body');
   var confirmTasksSource = document.getElementById('confirm-tasks-source');
   var confirmTasksBody = document.getElementById('confirm-tasks-body');
+  var confirmConstraintsBody = document.getElementById('confirm-constraints-body');
   var confirmBlocksBody = document.getElementById('confirm-blocks-body');
   var missingAlert = document.getElementById('missing-alert');
   var missingList = document.getElementById('missing-list');
@@ -2724,6 +2816,19 @@ firebase.initializeApp(firebaseConfig);
       });
   }
 
+  /* порожнє поле показуємо явно ("обмеження не задані"), не ховаємо секцію:
+     ядро вимагає, щоб дизайнер бачив, що систему не враховує обмежень,
+     а не сам вирішив, що їх немає */
+  function renderConfirmConstraints(state) {
+    confirmConstraintsBody.innerHTML = '';
+    var text = state.constraints.trim();
+    if (text) {
+      confirmConstraintsBody.appendChild(el('p', 'summary-row__value', text));
+    } else {
+      confirmConstraintsBody.appendChild(el('p', 'field-caption', 'обмеження не задані'));
+    }
+  }
+
   /* текст задачі/аудиторії — від дизайнера, тому textContent, не innerHTML-конкатенація */
   function makeOption(value, label) {
     var opt = document.createElement('sl-option');
@@ -2770,8 +2875,9 @@ firebase.initializeApp(firebaseConfig);
 
   /* Три перевірки — блок без задачі, блок без аудиторії (тільки коли
      аудиторій більше однієї — при одній дропдаун не рендериться, дизайнеру
-     нема чого обирати), задача без блоку. Блокує «Згенерувати», поки є
-     хоч один рядок. */
+     нема чого обирати), задача без блоку (тільки коли хоч один блок уже
+     щось прив'язав — на порожньому старті це не помилка). Блокує
+     «Згенерувати», поки є хоч один рядок. */
   function updateMissingSection() {
     var taskItems = Array.from(taskList.querySelectorAll('.task-item')).filter(function (item) {
       return item.querySelector('.task-input').value.trim() !== '';
@@ -2802,11 +2908,16 @@ firebase.initializeApp(firebaseConfig);
       }
     });
 
-    taskItems.forEach(function (item) {
-      if (coveredTaskIds.indexOf(item.dataset.id) === -1) {
-        rows.push('Задачу «' + item.querySelector('.task-input').value.trim() + '» не покриває жоден блок.');
-      }
-    });
+    /* на першому вході жоден блок ще не має задачі — "не покриває жоден
+       блок" тоді не помилка, а очевидність. Показуємо тільки після того,
+       як хоч один блок реально щось прив'язав */
+    if (coveredTaskIds.length > 0) {
+      taskItems.forEach(function (item) {
+        if (coveredTaskIds.indexOf(item.dataset.id) === -1) {
+          rows.push('Задачу «' + item.querySelector('.task-input').value.trim() + '» не покриває жоден блок.');
+        }
+      });
+    }
 
     missingList.innerHTML = '';
     rows.forEach(function (text) {
@@ -2847,16 +2958,35 @@ firebase.initializeApp(firebaseConfig);
 
       row.appendChild(el('p', 'field-label', blockItem.querySelector('.block-name').value));
 
+      /* обсяг — тільки перегляд того, що вже задано на формі, не поле
+         вводу; редагування лишається на Екрані 1. Рядка нема, якщо unit
+         і count обидва порожні — та сама умова, що "не визначено" на формі
+         (updateBlockCaption). unitOther замість unit, коли unit === 'інше' —
+         той самий вибір, що вже робить renderSummary()/buildReportText() */
+      var blockUnit = blockItem.querySelector('.block-unit').value;
+      var blockUnitOther = blockItem.querySelector('.block-unit-other').value;
+      var blockCount = blockItem.querySelector('.block-count').value;
+      var blockUnitLabel = blockUnit === 'інше' ? blockUnitOther : blockUnit;
+      if (blockUnitLabel) {
+        row.appendChild(el('p', 'field-caption', blockUnitLabel + (blockCount ? ' · ' + blockCount : '')));
+      }
+
+      /* задача й аудиторія — в один рядок, по половині ширини; плейсхолдер
+         замінює лейбл, який тут лише дублював його й додавав два зайвих
+         рядки. flex-wrap, не медіа-запит (CLAUDE.md: жодних медіазапитів) —
+         на вузькому вмісті селекти самі переносяться один під одного */
+      var selectsRow = el('div', 'confirm-block-selects');
+      row.appendChild(selectsRow);
+
       var taskSelect = document.createElement('sl-select');
       taskSelect.className = 'confirm-task-select';
       taskSelect.setAttribute('multiple', '');
-      taskSelect.setAttribute('label', 'Задача(і)');
       taskSelect.setAttribute('placeholder', 'оберіть задачу');
       taskItems.forEach(function (taskItem) {
         taskSelect.appendChild(makeOption(taskItem.dataset.id, taskItem.querySelector('.task-input').value));
       });
       taskSelect.appendChild(makeOption(TASK_NONE_VALUE, 'без задачі'));
-      row.appendChild(taskSelect);
+      selectsRow.appendChild(taskSelect);
 
       /* у компонент завжди йде масив ([] замість null) — null живе тільки
          в dataset. Порожній вибір без __none__ лишається null (нижче,
@@ -2872,13 +3002,12 @@ firebase.initializeApp(firebaseConfig);
         var audienceSelect = document.createElement('sl-select');
         audienceSelect.className = 'confirm-audience-select';
         audienceSelect.setAttribute('multiple', '');
-        audienceSelect.setAttribute('label', 'Аудиторія');
         audienceSelect.setAttribute('placeholder', 'оберіть аудиторію');
         audienceSelect.appendChild(makeOption(AUDIENCE_ALL_VALUE, 'усі аудиторії'));
         audienceItems.forEach(function (audienceItem) {
           audienceSelect.appendChild(makeOption(audienceItem.dataset.id, audienceItem.querySelector('.audience-input').value));
         });
-        row.appendChild(audienceSelect);
+        selectsRow.appendChild(audienceSelect);
 
         /* дизайнер обирає явно: null (не обрано) — порожній селект, жодної
            галочки; __all__ — свій рядок у dataset, у компоненті йде як
@@ -2993,6 +3122,7 @@ firebase.initializeApp(firebaseConfig);
     confirmScreen.hidden = false;
     renderConfirmSummary(state);
     renderConfirmTasks(state);
+    renderConfirmConstraints(state);
     renderConfirmBlocks();
     window.scrollTo(0, 0);
   }
