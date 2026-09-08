@@ -884,6 +884,39 @@ textarea.field-input {
   flex-wrap: wrap;
 }
 
+/* ---------- базова смуга ---------- */
+/* заливка --surface-card, не --surface-page (як картки варіантів) — точка
+   відліку читається окремо від трьох альтернатив, не як четверта */
+.baseline-strip {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--spacing-24);
+  padding: var(--spacing-24);
+  background: var(--surface-card);
+  border-radius: var(--radius-ml);
+}
+
+.baseline-strip__col {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-8);
+}
+
+.baseline-strip__col--metric {
+  padding-left: var(--spacing-24);
+  border-left: 1px solid var(--border-card);
+}
+
+/* найбільший кегль, уже вжитий на цьому екрані (.variant-card__title,
+   .result-section__title) — не вигадане значення */
+.baseline-strip__value {
+  font-weight: 700;
+  font-size: 20px;
+  line-height: 1.15;
+  letter-spacing: -0.44px;
+  color: var(--text-primary);
+}
+
 /* ---------- картки варіантів ---------- */
 /* сім рядків: бейдж, шапка, потік, осі, метрики, аудит, висновок.
    Картки — subgrid цієї ж сітки, тому однойменні секції всіх трьох
@@ -1579,6 +1612,8 @@ sl-button[variant="text"]::part(label):hover {
 
     <div class="audience-switcher" id="audience-switcher" hidden></div>
 
+    <div class="baseline-strip" id="baseline-strip" hidden></div>
+
     <div class="variants-grid" id="variants-grid"></div>
 
     <section class="result-section">
@@ -1792,6 +1827,7 @@ firebase.initializeApp(firebaseConfig);
   var inputSummary = document.getElementById('input-summary');
   var summaryHint = document.getElementById('summary-hint');
   var audienceSwitcher = document.getElementById('audience-switcher');
+  var baselineStrip = document.getElementById('baseline-strip');
   var variantsGrid = document.getElementById('variants-grid');
   var divergenceBody = document.getElementById('divergence-body');
   var saveNotice = document.getElementById('save-notice');
@@ -2530,14 +2566,63 @@ firebase.initializeApp(firebaseConfig);
     return section;
   }
 
+  /* Базова смуга — порядок блоків як введено на Екрані 1, точка відліку,
+     не четверта альтернатива: не картка в сітці, не бере участі в
+     metricMinimums() і не отримує тег "найкоротше" — вона не змагається
+     з варіантами. Порядок зі збігом із якимось згенерованим варіантом —
+     не дубль, лишається: це нормальний результат.
+     Той самий null / {max:null} патерн, що в картках (computeVariantMetrics()):
+     null — задач немає взагалі, смуга не рендериться; max: null — жодна
+     задача не прив'язана до поточної аудиторії, той самий текст, що в картці. */
+  function renderBaselineStrip(order, metrics) {
+    baselineStrip.innerHTML = '';
+
+    if (!metrics) {
+      baselineStrip.hidden = true;
+      return;
+    }
+    baselineStrip.hidden = false;
+
+    var left = el('div', 'baseline-strip__col');
+    left.appendChild(el('span', 'section-label', 'Твій порядок'));
+    left.appendChild(el('p', 'field-caption', 'як введено на Екрані 1 · осей немає'));
+    var flow = el('div', 'flow');
+    order.forEach(function (name, index) {
+      var item = el('span', 'flow__item');
+      item.appendChild(el('span', 'flow__index', String(index + 1) + ' ·'));
+      item.appendChild(el('span', null, name));
+      flow.appendChild(item);
+    });
+    left.appendChild(flow);
+    baselineStrip.appendChild(left);
+
+    var right = el('div', 'baseline-strip__col baseline-strip__col--metric');
+    right.appendChild(el('span', 'metric-label', 'До найдальшої задачі'));
+    if (metrics.max) {
+      right.appendChild(el('p', 'baseline-strip__value', String(metrics.max.section)));
+      right.appendChild(el('p', 'field-caption',
+        '«' + metrics.max.task + '» — вперше на секції ' + metrics.max.section + ' з ' + order.length));
+    } else {
+      right.appendChild(el('p', 'field-caption', 'жодна задача не прив’язана до цієї аудиторії'));
+    }
+    baselineStrip.appendChild(right);
+  }
+
   /* Метрики рахуються наживо з currentRun.input для selectedMetricsAudienceId —
      ніякого звернення до моделі: перемикач аудиторії (renderAudienceSwitcher())
-     лише міняє цю змінну й кличе renderVariants() знову. */
+     лише міняє цю змінну й кличе renderVariants() знову — це заразом
+     перераховує й базову смугу (renderBaselineStrip() наприкінці). */
   function renderVariants() {
+    var state = currentRun.input;
+    var baselineOrder = (state.structureBlocks || [])
+      .filter(function (b) { return b.name.trim() !== ''; })
+      .map(function (b) { return b.name; });
+    var baselineMetrics = computeVariantMetrics(baselineOrder, state, selectedMetricsAudienceId);
+
     var metricsList = currentRun.result.variants.map(function (variant) {
       return computeVariantMetrics(
         variant.flow.map(function (b) { return b.name; }),
-        currentRun.input,
+        state,
         selectedMetricsAudienceId
       );
     });
@@ -2570,6 +2655,8 @@ firebase.initializeApp(firebaseConfig);
 
       variantsGrid.appendChild(card);
     });
+
+    renderBaselineStrip(baselineOrder, baselineMetrics);
   }
 
   function renderDivergence() {
