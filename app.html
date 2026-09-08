@@ -2507,7 +2507,7 @@ firebase.initializeApp(firebaseConfig);
      виклику), тож 7-рядковий subgrid карток не розсинхронізується.
      metrics.max === null (задачі є, жодна не прив'язана до цієї
      аудиторії) — секція лишається, число заміняється поясненням. */
-  function renderMetrics(metrics, minSection, flowLength) {
+  function renderMetrics(metrics, minSection, flowLength, baselineMetrics) {
     if (!metrics) { return null; }
 
     var section = el('div', 'card-section card-section--divided');
@@ -2523,6 +2523,19 @@ firebase.initializeApp(firebaseConfig);
     row.appendChild(el('span', 'metric-label', 'До найдальшої задачі'));
     row.appendChild(el('span', 'metric-row__value', String(metrics.max.section)));
     section.appendChild(row);
+
+    /* різниця з базовою смугою — поруч із числом, окремим дрібним рядком
+       (не в самому metric-row: той самий урок, що з тегом "найкоротше"
+       нижче — довший текст в одному рядку з підписом ламає його на три
+       рядки). Базова смуга сама тегу й різниці не показує й не отримує —
+       вона точка відліку, не учасник порівняння. */
+    if (baselineMetrics && baselineMetrics.max) {
+      var diff = baselineMetrics.max.section - metrics.max.section;
+      var diffText = diff > 0 ? ('на ' + diff + ' коротше за твій')
+        : diff < 0 ? ('на ' + (-diff) + ' довше за твій')
+        : 'так само, як у твоєму';
+      section.appendChild(el('p', 'field-caption', diffText));
+    }
 
     section.appendChild(el('p', 'field-caption',
       '«' + metrics.max.task + '» — вперше на секції ' + metrics.max.section + ' з ' + flowLength));
@@ -2648,7 +2661,7 @@ firebase.initializeApp(firebaseConfig);
 
       card.appendChild(renderFlow(variant));
       card.appendChild(renderAxes(variant));
-      var metricsSection = renderMetrics(metricsList[index], mins, variant.flow.length);
+      var metricsSection = renderMetrics(metricsList[index], mins, variant.flow.length, baselineMetrics);
       if (metricsSection) { card.appendChild(metricsSection); }
       card.appendChild(renderRemarks(variant));
       card.appendChild(renderConclusion(variant));
