@@ -880,21 +880,44 @@ textarea.field-input {
 .audience-switcher__row {
   display: flex;
   align-items: center;
-  gap: var(--spacing-12);
+  gap: var(--spacing-8);
   flex-wrap: wrap;
 }
 
-/* Активний стан — темна заливка/рамка (.button--dark), не жовтий Shoelace
-   за замовчуванням. Звірено з джерела sl-radio-button 2.20.1: чекнутий
-   стан керується правилом .button--outline.button--default.button--checked
-   у стилях button.styles.ts, де і рамка, і фон — --sl-color-primary-600,
-   текст — --sl-color-neutral-0; нечекнута рамка — --sl-input-border-color.
-   Той самий прийом скоупингу кастомних властивостей, що для
-   sl-button[variant="primary"] нижче — тільки на ці кнопки, не глобально. */
-.audience-switcher__group {
-  --sl-color-primary-600: var(--text-primary);
-  --sl-color-neutral-0: var(--text-on-dark);
-  --sl-input-border-color: var(--border-default);
+/* Нативні кнопки, не sl-radio-group: sl-radio-group зліплює сусідні
+   sl-radio-button у сегментований контрол (спільна рамка, обнулені
+   внутрішні радіуси — керується :host([data-sl-button-group__button--*])
+   усередині shadow DOM самого radio-button, це не проходить через жоден
+   ::part()). Тут потрібні окремі пігулки, тож — button + aria-pressed,
+   обробник кличе renderAudienceSwitcher() і renderVariants() удвох:
+   на відміну від sl-radio-group, ніщо не підтримує aria-pressed/назву
+   аудиторії саме собою. */
+.audience-switcher__pill {
+  padding: var(--spacing-8) var(--spacing-20);
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border-default);
+  background: transparent;
+  font-family: 'DM Sans', sans-serif;
+  font-weight: 700;
+  font-size: 14px;
+  line-height: 1.2;
+  color: var(--text-primary);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.audience-switcher__pill[aria-pressed="true"] {
+  background: var(--text-primary);
+  border-color: var(--text-primary);
+  color: var(--text-on-dark);
+}
+
+/* повна назва обраної аудиторії — окремим рядком під пігулками, міняється
+   разом із вибором (тип у пігулці — коротка мітка, не вся фраза) */
+.audience-switcher__name {
+  font-size: 16px;
+  line-height: 1.5;
+  color: var(--text-primary);
 }
 
 /* ---------- базова смуга ---------- */
@@ -2133,20 +2156,6 @@ firebase.initializeApp(firebaseConfig);
       });
   }
 
-  /* Той самий патерн і та сама причина, що setSlSelectValue(): значення,
-     виставлене одразу після appendChild, губиться, поки sl-radio-group і
-     sl-radio-button ще не завершили асинхронне підвантаження Shoelace. */
-  function setSlRadioGroupValue(group, value) {
-    return Promise.all([customElements.whenDefined('sl-radio-group'), customElements.whenDefined('sl-radio-button')])
-      .then(function () {
-        var buttons = Array.from(group.querySelectorAll('sl-radio-button'));
-        return Promise.all([group.updateComplete].concat(buttons.map(function (b) { return b.updateComplete; })));
-      })
-      .then(function () {
-        group.value = value;
-      });
-  }
-
   function addAudienceRow(value, type, id) {
     var item = document.createElement('div');
     item.className = 'audience-item';
@@ -2917,8 +2926,12 @@ firebase.initializeApp(firebaseConfig);
   /* Перемикач між #input-summary й .variants-grid. Нема взагалі, якщо
      аудиторія одна — тоді перемикати нічого, і всі links блоків і так
      примусово нормалізовані на цю єдину аудиторію (pruneConfirmRefs()
-     на Екрані 2). Перебудовується заново при кожному renderCurrentRun();
-     сам вибір міняє лише renderVariants(), не цю розмітку. */
+     на Екрані 2). Перебудовується заново при кожному renderCurrentRun()
+     і при кожному кліку (аудиторія зі свіжим aria-pressed і назва під
+     пігулками — обидва залежать від вибору, самі себе не підтримують,
+     на відміну від sl-radio-group). Пігулка показує тільки тип
+     ("головна"/"другорядна") — повне речення з форми не влазить у таб,
+     повна назва — окремим рядком нижче. */
   function renderAudienceSwitcher() {
     var audiences = currentRun.input.audiences.filter(function (a) { return a.value.trim() !== ''; });
     audienceSwitcher.innerHTML = '';
@@ -2932,28 +2945,32 @@ firebase.initializeApp(firebaseConfig);
     var row = el('div', 'audience-switcher__row');
     row.appendChild(el('span', 'field-caption', 'Числа для аудиторії'));
 
-    var group = document.createElement('sl-radio-group');
-    group.className = 'audience-switcher__group';
     audiences.forEach(function (a) {
-      var btn = document.createElement('sl-radio-button');
-      btn.setAttribute('value', a.id);
-      btn.textContent = a.value + ' · ' + a.type;
-      group.appendChild(btn);
+      var btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'audience-switcher__pill';
+      btn.dataset.audienceId = a.id;
+      btn.setAttribute('aria-pressed', String(a.id === selectedMetricsAudienceId));
+      btn.textContent = a.type;
+      row.appendChild(btn);
     });
-    row.appendChild(group);
     audienceSwitcher.appendChild(row);
-    setSlRadioGroupValue(group, selectedMetricsAudienceId);
+
+    var selected = audiences.filter(function (a) { return a.id === selectedMetricsAudienceId; })[0] || audiences[0];
+    audienceSwitcher.appendChild(el('p', 'audience-switcher__name', selected.value));
 
     audienceSwitcher.appendChild(el('p', 'field-hint',
       'Перемикач впливає тільки на метрики. Структура варіантів однакова в обох режимах.'));
   }
 
   /* Перемикання не звертається до моделі — метрики рахуються наживо з
-     currentRun.input у renderVariants(). Делеговано на контейнер, не на
-     сам group: розмітка перебудовується щоразу в renderAudienceSwitcher(). */
-  audienceSwitcher.addEventListener('sl-change', function (event) {
-    if (!event.target.classList.contains('audience-switcher__group')) { return; }
-    selectedMetricsAudienceId = event.target.value;
+     currentRun.input у renderVariants(). Делеговано на контейнер: розмітка
+     перебудовується щоразу в renderAudienceSwitcher(). */
+  audienceSwitcher.addEventListener('click', function (event) {
+    var btn = event.target.closest('.audience-switcher__pill');
+    if (!btn) { return; }
+    selectedMetricsAudienceId = btn.dataset.audienceId;
+    renderAudienceSwitcher();
     renderVariants();
   });
 
