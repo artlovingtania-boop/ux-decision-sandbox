@@ -1803,6 +1803,11 @@ firebase.initializeApp(firebaseConfig);
      missing-alert, не окремий елемент; null, поки провалу не було або
      він знятий новою спробою */
   var generateErrorText = null;
+  /* true під час виклику /api/generate — updateMissingSection() враховує
+     цей прапорець при виставленні generateBtn.disabled, інакше дизайнер
+     міг би змінити прив'язку на Екрані 2 просто зараз (чек-лист стане
+     "готово") і запустити другу генерацію поверх першої, що ще йде */
+  var generationInProgress = false;
 
   var loginScreen = document.getElementById('login-screen');
   var loginForm = document.getElementById('login-form');
@@ -2852,6 +2857,7 @@ firebase.initializeApp(firebaseConfig);
     var originalGenerateText = generateBtn.textContent;
     generateBtn.textContent = 'Генеруємо…';
     generateErrorText = null;
+    generationInProgress = true;
 
     /* Другий аргумент .then(), не .catch() після — помилка тут має ловити
        тільки провал самого generateVariants(), не будь-яку помилку в
@@ -2878,6 +2884,7 @@ firebase.initializeApp(firebaseConfig);
       generateErrorText = 'Не вдалось згенерувати варіанти — спробуйте ще раз.';
       updateMissingSection();
     }).finally(function () {
+      generationInProgress = false;
       generateBtn.textContent = originalGenerateText;
       updateMissingSection();
     });
@@ -3188,7 +3195,10 @@ firebase.initializeApp(firebaseConfig);
     missingAlert.variant = generateErrorText ? 'danger' : (ready ? 'neutral' : 'warning');
     missingList.hidden = rows.length === 0;
     missingSummary.hidden = !(ready && !generateErrorText);
-    generateBtn.disabled = !ready;
+    /* generationInProgress тримає кнопку заблокованою, навіть якщо
+       checklist саме зараз став готовим (дизайнер щось поправив, поки
+       йде запит) — інакше можна запустити другу генерацію поверх першої */
+    generateBtn.disabled = !ready || generationInProgress;
   }
 
   /* Один рядок-прив'язка: "задача ▾ для аудиторія ▾ ✕". Аудиторія й
