@@ -1811,6 +1811,10 @@ firebase.initializeApp(firebaseConfig);
   /* опція "усі аудиторії" в дропдауні аудиторії рядка-прив'язки — рядок,
      не id, тож зіткнення зі справжнім genId() практично неможливе */
   var AUDIENCE_ALL_VALUE = '__all__';
+  /* текст останнього провалу /api/generate — показується через той самий
+     missing-alert, не окремий елемент; null, поки провалу не було або
+     він знятий новою спробою */
+  var generateErrorText = null;
 
   var loginScreen = document.getElementById('login-screen');
   var loginForm = document.getElementById('login-form');
@@ -2666,29 +2670,167 @@ firebase.initializeApp(firebaseConfig);
     runConfirm.hidden = false;
   }
 
+  /* Три комбінації осей для трьох варіантів — кожне значення evidence й
+     grouping зустрічається рівно раз; розподіл ваги — TT1/TT2/рівний,
+     доповнюється "рівний", якщо реальних задач менше двох (звідки взяти
+     другий top task нема) */
+  function buildAxisCombinations(state) {
+    var taskCount = state.tasks.filter(function (t) { return t.value.trim() !== ''; }).length;
+    var weightValues = taskCount >= 2
+      ? ['TT1', 'TT2', 'рівний']
+      : (taskCount === 1 ? ['TT1', 'рівний', 'рівний'] : ['рівний', 'рівний', 'рівний']);
+    return [
+      { evidence: 'мінімальна', grouping: 'за типом контенту', weight: weightValues[0] },
+      { evidence: 'достатня', grouping: 'за задачею', weight: weightValues[1] },
+      { evidence: 'повна', grouping: 'за етапом знайомства', weight: weightValues[2] }
+    ];
+  }
+
+  /* Блоки для запиту моделі: назва, обсяг (unitOther замість unit, коли
+     unit === 'інше' — той самий вибір, що й в решті коду) і назви задач,
+     які блок закриває — з links, без дублів, без audienceId (моделі тут
+     потрібен лише зв'язок блок→задача, не блок→аудиторія) */
+  function buildBlocksPayload(state) {
+    var taskById = {};
+    state.tasks.forEach(function (t) { taskById[t.id] = t.value; });
+    return state.structureBlocks
+      .filter(function (b) { return b.name.trim() !== ''; })
+      .map(function (b) {
+        var unit = b.unit === 'інше' ? b.unitOther : b.unit;
+        var taskNames = [];
+        if (Array.isArray(b.links)) {
+          b.links.forEach(function (link) {
+            var name = taskById[link.taskId];
+            if (name && taskNames.indexOf(name) === -1) { taskNames.push(name); }
+          });
+        }
+        return { name: b.name, unit: unit, count: b.count, tasks: taskNames };
+      });
+  }
+
+  /* Один запит до /api/generate. Провал мережі чи розбіжність між order
+     і реальними назвами блоків (fetchValidatedOrder) — одна повторна
+     спроба; провал і тоді — відмова піднімається до generateVariants(). */
+  function fetchGenerateOrder(payload) {
+    return fetch('/api/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    }).then(function (res) {
+      if (!res.ok) { throw new Error('Запит не вдався'); }
+      return res.json();
+    }).then(function (data) {
+      if (!data || !Array.isArray(data.order)) { throw new Error('Відповідь без order'); }
+      return data.order;
+    });
+  }
+
+  function fetchValidatedOrder(payload, validNames) {
+    var validSet = validNames.slice().sort().join('|');
+    function attempt() {
+      return fetchGenerateOrder(payload).then(function (order) {
+        var trimmed = order.map(function (name) { return String(name).trim(); });
+        if (trimmed.slice().sort().join('|') !== validSet) {
+          throw new Error('order не збігається з блоками');
+        }
+        return trimmed;
+      });
+    }
+    return attempt().catch(attempt);
+  }
+
+  /* Три виклики — по одному на комбінацію осей, паралельно; кожен зі
+     своєю валідацією й повторною спробою. */
+  function generateVariants(state) {
+    var validNames = state.structureBlocks
+      .filter(function (b) { return b.name.trim() !== ''; })
+      .map(function (b) { return b.name.trim(); });
+
+    var axesCombos = buildAxisCombinations(state);
+    var blocksPayload = buildBlocksPayload(state);
+    var tasksPayload = state.tasks
+      .filter(function (t) { return t.value.trim() !== ''; })
+      .map(function (t) { return t.value; });
+    var audienceText = state.audiences
+      .filter(function (a) { return a.value.trim() !== ''; })
+      .map(function (a) { return a.value + ' (' + a.type + ')'; })
+      .join('; ');
+
+    var requests = axesCombos.map(function (axes) {
+      return fetchValidatedOrder({
+        category: state.category,
+        support: state.support,
+        audience: audienceText,
+        goal: state.goal,
+        tasks: tasksPayload,
+        blocks: blocksPayload,
+        axes: axes
+      }, validNames);
+    });
+
+    return Promise.all(requests).then(function (orders) {
+      return buildGenerateResult(orders, axesCombos);
+    });
+  }
+
+  /* Структура результату не змінюється — тільки flow/axes/subtitle реальні
+     (з order і заданої комбінації), metrics/remarks/conclusion/clean/
+     divergence лишаються з MOCK_RESULT: реальні метрики — наступний крок,
+     не цей. */
+  function buildGenerateResult(orders, axesCombos) {
+    return {
+      variants: orders.map(function (order, i) {
+        var variant = JSON.parse(JSON.stringify(MOCK_RESULT.variants[i]));
+        variant.flow = order.map(function (name) { return { name: name }; });
+        variant.subtitle = 'Групування ' + axesCombos[i].grouping;
+        variant.axes = [
+          { name: 'Доказова база до дії', value: axesCombos[i].evidence },
+          { name: 'Принцип групування', value: axesCombos[i].grouping },
+          { name: 'Розподіл ваги', value: axesCombos[i].weight }
+        ];
+        return variant;
+      }),
+      divergence: JSON.parse(JSON.stringify(MOCK_RESULT.divergence))
+    };
+  }
+
   /* Раніше — локальна finish() усередині runAnalysis(). Тепер між виведенням
      Top Tasks і записом прогону став Екран 2, тож цю дію викликає кнопка
      «Згенерувати» зі свіжим collectState() — функція винесена на рівень
-     модуля і читає category з finalState, а не із зовнішньої змінної. */
+     модуля і читає category з finalState, а не із зовнішньої змінної.
+     Асинхронна: спершу три виклики /api/generate, потім запис прогону.
+     На час запиту — той самий патерн блокування кнопки, що в runAnalysis()
+     для confirmRunBtn. */
   function finishRun(finalState) {
-    currentRun = {
-      id: genId(),
-      date: new Date().toISOString(),
-      category: finalState.category,
-      seq: nextSeq(finalState.category),
-      title: '',
-      input: finalState,
-      /* копія, а не посилання: пізніше результат прийде від моделі
-         і буде різним для кожного прогону */
-      result: JSON.parse(JSON.stringify(MOCK_RESULT))
-    };
-    runs.unshift(currentRun);
+    generateBtn.disabled = true;
+    var originalGenerateText = generateBtn.textContent;
+    generateBtn.textContent = 'Генеруємо…';
+    generateErrorText = null;
 
-    /* провал запису більше не мовчить; успіх — коротке повідомлення */
-    var saved = saveState();
-    saveNotice.open = !saved;
-    renderCurrentRun();
-    if (saved) { showToast('Прогін збережено в ', true); }
+    generateVariants(finalState).then(function (result) {
+      currentRun = {
+        id: genId(),
+        date: new Date().toISOString(),
+        category: finalState.category,
+        seq: nextSeq(finalState.category),
+        title: '',
+        input: finalState,
+        result: result
+      };
+      runs.unshift(currentRun);
+
+      /* провал запису більше не мовчить; успіх — коротке повідомлення */
+      var saved = saveState();
+      saveNotice.open = !saved;
+      renderCurrentRun();
+      if (saved) { showToast('Прогін збережено в ', true); }
+    }).catch(function () {
+      generateErrorText = 'Не вдалось згенерувати варіанти — спробуйте ще раз.';
+      updateMissingSection();
+    }).finally(function () {
+      generateBtn.textContent = originalGenerateText;
+      updateMissingSection();
+    });
   }
 
   function runAnalysis() {
@@ -2979,15 +3121,23 @@ firebase.initializeApp(firebaseConfig);
       });
     }
 
+    var ready = rows.length === 0;
+
+    /* провал /api/generate не належить до чек-листа — не блокує кнопку
+       (це не причина, чому генерувати не можна, а привід спробувати ще
+       раз), лише додається до того самого списку й перефарбовує alert */
+    if (generateErrorText) {
+      rows.push(generateErrorText);
+    }
+
     missingList.innerHTML = '';
     rows.forEach(function (text) {
       missingList.appendChild(el('p', 'summary-row__value', text));
     });
 
-    var ready = rows.length === 0;
-    missingAlert.variant = ready ? 'neutral' : 'warning';
-    missingList.hidden = ready;
-    missingSummary.hidden = !ready;
+    missingAlert.variant = generateErrorText ? 'danger' : (ready ? 'neutral' : 'warning');
+    missingList.hidden = rows.length === 0;
+    missingSummary.hidden = !(ready && !generateErrorText);
     generateBtn.disabled = !ready;
   }
 
@@ -3280,6 +3430,8 @@ firebase.initializeApp(firebaseConfig);
     resultScreen.hidden = true;
     loginScreen.hidden = true;
     confirmScreen.hidden = false;
+    /* новий вхід на екран — стара помилка генерації більше не про поточну спробу */
+    generateErrorText = null;
     renderConfirmSummary(state);
     renderConfirmTasks(state);
     renderConfirmConstraints(state);
