@@ -2481,15 +2481,15 @@ firebase.initializeApp(firebaseConfig);
     window.scrollTo(0, 0);
   }
 
-  /* Запуск із форми: критична дія лише тоді, коли створюється новий запис.
-     Якщо опис не змінювався з останнього прогону — записувати нема чого,
-     показуємо той самий прогін і нічого не питаємо. */
+  /* Запуск із форми: банер "точно новий прогін?" лише коли вхід реально
+     відрізняється від останнього прогону. Дедуплікація сама (чи не
+     створювати запис-дублікат) сюди більше не належить — Екран 2 стоїть
+     між цим кліком і записом прогону, і його не можна пропускати навіть
+     коли вхід не змінився. Порівняння зі свіжим collectState() тепер у
+     generateBtn нижче, після того, як дизайнер реально пройшов Екран 2. */
   function requestRun() {
-    if (runs.length && JSON.stringify(runs[0].input) === JSON.stringify(collectState())) {
-      openRun(runs[0].id);
-      return;
-    }
-    if (!runs.length) {
+    var unchanged = runs.length && JSON.stringify(runs[0].input) === JSON.stringify(collectState());
+    if (!runs.length || unchanged) {
       runAnalysis();
       return;
     }
@@ -2980,7 +2980,16 @@ firebase.initializeApp(firebaseConfig);
   confirmBackBtn.addEventListener('click', showForm);
 
   generateBtn.addEventListener('click', function () {
-    finishRun(collectState());
+    /* дедуплікація тут, не в requestRun(): на Екрані 2 дизайнер міг змінити
+       лише прив'язку блок↔задача↔аудиторія, лишивши верхні поля форми
+       тими самими — тоді collectState() (dataset блоків читається звідти
+       само) уже не збігається з runs[0].input, і має піти новий запис */
+    var state = collectState();
+    if (runs.length && JSON.stringify(runs[0].input) === JSON.stringify(state)) {
+      openRun(runs[0].id);
+      return;
+    }
+    finishRun(state);
   });
 
   /* очищення форми: перший клік по «Новий прогін» лише озброює кнопку,
