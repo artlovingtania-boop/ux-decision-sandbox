@@ -2683,6 +2683,28 @@ firebase.initializeApp(firebaseConfig);
     });
   }
 
+  /* Спільний блок для звіту — задачі з номерами секцій по кожній
+     аудиторії, max і розкид — потрібен і базовому порядку, і кожному
+     варіанту. */
+  function pushMetricsReportLines(lines, order, state, tasks, namedAudiences) {
+    if (!tasks.length || !namedAudiences.length) { return; }
+    lines.push('');
+    lines.push('Порівняльні метрики (порогу немає — число показує різницю між варіантами, не оцінку):');
+    namedAudiences.forEach(function (a) {
+      var m = computeVariantMetrics(order, state, a.id);
+      lines.push('  ' + a.value + ' (' + a.type + '):');
+      if (!m || !m.max) {
+        lines.push('    жодна задача не прив’язана до цієї аудиторії');
+        return;
+      }
+      m.tasks.forEach(function (t) {
+        lines.push('    ' + t.task + ' — секція ' + t.section);
+      });
+      lines.push('    До найдальшої: ' + m.max.task + ' (секція ' + m.max.section + ')');
+      lines.push('    Розкид: ' + (m.max.section - m.min.section));
+    });
+  }
+
   /* увесь звіт одним простим текстом — і для буфера, і для файлу */
   function buildReportText() {
     var state = currentRun.input;
@@ -2711,6 +2733,19 @@ firebase.initializeApp(firebaseConfig);
       }).join('; '));
     }
 
+    /* базовий порядок — першим блоком, до варіантів */
+    var baselineOrder = namedBlocks.map(function (b) { return b.name; });
+    if (baselineOrder.length) {
+      lines.push('');
+      lines.push('— — —');
+      lines.push('');
+      lines.push('ТВІЙ ПОРЯДОК · як введено на Екрані 1');
+      lines.push('');
+      lines.push('Перелік блоків:');
+      lines.push(baselineOrder.map(function (name, index) { return (index + 1) + '. ' + name; }).join(' → '));
+      pushMetricsReportLines(lines, baselineOrder, state, tasks, namedAudiences);
+    }
+
     currentRun.result.variants.forEach(function (variant) {
       lines.push('');
       lines.push('— — —');
@@ -2731,24 +2766,8 @@ firebase.initializeApp(firebaseConfig);
       });
       /* незалежно від перемикача на екрані — обидві аудиторії тут повністю,
          кожна своїм розрахунком (computeVariantMetrics з її audienceId) */
-      if (tasks.length && namedAudiences.length) {
-        lines.push('');
-        lines.push('Порівняльні метрики (порогу немає — число показує різницю між варіантами, не оцінку):');
-        var order = variant.flow.map(function (block) { return block.name; });
-        namedAudiences.forEach(function (a) {
-          var m = computeVariantMetrics(order, state, a.id);
-          lines.push('  ' + a.value + ' (' + a.type + '):');
-          if (!m || !m.max) {
-            lines.push('    жодна задача не прив’язана до цієї аудиторії');
-            return;
-          }
-          m.tasks.forEach(function (t) {
-            lines.push('    ' + t.task + ' — секція ' + t.section);
-          });
-          lines.push('    До найдальшої: ' + m.max.task + ' (секція ' + m.max.section + ')');
-          lines.push('    Розкид: ' + (m.max.section - m.min.section));
-        });
-      }
+      var order = variant.flow.map(function (block) { return block.name; });
+      pushMetricsReportLines(lines, order, state, tasks, namedAudiences);
       lines.push('');
       lines.push('Персонний аудит:');
       variant.remarks.forEach(function (remark) {
