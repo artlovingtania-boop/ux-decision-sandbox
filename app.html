@@ -870,6 +870,20 @@ textarea.field-input {
   gap: var(--spacing-4);
 }
 
+/* ---------- перемикач аудиторії (метрики) ---------- */
+.audience-switcher {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-8);
+}
+
+.audience-switcher__row {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-12);
+  flex-wrap: wrap;
+}
+
 /* ---------- картки варіантів ---------- */
 /* сім рядків: бейдж, шапка, потік, осі, метрики, аудит, висновок.
    Картки — subgrid цієї ж сітки, тому однойменні секції всіх трьох
@@ -1563,6 +1577,8 @@ sl-button[variant="text"]::part(label):hover {
       </div>
     </details>
 
+    <div class="audience-switcher" id="audience-switcher" hidden></div>
+
     <div class="variants-grid" id="variants-grid"></div>
 
     <section class="result-section">
@@ -1775,6 +1791,7 @@ firebase.initializeApp(firebaseConfig);
   var summaryBody = document.getElementById('summary-body');
   var inputSummary = document.getElementById('input-summary');
   var summaryHint = document.getElementById('summary-hint');
+  var audienceSwitcher = document.getElementById('audience-switcher');
   var variantsGrid = document.getElementById('variants-grid');
   var divergenceBody = document.getElementById('divergence-body');
   var saveNotice = document.getElementById('save-notice');
@@ -1842,6 +1859,11 @@ firebase.initializeApp(firebaseConfig);
   /* прогін, з якого зайшли у форму через «Змінити опис»; поки він є,
      форма порівнюється з ним і показує попередження про розбіжність */
   var editingRun = null;
+  /* аудиторія, для якої зараз показані метрики на Екрані 3 — стан
+     перегляду, не властивість прогону: у localStorage не пишеться,
+     скидається на головну при кожному renderCurrentRun() (новий прогін
+     чи відкритий зі списку) */
+  var selectedMetricsAudienceId = null;
 
   /* ---------- єдине місце роботи зі сховищем ---------- */
 
@@ -2050,6 +2072,20 @@ firebase.initializeApp(firebaseConfig);
       })
       .then(function () {
         select.value = value;
+      });
+  }
+
+  /* Той самий патерн і та сама причина, що setSlSelectValue(): значення,
+     виставлене одразу після appendChild, губиться, поки sl-radio-group і
+     sl-radio-button ще не завершили асинхронне підвантаження Shoelace. */
+  function setSlRadioGroupValue(group, value) {
+    return Promise.all([customElements.whenDefined('sl-radio-group'), customElements.whenDefined('sl-radio-button')])
+      .then(function () {
+        var buttons = Array.from(group.querySelectorAll('sl-radio-button'));
+        return Promise.all([group.updateComplete].concat(buttons.map(function (b) { return b.updateComplete; })));
+      })
+      .then(function () {
+        group.value = value;
       });
   }
 
@@ -2329,17 +2365,69 @@ firebase.initializeApp(firebaseConfig);
     }
   }
 
-  /* Найменший "До найдальшої задачі" серед трьох варіантів — єдина
-     метрика в картці, тож єдине число, не мапа по назвах. Варіанти без
-     задач (variant.metrics === null) пропускаються. null, якщо жоден
-     варіант метрик не має. Спільний мінімум — тег дістають усі, хто
-     його ділить (звірка на рівність нижче, у renderMetrics()). */
-  function metricMinimums() {
+  /* Метрика варіанта для конкретної аудиторії: для кожної задачі — номер
+     секції (1-based індекс найпершого блоку в order, прив'язаного до неї
+     через links для цієї audienceId або AUDIENCE_ALL_VALUE). Задача, яку
+     в цьому режимі не покриває жоден блок, пропускається — Екран 2 не
+     пропустить цього для "поточної" аудиторії за замовчуванням, але для
+     другої (не форсованої prune) це реальний випадок, не лише захист від
+     падіння. Нічия за max/min — перша задача за порядком у state.tasks.
+
+     Два різні "порожні" стани:
+     - null — задач немає взагалі (state.tasks порожній) — секцію метрик
+       не рендеримо зовсім, однаково для всіх трьох варіантів одного
+       прогону (той самий state.tasks для кожного виклику).
+     - { max: null, min: null, tasks: [] } — задачі є, але жодна не
+       прив'язана до ЦІЄЇ аудиторії — секція рендериться з поясненням
+       замість числа. */
+  function computeVariantMetrics(order, state, audienceId) {
+    var taskItems = state.tasks.filter(function (t) { return t.value.trim() !== ''; });
+    if (!taskItems.length) { return null; }
+
+    var blockByName = {};
+    state.structureBlocks.forEach(function (b) { blockByName[b.name] = b; });
+
+    var sections = [];
+    taskItems.forEach(function (t) {
+      var sectionNumber = null;
+      for (var i = 0; i < order.length; i++) {
+        var block = blockByName[order[i]];
+        var links = block && Array.isArray(block.links) ? block.links : [];
+        var covered = links.some(function (l) {
+          return l.taskId === t.id && (l.audienceId === audienceId || l.audienceId === AUDIENCE_ALL_VALUE);
+        });
+        if (covered) { sectionNumber = i + 1; break; }
+      }
+      if (sectionNumber === null) { return; }
+      sections.push({ task: t.value, section: sectionNumber });
+    });
+
+    if (!sections.length) { return { max: null, min: null, tasks: [] }; }
+
+    var max = sections[0];
+    var min = sections[0];
+    sections.forEach(function (s) {
+      if (s.section > max.section) { max = s; }
+      if (s.section < min.section) { min = s; }
+    });
+
+    return { max: max, min: min, tasks: sections };
+  }
+
+  /* Найменший "До найдальшої задачі" серед трьох варіантів для тієї самої
+     аудиторії — єдина метрика в картці, тож єдине число, не мапа по
+     назвах. Варіанти без метрик (null) чи без покритих задач (max: null)
+     пропускаються. null, якщо жоден варіант числа не дав. Спільний
+     мінімум — тег дістають усі, хто його ділить (звірка на рівність
+     нижче, у renderMetrics()). Мінімум рахується всередині поточного
+     режиму: при перемиканні аудиторії тег може переїхати на інший
+     варіант — це очікувано, не баг. */
+  function metricMinimums(metricsList) {
     var min = null;
-    currentRun.result.variants.forEach(function (variant) {
-      if (!variant.metrics) { return; }
-      if (min === null || variant.metrics.max.section < min) {
-        min = variant.metrics.max.section;
+    metricsList.forEach(function (metrics) {
+      if (!metrics || !metrics.max) { return; }
+      if (min === null || metrics.max.section < min) {
+        min = metrics.max.section;
       }
     });
     return min;
@@ -2377,24 +2465,31 @@ firebase.initializeApp(firebaseConfig);
     return section;
   }
 
-  /* Секції нема, якщо задач немає взагалі (variant.metrics === null) —
+  /* Секції нема, якщо задач немає взагалі (metrics === null) —
      computeVariantMetrics() тоді повертає null уніфіковано для всіх
      трьох варіантів разом (той самий стан state.tasks для кожного
-     виклику), тож 7-рядковий subgrid карток не розсинхронізується. */
-  function renderMetrics(variant, minSection) {
-    if (!variant.metrics) { return null; }
+     виклику), тож 7-рядковий subgrid карток не розсинхронізується.
+     metrics.max === null (задачі є, жодна не прив'язана до цієї
+     аудиторії) — секція лишається, число заміняється поясненням. */
+  function renderMetrics(metrics, minSection, flowLength) {
+    if (!metrics) { return null; }
 
     var section = el('div', 'card-section card-section--divided');
     section.appendChild(el('span', 'section-label', 'Порівняльні метрики'));
     section.appendChild(el('p', 'field-hint', 'порогу немає — число показує різницю між варіантами, не оцінку'));
 
+    if (!metrics.max) {
+      section.appendChild(el('p', 'field-caption', 'жодна задача не прив’язана до цієї аудиторії'));
+      return section;
+    }
+
     var row = el('div', 'metric-row');
     row.appendChild(el('span', 'metric-label', 'До найдальшої задачі'));
-    row.appendChild(el('span', 'metric-row__value', String(variant.metrics.max.section)));
+    row.appendChild(el('span', 'metric-row__value', String(metrics.max.section)));
     section.appendChild(row);
 
     section.appendChild(el('p', 'field-caption',
-      '«' + variant.metrics.max.task + '» — вперше на секції ' + variant.metrics.max.section + ' з ' + variant.flow.length));
+      '«' + metrics.max.task + '» — вперше на секції ' + metrics.max.section + ' з ' + flowLength));
 
     /* тег — окремим рядком, не в одному рядку з підписом metric-row: довше
        за старе "мін.", ламало підпис зліва на три рядки. Місце під нього
@@ -2402,7 +2497,7 @@ firebase.initializeApp(firebaseConfig);
        прийом, що для бейджа "чистий за обома перевірками" вище в картці —
        інакше висота секції різна й картки не вирівнюються поглядом. */
     var shortestTag = el('span', 'tag tag--muted', 'найкоротше');
-    if (variant.metrics.max.section !== minSection) {
+    if (metrics.max.section !== minSection) {
       shortestTag.classList.add('variant-card__badge--empty');
     }
     section.appendChild(shortestTag);
@@ -2435,15 +2530,28 @@ firebase.initializeApp(firebaseConfig);
     return section;
   }
 
+  /* Метрики рахуються наживо з currentRun.input для selectedMetricsAudienceId —
+     ніякого звернення до моделі: перемикач аудиторії (renderAudienceSwitcher())
+     лише міняє цю змінну й кличе renderVariants() знову. */
   function renderVariants() {
-    var mins = metricMinimums();
+    var metricsList = currentRun.result.variants.map(function (variant) {
+      return computeVariantMetrics(
+        variant.flow.map(function (b) { return b.name; }),
+        currentRun.input,
+        selectedMetricsAudienceId
+      );
+    });
+    var mins = metricMinimums(metricsList);
     variantsGrid.innerHTML = '';
 
-    currentRun.result.variants.forEach(function (variant) {
+    currentRun.result.variants.forEach(function (variant, index) {
       var card = el('article', 'variant-card');
 
       /* місце під бейдж зайняте в усіх трьох картках, інакше заголовки
-         стоять на різній висоті й картки важче зіставляти поглядом */
+         стоять на різній висоті й картки важче зіставляти поглядом.
+         Бейдж прив'язаний до персони (variant.clean), не до аудиторії —
+         на відміну від тега "найкоротше" нижче, він не рухається при
+         перемиканні режиму; це два незалежні критерії, не одне й те саме. */
       var badge = el('span', 'tag tag--green-soft', 'чистий за обома перевірками');
       if (!variant.clean) { badge.classList.add('variant-card__badge--empty'); }
       card.appendChild(badge);
@@ -2455,7 +2563,7 @@ firebase.initializeApp(firebaseConfig);
 
       card.appendChild(renderFlow(variant));
       card.appendChild(renderAxes(variant));
-      var metricsSection = renderMetrics(variant, mins);
+      var metricsSection = renderMetrics(metricsList[index], mins, variant.flow.length);
       if (metricsSection) { card.appendChild(metricsSection); }
       card.appendChild(renderRemarks(variant));
       card.appendChild(renderConclusion(variant));
@@ -2489,6 +2597,7 @@ firebase.initializeApp(firebaseConfig);
       lines.push('Цільова аудиторія: ' + a.value + ' · ' + a.type);
     });
     lines.push('Бізнес-ціль: ' + state.goal);
+    var namedAudiences = state.audiences.filter(function (a) { return a.value.trim() !== ''; });
     var tasks = state.tasks.filter(function (t) { return t.value.trim() !== ''; });
     if (tasks.length) {
       lines.push('Top Tasks: ' + tasks.map(function (t) { return t.value; }).join('; '));
@@ -2520,13 +2629,25 @@ firebase.initializeApp(firebaseConfig);
       variant.axes.forEach(function (axis) {
         lines.push('  ' + axis.name + ': ' + axis.value);
       });
-      if (variant.metrics) {
+      /* незалежно від перемикача на екрані — обидві аудиторії тут повністю,
+         кожна своїм розрахунком (computeVariantMetrics з її audienceId) */
+      if (tasks.length && namedAudiences.length) {
         lines.push('');
         lines.push('Порівняльні метрики (порогу немає — число показує різницю між варіантами, не оцінку):');
-        variant.metrics.tasks.forEach(function (t) {
-          lines.push('  ' + t.task + ' — секція ' + t.section);
+        var order = variant.flow.map(function (block) { return block.name; });
+        namedAudiences.forEach(function (a) {
+          var m = computeVariantMetrics(order, state, a.id);
+          lines.push('  ' + a.value + ' (' + a.type + '):');
+          if (!m || !m.max) {
+            lines.push('    жодна задача не прив’язана до цієї аудиторії');
+            return;
+          }
+          m.tasks.forEach(function (t) {
+            lines.push('    ' + t.task + ' — секція ' + t.section);
+          });
+          lines.push('    До найдальшої: ' + m.max.task + ' (секція ' + m.max.section + ')');
+          lines.push('    Розкид: ' + (m.max.section - m.min.section));
         });
-        lines.push('  Розкид: ' + (variant.metrics.max.section - variant.metrics.min.section));
       }
       lines.push('');
       lines.push('Персонний аудит:');
@@ -2643,6 +2764,58 @@ firebase.initializeApp(firebaseConfig);
     runsBody.appendChild(list);
   }
 
+  /* Стан перегляду метрик — не властивість прогону, у localStorage не
+     пишеться. Скидається на головну аудиторію (type === 'головна';
+     резервно — перша, якщо міток немає) при кожному відкритті прогону. */
+  function resetMetricsAudience() {
+    var audiences = currentRun.input.audiences.filter(function (a) { return a.value.trim() !== ''; });
+    var main = audiences.filter(function (a) { return a.type === 'головна'; })[0] || audiences[0];
+    selectedMetricsAudienceId = main ? main.id : null;
+  }
+
+  /* Перемикач між #input-summary й .variants-grid. Нема взагалі, якщо
+     аудиторія одна — тоді перемикати нічого, і всі links блоків і так
+     примусово нормалізовані на цю єдину аудиторію (pruneConfirmRefs()
+     на Екрані 2). Перебудовується заново при кожному renderCurrentRun();
+     сам вибір міняє лише renderVariants(), не цю розмітку. */
+  function renderAudienceSwitcher() {
+    var audiences = currentRun.input.audiences.filter(function (a) { return a.value.trim() !== ''; });
+    audienceSwitcher.innerHTML = '';
+
+    if (audiences.length <= 1) {
+      audienceSwitcher.hidden = true;
+      return;
+    }
+    audienceSwitcher.hidden = false;
+
+    var row = el('div', 'audience-switcher__row');
+    row.appendChild(el('span', 'field-caption', 'Числа для аудиторії'));
+
+    var group = document.createElement('sl-radio-group');
+    group.className = 'audience-switcher__group';
+    audiences.forEach(function (a) {
+      var btn = document.createElement('sl-radio-button');
+      btn.setAttribute('value', a.id);
+      btn.textContent = a.value + ' · ' + a.type;
+      group.appendChild(btn);
+    });
+    row.appendChild(group);
+    audienceSwitcher.appendChild(row);
+    setSlRadioGroupValue(group, selectedMetricsAudienceId);
+
+    audienceSwitcher.appendChild(el('p', 'field-hint',
+      'Перемикач впливає тільки на метрики. Структура варіантів однакова в обох режимах.'));
+  }
+
+  /* Перемикання не звертається до моделі — метрики рахуються наживо з
+     currentRun.input у renderVariants(). Делеговано на контейнер, не на
+     сам group: розмітка перебудовується щоразу в renderAudienceSwitcher(). */
+  audienceSwitcher.addEventListener('sl-change', function (event) {
+    if (!event.target.classList.contains('audience-switcher__group')) { return; }
+    selectedMetricsAudienceId = event.target.value;
+    renderVariants();
+  });
+
   function renderCurrentRun() {
     if (!isLoggedIn) { showLogin(); return; }
     /* вузол живе між прогонами: без цього раз розгорнутий блок
@@ -2651,7 +2824,9 @@ firebase.initializeApp(firebaseConfig);
     disarmReset();
     disarmEdit();
     disarmDeleteRun();
+    resetMetricsAudience();
     renderSummary();
+    renderAudienceSwitcher();
     renderVariants();
     renderDivergence();
     formScreen.hidden = true;
@@ -2779,55 +2954,18 @@ firebase.initializeApp(firebaseConfig);
     });
 
     return Promise.all(requests).then(function (orders) {
-      return buildGenerateResult(orders, axesCombos, state);
+      return buildGenerateResult(orders, axesCombos);
     });
   }
 
-  /* Метрика варіанта: для кожної задачі — номер секції (1-based індекс
-     найпершого блоку в order, що прив'язаний до неї через links). Задача
-     без жодного блоку в order пропускається — Екран 2 такого не пропустить
-     (генерація заблокована, поки є непокрита задача), але код не падає.
-     Нічия за max — перша задача за порядком у state.tasks (не оновлюємо
-     max/min на рівність, лише на строге >/<). null, якщо задач немає
-     взагалі — тоді секцію метрик не рендеримо. */
-  function computeVariantMetrics(order, state) {
-    var blockByName = {};
-    state.structureBlocks.forEach(function (b) { blockByName[b.name] = b; });
-
-    var sections = [];
-    state.tasks
-      .filter(function (t) { return t.value.trim() !== ''; })
-      .forEach(function (t) {
-        var sectionNumber = null;
-        for (var i = 0; i < order.length; i++) {
-          var block = blockByName[order[i]];
-          var links = block && Array.isArray(block.links) ? block.links : [];
-          if (links.some(function (l) { return l.taskId === t.id; })) {
-            sectionNumber = i + 1;
-            break;
-          }
-        }
-        if (sectionNumber === null) { return; }
-        sections.push({ task: t.value, section: sectionNumber });
-      });
-
-    if (!sections.length) { return null; }
-
-    var max = sections[0];
-    var min = sections[0];
-    sections.forEach(function (s) {
-      if (s.section > max.section) { max = s; }
-      if (s.section < min.section) { min = s; }
-    });
-
-    return { max: max, min: min, tasks: sections };
-  }
-
-  /* Структура результату: flow/axes/subtitle/metrics реальні (з order,
-     заданої комбінації й computeVariantMetrics() відповідно) — не з
-     MOCK_RESULT. remarks/conclusion/clean/divergence поки лишаються
-     моковими: реальний розрахунок — наступний крок, не цей. */
-  function buildGenerateResult(orders, axesCombos, state) {
+  /* Структура результату: flow/axes/subtitle реальні (з order і заданої
+     комбінації) — не з MOCK_RESULT. metrics тут більше не проставляється:
+     вони аудиторія-залежні й рахуються наживо при рендері (computeVariantMetrics(),
+     нижче біля renderMetrics()) з currentRun.input — перемикач аудиторії
+     на Екрані 3 інакше вимагав би повторної генерації. remarks/conclusion/
+     clean/divergence поки лишаються моковими: реальний розрахунок —
+     наступний крок, не цей. */
+  function buildGenerateResult(orders, axesCombos) {
     return {
       variants: orders.map(function (order, i) {
         var variant = JSON.parse(JSON.stringify(MOCK_RESULT.variants[i]));
@@ -2838,7 +2976,6 @@ firebase.initializeApp(firebaseConfig);
           { name: 'Принцип групування', value: axesCombos[i].grouping },
           { name: 'Розподіл ваги', value: axesCombos[i].weight }
         ];
-        variant.metrics = computeVariantMetrics(order, state);
         return variant;
       }),
       divergence: JSON.parse(JSON.stringify(MOCK_RESULT.divergence))
