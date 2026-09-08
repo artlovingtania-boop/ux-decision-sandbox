@@ -1103,6 +1103,13 @@ textarea.field-input {
 .divergence tr:last-child td {
   border-bottom: 0;
 }
+
+/* ---------- екран 2: картки блоків ---------- */
+/* без width обидва sl-select стискались до вмісту: порожній — до самої
+   каретки, з чипами аудиторії — на всю ширину. Одна ширина під обидва. */
+.confirm-block sl-select {
+  width: 100%;
+}
 </style>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.20.1/cdn/themes/light.css">
 <script type="module" src="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.20.1/cdn/shoelace-autoloader.js"></script>
@@ -1676,6 +1683,9 @@ firebase.initializeApp(firebaseConfig);
   /* опція "без задачі" в дропдауні задач Екрана 2 — рядок, не id,
      тож зіткнення зі справжнім genId() практично неможливе */
   var TASK_NONE_VALUE = '__none__';
+  /* опція "усі аудиторії" в дропдауні аудиторій — той самий патерн, що
+     TASK_NONE_VALUE для задач, тільки dataset тримає її як рядок, не [рядок] */
+  var AUDIENCE_ALL_VALUE = '__all__';
 
   var loginScreen = document.getElementById('login-screen');
   var loginForm = document.getElementById('login-form');
@@ -2723,13 +2733,14 @@ firebase.initializeApp(firebaseConfig);
   }
 
   /* Спільне правило для обох полів: був непорожнім масивом, після
-     виключення невалідних id спорожнів → null. Для taskIds null означає
-     "не обрано, блокує"; для audienceIds — "для всіх поточних". Різний
-     сенс, те саме правило: конкретний звужений вибір, що втратив усі
-     свої посилання, не застигає порожнім, а знімається. Якщо ids уже
-     був null — лишається null, prune його не чіпає. */
+     виключення невалідних id спорожнів → null. І taskIds, і audienceIds —
+     null означає "не обрано, блокує". __none__ для задач живе лише в []
+     всередині dataset, а от __all__ для аудиторій зберігається як голий
+     рядок — валідних id немає, prune не чіпає, як і null. Конкретний
+     звужений вибір, що втратив усі свої посилання, не застигає порожнім,
+     а знімається — повертається в null, не в __all__. */
   function pruneIdRefs(ids, validIds) {
-    if (ids === null) { return null; }
+    if (ids === null || typeof ids === 'string') { return ids; }
     var kept = ids.filter(function (id) { return validIds.indexOf(id) !== -1; });
     if (kept.length === 0 && ids.length > 0) { return null; }
     return kept;
@@ -2757,14 +2768,17 @@ firebase.initializeApp(firebaseConfig);
     saveState();
   }
 
-  /* Дві перевірки — блок без задачі, задача без блоку. Аудиторії тут
-     немає навмисно: "блок без аудиторії" неможливий за природою поля —
-     null уже означає "для всіх поточних", не "не обрано" (Екран 2, розмова
-     про audienceIds). Блокує «Згенерувати», поки є хоч один рядок. */
+  /* Три перевірки — блок без задачі, блок без аудиторії (тільки коли
+     аудиторій більше однієї — при одній дропдаун не рендериться, дизайнеру
+     нема чого обирати), задача без блоку. Блокує «Згенерувати», поки є
+     хоч один рядок. */
   function updateMissingSection() {
     var taskItems = Array.from(taskList.querySelectorAll('.task-item')).filter(function (item) {
       return item.querySelector('.task-input').value.trim() !== '';
     });
+    var multipleAudiences = Array.from(audienceList.querySelectorAll('.audience-item')).filter(function (item) {
+      return item.querySelector('.audience-input').value.trim() !== '';
+    }).length > 1;
     var blockItems = Array.from(blockList.querySelectorAll('.block-item')).filter(function (item) {
       return item.querySelector('.block-name').value.trim() !== '';
     });
@@ -2778,9 +2792,13 @@ firebase.initializeApp(firebaseConfig);
     var rows = [];
 
     blockItems.forEach(function (item) {
+      var name = item.querySelector('.block-name').value.trim();
       var taskIds = JSON.parse(item.dataset.taskIds || 'null');
       if (taskIds === null) {
-        rows.push('Блок «' + item.querySelector('.block-name').value.trim() + '» ще не має задачі.');
+        rows.push('Блок «' + name + '» ще не має задачі.');
+      }
+      if (multipleAudiences && JSON.parse(item.dataset.audienceIds || 'null') === null) {
+        rows.push('Блок «' + name + '» ще не має аудиторії.');
       }
     });
 
@@ -2816,7 +2834,6 @@ firebase.initializeApp(firebaseConfig);
       return item.querySelector('.audience-input').value.trim() !== '';
     });
     var showAudienceSelect = audienceItems.length > 1;
-    var allAudienceIds = audienceItems.map(function (item) { return item.dataset.id; });
 
     var blockItems = Array.from(blockList.querySelectorAll('.block-item')).filter(function (item) {
       return item.querySelector('.block-name').value.trim() !== '';
@@ -2834,6 +2851,7 @@ firebase.initializeApp(firebaseConfig);
       taskSelect.className = 'confirm-task-select';
       taskSelect.setAttribute('multiple', '');
       taskSelect.setAttribute('label', 'Задача(і)');
+      taskSelect.setAttribute('placeholder', 'оберіть задачу');
       taskItems.forEach(function (taskItem) {
         taskSelect.appendChild(makeOption(taskItem.dataset.id, taskItem.querySelector('.task-input').value));
       });
@@ -2851,31 +2869,26 @@ firebase.initializeApp(firebaseConfig);
       setSlSelectValue(taskSelect, initialTaskValue);
 
       if (showAudienceSelect) {
-        /* єдина дія, що повертає блок назад у null — «стежити за формою»,
-           а не застиглий список, який просто зараз збігається з усіма */
-        var selectAllBtn = document.createElement('button');
-        selectAllBtn.type = 'button';
-        selectAllBtn.className = 'text-action confirm-audience-select-all';
-        selectAllBtn.textContent = 'Обрати всі';
-        row.appendChild(selectAllBtn);
-
         var audienceSelect = document.createElement('sl-select');
         audienceSelect.className = 'confirm-audience-select';
         audienceSelect.setAttribute('multiple', '');
         audienceSelect.setAttribute('label', 'Аудиторія');
+        audienceSelect.setAttribute('placeholder', 'оберіть аудиторію');
+        audienceSelect.appendChild(makeOption(AUDIENCE_ALL_VALUE, 'усі аудиторії'));
         audienceItems.forEach(function (audienceItem) {
           audienceSelect.appendChild(makeOption(audienceItem.dataset.id, audienceItem.querySelector('.audience-input').value));
         });
         row.appendChild(audienceSelect);
 
-        /* null — блок незайманий: показує ВСІ поточні аудиторії, обчислені
-           наживо при кожному рендері, а не записаний масив. Якщо пізніше
-           з'явиться нова аудиторія — незайманий блок підхопить її сам,
-           просто тому що allAudienceIds порахований наново. Щойно дизайнер
-           зніме бодай одну галочку (sl-change нижче) — це стає конкретним
-           записаним масивом і в null саме по собі більше не повертається. */
+        /* дизайнер обирає явно: null (не обрано) — порожній селект, жодної
+           галочки; __all__ — свій рядок у dataset, у компоненті йде як
+           [__all__]; масив — звужено. Той самий патерн, що TASK_NONE_VALUE
+           нижче в обробнику sl-change */
         var storedAudienceIds = JSON.parse(blockItem.dataset.audienceIds || 'null');
-        var initialAudienceValue = storedAudienceIds === null ? allAudienceIds.slice() : storedAudienceIds;
+        var initialAudienceValue = storedAudienceIds === null
+          ? []
+          : (storedAudienceIds === AUDIENCE_ALL_VALUE ? [AUDIENCE_ALL_VALUE] : storedAudienceIds);
+        audienceSelect.dataset.prevValue = JSON.stringify(initialAudienceValue);
         setSlSelectValue(audienceSelect, initialAudienceValue);
       }
 
@@ -2931,40 +2944,44 @@ firebase.initializeApp(firebaseConfig);
     }
 
     if (target.classList.contains('confirm-audience-select')) {
-      /* будь-яка непорожня ручна зміна — конкретний записаний масив,
-         навіть якщо зараз він випадково збігається з усіма поточними
-         аудиторіями. Порожній результат (зняли всі галочки вручну, не
-         через «Обрати всі») — [] для audienceIds не існує як стан, тож
-         повертається в null, за тим самим правилом, що й pruneIdRefs(). */
       var newAudienceValue = target.value.slice();
-      if (newAudienceValue.length === 0) {
-        blockItem.dataset.audienceIds = JSON.stringify(null);
-        /* дизайнер не має бачити дві різні поведінки для тієї самої дії
-           "зняв усе": селект одразу показує ті самі галочки, що й після
-           «Обрати всі» — той самий патерн, що для __none__ у задачах вище */
-        var currentAudienceIds = Array.from(audienceList.querySelectorAll('.audience-item'))
-          .filter(function (item) { return item.querySelector('.audience-input').value.trim() !== ''; })
-          .map(function (item) { return item.dataset.id; });
-        setSlSelectValue(target, currentAudienceIds);
+      var oldAudienceValue = JSON.parse(target.dataset.prevValue || '[]');
+      var oldHasAll = oldAudienceValue.indexOf(AUDIENCE_ALL_VALUE) !== -1;
+      var newHasAll = newAudienceValue.indexOf(AUDIENCE_ALL_VALUE) !== -1;
+
+      /* взаємовиключність, той самий патерн, що для __none__ у задачах
+         вище: щойно обраний __all__ скидає решту; щойно обрана конкретна
+         аудиторія при активному __all__ знімає __all__ */
+      var resolvedAudience;
+      if (newHasAll && !oldHasAll) {
+        resolvedAudience = [AUDIENCE_ALL_VALUE];
+      } else if (newHasAll && oldHasAll && newAudienceValue.length > 1) {
+        resolvedAudience = newAudienceValue.filter(function (v) { return v !== AUDIENCE_ALL_VALUE; });
       } else {
-        blockItem.dataset.audienceIds = JSON.stringify(newAudienceValue);
+        resolvedAudience = newAudienceValue;
       }
+
+      target.dataset.prevValue = JSON.stringify(resolvedAudience);
+      if (JSON.stringify(resolvedAudience) !== JSON.stringify(newAudienceValue)) {
+        setSlSelectValue(target, resolvedAudience);
+      }
+
+      /* __all__ перевіряється до трактування resolvedAudience як id
+         аудиторій: тоді dataset тримає голий рядок, не масив із одним
+         елементом. Порожній вибір без __all__ лишається null (не обрано) */
+      var finalAudienceIds;
+      if (resolvedAudience.indexOf(AUDIENCE_ALL_VALUE) !== -1) {
+        finalAudienceIds = AUDIENCE_ALL_VALUE;
+      } else if (resolvedAudience.length === 0) {
+        finalAudienceIds = null;
+      } else {
+        finalAudienceIds = resolvedAudience;
+      }
+      blockItem.dataset.audienceIds = JSON.stringify(finalAudienceIds);
       saveState();
     }
 
     updateMissingSection();
-  });
-
-  confirmBlocksBody.addEventListener('click', function (event) {
-    var selectAllBtn = event.target.closest('.confirm-audience-select-all');
-    if (!selectAllBtn) { return; }
-    var row = selectAllBtn.closest('.confirm-block');
-    if (!row || !row.blockItemRef) { return; }
-    row.blockItemRef.dataset.audienceIds = JSON.stringify(null);
-    saveState();
-    /* перерендер картки: селект має показати всі поточні галочки
-       обчисленими, а не записаними — той самий шлях, що й перше малювання */
-    renderConfirmBlocks();
   });
 
   function showConfirm(state) {
