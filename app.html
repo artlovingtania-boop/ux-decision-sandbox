@@ -1048,7 +1048,7 @@ textarea.field-input {
 }
 
 /* точка дії — факт структури, а не висновок, тому нейтрально:
-   рамка без заливки. Зелений лишився тільки бейджу «чистий за обома перевірками» */
+   рамка без заливки. Зелений лишився тільки бейджу «без критичних зауважень» */
 .flow__item--action {
   background: transparent;
   border-color: var(--border-focus);
@@ -1085,7 +1085,7 @@ textarea.field-input {
 
 /* .tag не має власного display — як прямий флекс-дочірній .card-section
    (align-items: stretch за замовчуванням) розтягується в смугу на всю
-   ширину картки замість пігулки. Бейдж "чистий за обома перевірками" це
+   ширину картки замість пігулки. Бейдж "без критичних зауважень" це
    не зачіпає: він живе прямо в .variant-card (grid, justify-items: start),
    інший контейнер, інша поведінка за замовчуванням. */
 .card-section > .tag {
@@ -1856,19 +1856,19 @@ firebase.initializeApp(firebaseConfig);
         variant: 'A',
         code: 'Кроків до задачі — 5, розкид 3: обидва показники найбільші з трьох.',
         persona: 'Критично: до способу допомогти людина не доходить.',
-        meaning: 'Тут перевірки збігаються, і це рідший випадок. Коли код і персона вказують на те саме місце, сумніватись у ньому не доводиться — довгий шлях до дії відчувається так само довгим, як рахується.'
+        meaning: 'трактування розходження код ↔ персона — окремий крок методики, ще не реалізований'
       },
       {
         variant: 'Б',
         code: 'Кроків до задачі — 2, розкид 1: обидва найменші.',
         persona: 'Одне незначне зауваження, критичних немає.',
-        meaning: 'Розходження немає — саме тому варіант позначений як чистий за обома перевірками. Це фактичне твердження, а не оцінка «найкращий»: ваг між метриками система не має.'
+        meaning: 'трактування розходження код ↔ персона — окремий крок методики, ще не реалізований'
       },
       {
         variant: 'В',
         code: 'Кроків до задачі — 4, розкид 1: шлях середній, стабільний.',
         persona: 'Помірно: три блоки поспіль сприймаються як щільні.',
-        meaning: 'Ось власне розходження. Код рахує кількість секцій, персона реагує на щільність змісту: чотири секції читаються довше, ніж їх чотири. Якщо аудиторія приходить уже готовою, порахований шлях коротший за відчутий — і рішення тут за вами, система нічого не відсіює.'
+        meaning: 'трактування розходження код ↔ персона — окремий крок методики, ще не реалізований'
       }
     ]
   };
@@ -2894,14 +2894,22 @@ firebase.initializeApp(firebaseConfig);
 
     currentRun.result.variants.forEach(function (variant, index) {
       var card = el('article', 'variant-card');
+      var personaResult = getPersonaResultFor(variant.id);
 
       /* місце під бейдж зайняте в усіх трьох картках, інакше заголовки
          стоять на різній висоті й картки важче зіставляти поглядом.
-         Бейдж прив'язаний до персони (variant.clean), не до аудиторії —
-         на відміну від тега "найкоротше" нижче, він не рухається при
-         перемиканні режиму; це два незалежні критерії, не одне й те саме. */
-      var badge = el('span', 'tag tag--green-soft', 'чистий за обома перевірками');
-      if (!variant.clean) { badge.classList.add('variant-card__badge--empty'); }
+         Бейдж — з реального personaAudit (Етап 3), не з variant.clean
+         (моковий прапорець, ніколи не перераховувався). Показується
+         тільки коли аудит готовий (status 'ready') і серед його
+         зауважень немає жодного "критично"; loading/error/unavailable —
+         так само не показується, бо про критичні зауваження ще/зовсім
+         не відомо. Формулювання звужене навмисно: машинна частина рахує
+         тільки порівняльні метрики, без порогів (закони Міллера,
+         серійної позиції, Джейкоба не реалізовані) — "чистий за обома
+         перевірками" обіцяв би перевірку, якої немає. Не рухається при
+         перемиканні аудиторії — той самий довід, що раніше. */
+      var badge = el('span', 'tag tag--green-soft', 'без критичних зауважень');
+      if (!hasCleanPersonaAudit(personaResult)) { badge.classList.add('variant-card__badge--empty'); }
       card.appendChild(badge);
 
       var head = el('div', 'variant-card__head');
@@ -2913,7 +2921,6 @@ firebase.initializeApp(firebaseConfig);
       card.appendChild(renderAxes(variant));
       var metricsSection = renderMetrics(metricsList[index], mins, variant.flow, state, baselineMetrics);
       if (metricsSection) { card.appendChild(metricsSection); }
-      var personaResult = getPersonaResultFor(variant.id);
       card.appendChild(renderRemarks(variant, personaResult));
       card.appendChild(renderConclusion(variant, personaResult));
 
@@ -3117,8 +3124,11 @@ firebase.initializeApp(firebaseConfig);
       lines.push('— — —');
       lines.push('');
       lines.push(variant.title.toUpperCase() + ' · ' + variant.subtitle);
-      if (variant.clean) {
-        lines.push('Чистий за обома перевірками.');
+      /* hasCleanPersonaAudit() — та сама умова, що бейдж на картці, не
+         мертвий variant.clean. loading/error/unavailable — рядок
+         у звіт не потрапляє взагалі (falsy результат нижче). */
+      if (hasCleanPersonaAudit(getPersonaResultFor(variant.id))) {
+        lines.push('Без критичних зауважень.');
       }
       lines.push('');
       lines.push('Потік блоків:');
@@ -3437,6 +3447,17 @@ firebase.initializeApp(firebaseConfig);
     if (personaResult.status === 'error') { return personaResult.errorText; }
     if (!personaResult.remarks.length) { return 'без зауважень'; }
     return personaResult.remarks.map(function (r) { return r.level + ': ' + r.text; }).join('; ');
+  }
+
+  /* Спільна умова бейджа "без критичних зауважень" — і для картки
+     (renderVariants), і для текстового звіту (buildReportText), щоб
+     вони фізично не могли розійтись удруге (та сама причина, що
+     buildDivergenceCodeText для стовпця "Код"). Аудит готовий і серед
+     зауважень немає жодного "критично"; loading/error/unavailable —
+     false, бо про критичні зауваження ще/зовсім не відомо. */
+  function hasCleanPersonaAudit(personaResult) {
+    return personaResult.status === 'ready'
+      && !personaResult.remarks.some(function (r) { return r.level === 'критично'; });
   }
 
   /* Стан перегляду персони — не властивість прогону, у localStorage не
