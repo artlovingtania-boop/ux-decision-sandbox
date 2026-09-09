@@ -8,6 +8,49 @@ import { PERSONAS } from './personas.js';
 
 const VALID_LEVELS = ['критично', 'помірно', 'незначно'];
 
+// gemini-3.6-flash іноді додає після валідного JSON уламок markdown-
+// огорожі — той самий підхід, що в api/generate.js (коміт 36e5960):
+// виділяємо перший повний {...} лічильником дужок, а не регуляркою,
+// бо вкладені об'єкти й лапки в назвах блоків її зламають. Дужки й
+// лапки всередині рядкових значень ігноруються (з урахуванням
+// екранованих \").
+function extractFirstJsonObject(text) {
+  const start = text.indexOf('{');
+  if (start === -1) { return null; }
+
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+
+  for (let i = start; i < text.length; i++) {
+    const ch = text[i];
+
+    if (inString) {
+      if (escaped) {
+        escaped = false;
+      } else if (ch === '\\') {
+        escaped = true;
+      } else if (ch === '"') {
+        inString = false;
+      }
+      continue;
+    }
+
+    if (ch === '"') {
+      inString = true;
+    } else if (ch === '{') {
+      depth++;
+    } else if (ch === '}') {
+      depth--;
+      if (depth === 0) {
+        return text.slice(start, i + 1);
+      }
+    }
+  }
+
+  return null;
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     res.status(405).json({ error: 'Метод не підтримується' });
@@ -44,7 +87,7 @@ export default async function handler(req, res) {
           return (i + 1) + '. ' + b.name + (b.action ? ' (точка дії)' : '');
         })
         .join('\n');
-      return s.title + '\n' + items;
+      return '[id: ' + s.id + '] ' + s.title + '\n' + items;
     })
     .join('\n\n');
 
@@ -55,7 +98,8 @@ export default async function handler(req, res) {
 ${structuresText}
 
 Поверни ТІЛЬКИ JSON, без пояснень і без markdown-огорожі, у форматі:
-{"structures": [{"id": "...", "remarks": [{"level": "критично|помірно|незначно", "text": "..."}], "conclusion": "..."}]}`;
+{"structures": [{"id": "...", "remarks": [{"level": "критично|помірно|незначно", "text": "..."}], "conclusion": "..."}]}
+Поле id має точно збігатися з id структури, під яким вона подана вище.`;
 
   const validIds = structures.map(function (s) { return s.id; }).sort().join('|');
 
@@ -85,6 +129,7 @@ ${structuresText}
             console.error('[persona] спроба ' + n + ': Gemini відповів не-200', response.status, errText.slice(0, 200));
           }
           const err = new Error('Gemini не відповів: ' + errText);
+          if (response.status === 429) { err.isLimit = true; }
           if (response.status === 503) { err.isOverloaded = true; }
           throw err;
         });
@@ -99,7 +144,11 @@ ${structuresText}
 
       let parsed;
       try {
-        parsed = JSON.parse(rawText);
+        const jsonSlice = extractFirstJsonObject(rawText);
+        if (jsonSlice === null) {
+          throw new Error('JSON-об’єкт не знайдено у відповіді');
+        }
+        parsed = JSON.parse(jsonSlice);
       } catch (parseErr) {
         console.error('[persona] спроба ' + n + ': JSON.parse rawText упав', rawText.slice(0, 200));
         throw parseErr;
@@ -137,6 +186,7 @@ ${structuresText}
     res.status(200).json({ structures: result });
   } catch (err) {
     const errorBody = { error: 'Не вдалось отримати коректну відповідь від моделі', details: String(err) };
+    if (err && err.isLimit) { errorBody.limit = true; }
     if (err && err.isOverloaded) { errorBody.overloaded = true; }
     res.status(502).json(errorBody);
   }

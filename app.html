@@ -2774,12 +2774,27 @@ firebase.initializeApp(firebaseConfig);
     return section;
   }
 
-  function renderRemarks(variant) {
+  /* remarks/conclusion — реальні з personaAudit (Етап 3), не мокові
+     variant.remarks. personaResult — з getPersonaResultFor(variant.id),
+     той самий об'єкт, що передається і в renderConclusion() нижче.
+     Нового CSS не додано — стани "не Kolo"/завантаження/помилка на
+     наявному .field-caption, тому самому, що вже показує "жодна
+     задача не прив'язана до цієї аудиторії" в метриках. */
+  function renderRemarks(variant, personaResult) {
     var section = el('div', 'card-section card-section--divided');
     section.appendChild(el('span', 'section-label', 'Персонний аудит'));
+
+    if (personaResult.status !== 'ready') {
+      var text = personaResult.status === 'unavailable' ? 'персонний аудит не виконується'
+        : personaResult.status === 'loading' ? 'Персона читає структури…'
+        : personaResult.errorText;
+      section.appendChild(el('p', 'field-caption', text));
+      return section;
+    }
+
     var list = el('div', 'remark-list');
     var dotClass = { 'критично': 'critical', 'помірно': 'moderate', 'незначно': 'minor' };
-    variant.remarks.forEach(function (remark) {
+    personaResult.remarks.forEach(function (remark) {
       var item = el('div', 'remark');
       item.appendChild(el('span', 'remark__dot remark__dot--' + dotClass[remark.level]));
       var body = el('div', 'remark__body');
@@ -2792,10 +2807,14 @@ firebase.initializeApp(firebaseConfig);
     return section;
   }
 
-  function renderConclusion(variant) {
+  function renderConclusion(variant, personaResult) {
     var section = el('div', 'card-section card-section--divided conclusion');
     section.appendChild(el('span', 'section-label', 'Висновок'));
-    section.appendChild(el('p', 'conclusion__text', variant.conclusion));
+    var text = personaResult.status === 'ready' ? personaResult.conclusion
+      : personaResult.status === 'unavailable' ? 'персонний аудит не виконується'
+      : personaResult.status === 'loading' ? 'Персона читає структури…'
+      : personaResult.errorText;
+    section.appendChild(el('p', 'conclusion__text', text));
     return section;
   }
 
@@ -2894,8 +2913,9 @@ firebase.initializeApp(firebaseConfig);
       card.appendChild(renderAxes(variant));
       var metricsSection = renderMetrics(metricsList[index], mins, variant.flow, state, baselineMetrics);
       if (metricsSection) { card.appendChild(metricsSection); }
-      card.appendChild(renderRemarks(variant));
-      card.appendChild(renderConclusion(variant));
+      var personaResult = getPersonaResultFor(variant.id);
+      card.appendChild(renderRemarks(variant, personaResult));
+      card.appendChild(renderConclusion(variant, personaResult));
 
       variantsGrid.appendChild(card);
     });
@@ -2916,6 +2936,21 @@ firebase.initializeApp(firebaseConfig);
       : '';
     var gapPart = ', блоків підряд без виходу ' + computeLongestGapWithoutAction(order.length, actionSections);
     return baseText + evidencePart + gapPart;
+  }
+
+  /* Спільна збірка тексту стовпця "Код" — і для renderDivergence()
+     (екран), і для buildReportText() (звіт), щоб вони фізично не
+     могли розійтись удруге (як розійшлись row.code в звіті до цього
+     фіксу). metrics — уже порахований computeVariantMetrics() з
+     потрібним audienceId (selectedMetricsAudienceId — той самий,
+     що зараз на екрані). */
+  function buildDivergenceCodeText(order, actionSections, state, metrics) {
+    return metrics && metrics.max
+      ? appendActionMetrics(
+          'Кроків до задачі — ' + metrics.max.section + ', розкид ' + (metrics.max.section - metrics.min.section),
+          order, actionSections, state
+        )
+      : 'жодна задача не прив’язана до цієї аудиторії';
   }
 
   /* Базовий рядок — тим самим способом, що baselineMetrics у
@@ -2946,14 +2981,9 @@ firebase.initializeApp(firebaseConfig);
          не має, так само як у renderBaselineStrip(). */
       var baselineActionSections = computeActionCandidates(baselineOrder, state)
         .map(function (c) { return c.section; });
-      var codeText = baselineMetrics.max
-        ? appendActionMetrics(
-            'Кроків до задачі — ' + baselineMetrics.max.section + ', розкид ' + (baselineMetrics.max.section - baselineMetrics.min.section),
-            baselineOrder, baselineActionSections, state
-          )
-        : 'жодна задача не прив’язана до цієї аудиторії';
+      var codeText = buildDivergenceCodeText(baselineOrder, baselineActionSections, state, baselineMetrics);
       baselineRow.appendChild(el('td', null, codeText));
-      baselineRow.appendChild(el('td', null, 'персонний аудит не виконується'));
+      baselineRow.appendChild(el('td', null, formatPersonaColumn(getPersonaResultFor('Г'))));
       baselineRow.appendChild(el('td', null, 'Точка відліку: показники твоєї структури поруч із трьома альтернативами. Осей немає, тому пояснити число через вісь не можна'));
 
       divergenceBody.appendChild(baselineRow);
@@ -2966,9 +2996,12 @@ firebase.initializeApp(firebaseConfig);
        порядок MOCK_RESULT.variants і MOCK_RESULT.divergence зараз
        той самий, але це дві незалежні константи, і мовчазний зсув
        індексу дав би правильні на вигляд числа в неправильному рядку.
-       "Персона" і "Що це означає" лишаються з MOCK_RESULT.divergence —
-       персонного виклику ще немає, тлумачення може не відповідати
-       щойно порахованим числам. */
+       "Персона" — реальна, з personaAudit за variant.id (Етап 3),
+       тим самим getPersonaResultFor(), що в картках. "Що це означає"
+       лишається з MOCK_RESULT.divergence — трактування розходження
+       код↔персона (чому саме тут вони збігаються чи ні) окремий крок,
+       ще не реалізований; тлумачення може не відповідати щойно
+       порахованим числам чи реальним зауваженням персони. */
     currentRun.result.divergence.forEach(function (row) {
       var variant = currentRun.result.variants.filter(function (v) { return v.id === row.variant; })[0];
       var order = variant.flow.map(function (b) { return b.name; });
@@ -2978,15 +3011,11 @@ firebase.initializeApp(firebaseConfig);
          (buildGenerateResult), кандидатів тут заново не рахує. */
       var actionSections = [];
       variant.flow.forEach(function (b, i) { if (b.action) { actionSections.push(i + 1); } });
-      var codeText = metrics && metrics.max
-        ? appendActionMetrics(
-            'Кроків до задачі — ' + metrics.max.section + ', розкид ' + (metrics.max.section - metrics.min.section),
-            order, actionSections, state
-          )
-        : 'жодна задача не прив’язана до цієї аудиторії';
+      var codeText = buildDivergenceCodeText(order, actionSections, state, metrics);
+      var personaText = formatPersonaColumn(getPersonaResultFor(variant.id));
 
       var tr = document.createElement('tr');
-      [row.variant, codeText, row.persona, row.meaning].forEach(function (text) {
+      [row.variant, codeText, personaText, row.meaning].forEach(function (text) {
         tr.appendChild(el('td', null, text));
       });
       divergenceBody.appendChild(tr);
@@ -3016,6 +3045,32 @@ firebase.initializeApp(firebaseConfig);
   }
 
   /* увесь звіт одним простим текстом — і для буфера, і для файлу */
+  /* Той самий стан, що бачить картка (getPersonaResultFor(), Етап 3) —
+     не мокові variant.remarks/conclusion. 'loading' пропускається
+     цілком: звіт — знімок, не має фіксувати проміжний стан запиту. */
+  function pushPersonaReportLines(lines, variantId) {
+    var personaResult = getPersonaResultFor(variantId);
+    if (personaResult.status === 'loading') { return; }
+
+    var placeholderText = personaResult.status === 'unavailable' ? 'персонний аудит не виконується'
+      : personaResult.status === 'error' ? 'персонний аудит не виконано: ' + personaResult.errorText
+      : null;
+
+    lines.push('');
+    lines.push('Персонний аудит:');
+    if (placeholderText !== null) {
+      lines.push('  ' + placeholderText);
+    } else {
+      personaResult.remarks.forEach(function (remark) {
+        lines.push('  [' + remark.level + '] ' + remark.text);
+      });
+    }
+
+    lines.push('');
+    lines.push('Висновок:');
+    lines.push(placeholderText !== null ? placeholderText : personaResult.conclusion);
+  }
+
   function buildReportText() {
     var state = currentRun.input;
     var lines = [];
@@ -3054,6 +3109,7 @@ firebase.initializeApp(firebaseConfig);
       lines.push('Перелік блоків:');
       lines.push(baselineOrder.map(function (name, index) { return (index + 1) + '. ' + name; }).join(' → '));
       pushMetricsReportLines(lines, baselineOrder, state, tasks, namedAudiences);
+      pushPersonaReportLines(lines, 'Г');
     }
 
     currentRun.result.variants.forEach(function (variant) {
@@ -3078,14 +3134,7 @@ firebase.initializeApp(firebaseConfig);
          кожна своїм розрахунком (computeVariantMetrics з її audienceId) */
       var order = variant.flow.map(function (block) { return block.name; });
       pushMetricsReportLines(lines, order, state, tasks, namedAudiences);
-      lines.push('');
-      lines.push('Персонний аудит:');
-      variant.remarks.forEach(function (remark) {
-        lines.push('  [' + remark.level + '] ' + remark.text);
-      });
-      lines.push('');
-      lines.push('Висновок:');
-      lines.push(variant.conclusion);
+      pushPersonaReportLines(lines, variant.id);
     });
 
     lines.push('');
@@ -3093,10 +3142,19 @@ firebase.initializeApp(firebaseConfig);
     lines.push('');
     lines.push('РОЗХОДЖЕННЯ: КОД ↔ ПЕРСОНА');
     currentRun.result.divergence.forEach(function (row) {
+      var rowVariant = currentRun.result.variants.filter(function (v) { return v.id === row.variant; })[0];
+      var rowOrder = rowVariant.flow.map(function (b) { return b.name; });
+      var rowActionSections = [];
+      rowVariant.flow.forEach(function (b, i) { if (b.action) { rowActionSections.push(i + 1); } });
+      var rowMetrics = computeVariantMetrics(rowOrder, state, selectedMetricsAudienceId);
+
       lines.push('');
       lines.push(row.variant);
-      lines.push('  Код: ' + row.code);
-      lines.push('  Персона: ' + row.persona);
+      lines.push('  Код: ' + buildDivergenceCodeText(rowOrder, rowActionSections, state, rowMetrics));
+      lines.push('  Персона: ' + formatPersonaColumn(getPersonaResultFor(row.variant)));
+      /* "Що це означає" лишається моковим — трактування розходження
+         код↔персона окремий крок, ще не реалізований (той самий
+         коментар, що в renderDivergence()). */
       lines.push('  Що це означає: ' + row.meaning);
     });
 
@@ -3254,6 +3312,133 @@ firebase.initializeApp(firebaseConfig);
     renderDivergence();
   });
 
+  /* Чотири нейтральні структури для /api/persona: три згенеровані
+     варіанти + базовий порядок як четверта, з тими самими action-
+     позначками, що на екрані (variant.flow для варіантів,
+     computeActionCandidates без добору за віссю для базового —
+     той самий виклик, що в renderDivergence()/renderBaselineStrip()).
+     Титули нейтральні навмисно (Структура 1..4, не назви варіантів) —
+     модель не має знати, який порядок чий, інакше базовий отримає
+     або поблажливість, або зайву прискіпливість. Відповідність
+     тримається по id на клієнті. */
+  function buildPersonaStructures(run) {
+    var state = run.input;
+
+    var variantStructures = run.result.variants.map(function (variant, index) {
+      return {
+        id: variant.id,
+        title: 'Структура ' + (index + 1),
+        order: variant.flow.map(function (b) { return { name: b.name, action: b.action }; })
+      };
+    });
+
+    var baselineOrder = (state.structureBlocks || [])
+      .filter(function (b) { return b.name.trim() !== ''; })
+      .map(function (b) { return b.name; });
+    var baselineActionSections = computeActionCandidates(baselineOrder, state)
+      .map(function (c) { return c.section; });
+    var baselineStructure = {
+      id: 'Г',
+      title: 'Структура 4',
+      order: baselineOrder.map(function (name, index) {
+        return { name: name, action: baselineActionSections.indexOf(index + 1) !== -1 };
+      })
+    };
+
+    return variantStructures.concat([baselineStructure]);
+  }
+
+  /* Один запит до /api/persona. Клієнт сам не повторює — сервер уже
+     робить одну повторну спробу всередині (persona.js), той самий
+     принцип, що для generate.js, тільки без клієнтської паузи на
+     429/503: тіло читається навіть при !res.ok, щоб дістати
+     limit/overloaded так само, як fetchGenerateOrder(). */
+  function fetchPersonaAudit(run, personaKey) {
+    return fetch('/api/persona', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ personaKey: personaKey, structures: buildPersonaStructures(run) })
+    }).then(function (res) {
+      return res.json().catch(function () { return null; }).then(function (data) {
+        if (!res.ok) {
+          var err = new Error('Запит не вдався');
+          if (data && data.limit) { err.isLimit = true; }
+          if (data && data.overloaded) { err.isOverloaded = true; }
+          throw err;
+        }
+        if (!data || !Array.isArray(data.structures)) { throw new Error('Відповідь без structures'); }
+        return data.structures;
+      });
+    });
+  }
+
+  /* Кеш + координація виклику. run.result.personaAudit ініціалізується
+     лениво (не в buildGenerateResult) — старі прогони, збережені до
+     цього кроку, не ламаються. Стани: 'loading' (запит іде), 'ready'
+     (structures готові), 'error' (текст — та сама трискладова логіка,
+     що в finishRun(): ліміт / перевантаження / загальне — мокових
+     зауважень на екран не підставляємо). 'ready'/'loading' у кеші —
+     не викликати повторно; 'error' повтору не блокує (наступний показ
+     прогону чи клік по персоні спробує ще раз). */
+  function ensurePersonaAudit(run, personaKey) {
+    if (!IS_KOLO_AUDIENCE) { return; }
+
+    run.result.personaAudit = run.result.personaAudit || {};
+    var cached = run.result.personaAudit[personaKey];
+    if (cached && (cached.status === 'ready' || cached.status === 'loading')) { return; }
+
+    run.result.personaAudit[personaKey] = { status: 'loading', structures: null, errorText: null };
+
+    fetchPersonaAudit(run, personaKey).then(function (structures) {
+      run.result.personaAudit[personaKey] = { status: 'ready', structures: structures, errorText: null };
+      saveState();
+    }, function (err) {
+      var errorText = (err && err.isLimit)
+        ? 'Вичерпано ліміт запитів до моделі (Gemini Free tier) — зачекайте хвилину і спробуйте ще раз.'
+        : (err && err.isOverloaded)
+          ? 'Модель тимчасово перевантажена — спробуйте ще раз за хвилину.'
+          : 'Не вдалось отримати персонний аудит — спробуйте ще раз.';
+      run.result.personaAudit[personaKey] = { status: 'error', structures: null, errorText: errorText };
+    }).finally(function () {
+      /* дизайнер міг устигнути піти на інший прогін чи персону, поки
+         запит ще йшов — рендерити застарілу відповідь не треба */
+      if (currentRun === run && selectedPersonaKey === personaKey) {
+        renderVariants();
+        renderDivergence();
+      }
+    });
+  }
+
+  /* Пошук готового/поточного стану персонного аудиту для картки чи
+     рядка таблиці за id структури ("A"/"Б"/"В"/"Г") — ніколи за
+     індексом масиву, той самий принцип, що зіставлення в
+     renderDivergence(). status: 'unavailable' (не Kolo, аудит не
+     виконується), 'loading', 'error', 'ready'. */
+  function getPersonaResultFor(variantId) {
+    if (!IS_KOLO_AUDIENCE) { return { status: 'unavailable' }; }
+
+    var audit = currentRun.result.personaAudit && currentRun.result.personaAudit[selectedPersonaKey];
+    if (!audit) { return { status: 'loading', structures: null, errorText: null }; }
+    if (audit.status !== 'ready') { return audit; }
+
+    var found = audit.structures.filter(function (s) { return s.id === variantId; })[0];
+    if (!found) {
+      return { status: 'error', errorText: 'Відповідь моделі не містить цю структуру', structures: null };
+    }
+    return { status: 'ready', remarks: found.remarks, conclusion: found.conclusion };
+  }
+
+  /* Компактний текст для стовпця "Персона" в таблиці розходжень —
+     той самий роздільник "; ", що вже вживається у файлі для списків
+     (наприклад audienceText). */
+  function formatPersonaColumn(personaResult) {
+    if (personaResult.status === 'unavailable') { return 'персонний аудит не виконується'; }
+    if (personaResult.status === 'loading') { return 'Персона читає структури…'; }
+    if (personaResult.status === 'error') { return personaResult.errorText; }
+    if (!personaResult.remarks.length) { return 'без зауважень'; }
+    return personaResult.remarks.map(function (r) { return r.level + ': ' + r.text; }).join('; ');
+  }
+
   /* Стан перегляду персони — не властивість прогону, у localStorage не
      пишеться. Скидається на дефолтну при кожному відкритті прогону,
      тим самим принципом, що resetMetricsAudience(). */
@@ -3264,11 +3449,11 @@ firebase.initializeApp(firebaseConfig);
   /* Перемикач персони — той самий вигляд, що перемикач аудиторії
      (audience-switcher__row/__pill), щоб на екрані не було двох різних
      видів перемикача; нового CSS для пігулок не додано. На відміну від
-     аудиторії — завжди видимий (персон рівно дві, ховати нема коли),
-     і поки без наслідків: клік лише міняє aria-pressed, ані картки,
-     ані таблиця розходжень не перераховуються (Етап 2, виклику моделі
-     ще нема). Якщо !IS_KOLO_AUDIENCE — пігулки disabled, підпис під
-     ними замінюється поясненням, чому вибору немає. */
+     аудиторії — завжди видимий (персон рівно дві, ховати нема коли).
+     Клік (обробник нижче) кличе ensurePersonaAudit() і перерендерює
+     картки й таблицю розходжень — Етап 3, реальний виклик /api/persona.
+     Якщо !IS_KOLO_AUDIENCE — пігулки disabled, підпис під ними
+     замінюється поясненням, чому вибору немає. */
   function renderPersonaSwitcher() {
     personaSwitcher.innerHTML = '';
     personaSwitcher.hidden = false;
@@ -3295,7 +3480,10 @@ firebase.initializeApp(firebaseConfig);
     var btn = event.target.closest('.audience-switcher__pill');
     if (!btn || btn.disabled) { return; }
     selectedPersonaKey = btn.dataset.personaKey;
+    ensurePersonaAudit(currentRun, selectedPersonaKey);
     renderPersonaSwitcher();
+    renderVariants();
+    renderDivergence();
   });
 
   function renderCurrentRun() {
@@ -3308,6 +3496,10 @@ firebase.initializeApp(firebaseConfig);
     disarmDeleteRun();
     resetMetricsAudience();
     resetPersonaSelection();
+    /* до рендеру карток/таблиці — щоб 'loading' устиг проставитись
+       синхронно (ensurePersonaAudit) і перший же renderVariants()
+       уже показав стан завантаження, а не порожнечу на мить */
+    ensurePersonaAudit(currentRun, selectedPersonaKey);
     renderSummary();
     renderAudienceSwitcher();
     renderVariants();
