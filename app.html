@@ -1668,6 +1668,8 @@ sl-button[variant="text"]::part(label):hover {
 
     <div class="variants-grid" id="variants-grid"></div>
 
+    <div class="persona-switcher" id="persona-switcher" hidden></div>
+
     <section class="result-section">
       <h2 class="result-section__title">Розходження: код ↔ персона</h2>
       <div class="table-wrap">
@@ -1881,6 +1883,7 @@ firebase.initializeApp(firebaseConfig);
   var audienceSwitcher = document.getElementById('audience-switcher');
   var baselineStrip = document.getElementById('baseline-strip');
   var variantsGrid = document.getElementById('variants-grid');
+  var personaSwitcher = document.getElementById('persona-switcher');
   var divergenceBody = document.getElementById('divergence-body');
   var saveNotice = document.getElementById('save-notice');
 
@@ -1953,6 +1956,25 @@ firebase.initializeApp(firebaseConfig);
      скидається на головну при кожному renderCurrentRun() (новий прогін
      чи відкритий зі списку) */
   var selectedMetricsAudienceId = null;
+
+  /* Ключі мають збігатися з PERSONAS в api/personas.js — окремий список
+     тут, бо app.html без збірки не імпортує серверний модуль (ES-модулі
+     на клієнті — окрема зміна, не ця). При розходженні ключа з PERSONAS
+     виклик /api/persona поверне 400, і це буде видно тільки в рантаймі,
+     не тут. Етап 2: сам виклик ще не робиться, тільки вибір. */
+  var PERSONA_KEYS = ['фонди-оцінювачі', 'спільнота'];
+  var DEFAULT_PERSONA_KEY = 'фонди-оцінювачі';
+
+  /* Чи вхідні дані прогону — Kolo (єдина аудиторія, на якій каліброві
+     персони в api/personas.js). Визначення класу аудиторії за текстом
+     полів — відкрите питання, автоматичної евристики нема: прапорець
+     виставляється вручну під час перевірки. */
+  var IS_KOLO_AUDIENCE = true;
+
+  /* обрана персона на Екрані 3 — той самий принцип, що selectedMetricsAudienceId:
+     стан перегляду, не властивість прогону, у localStorage не пишеться,
+     скидається на дефолтну при кожному renderCurrentRun() */
+  var selectedPersonaKey = DEFAULT_PERSONA_KEY;
 
   /* ---------- єдине місце роботи зі сховищем ---------- */
 
@@ -3032,6 +3054,50 @@ firebase.initializeApp(firebaseConfig);
     renderDivergence();
   });
 
+  /* Стан перегляду персони — не властивість прогону, у localStorage не
+     пишеться. Скидається на дефолтну при кожному відкритті прогону,
+     тим самим принципом, що resetMetricsAudience(). */
+  function resetPersonaSelection() {
+    selectedPersonaKey = DEFAULT_PERSONA_KEY;
+  }
+
+  /* Перемикач персони — той самий вигляд, що перемикач аудиторії
+     (audience-switcher__row/__pill), щоб на екрані не було двох різних
+     видів перемикача; нового CSS для пігулок не додано. На відміну від
+     аудиторії — завжди видимий (персон рівно дві, ховати нема коли),
+     і поки без наслідків: клік лише міняє aria-pressed, ані картки,
+     ані таблиця розходжень не перераховуються (Етап 2, виклику моделі
+     ще нема). Якщо !IS_KOLO_AUDIENCE — пігулки disabled, підпис під
+     ними замінюється поясненням, чому вибору немає. */
+  function renderPersonaSwitcher() {
+    personaSwitcher.innerHTML = '';
+    personaSwitcher.hidden = false;
+
+    var row = el('div', 'audience-switcher__row');
+    PERSONA_KEYS.forEach(function (key) {
+      var btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'audience-switcher__pill';
+      btn.disabled = !IS_KOLO_AUDIENCE;
+      btn.dataset.personaKey = key;
+      btn.setAttribute('aria-pressed', String(key === selectedPersonaKey));
+      btn.textContent = key;
+      row.appendChild(btn);
+    });
+    personaSwitcher.appendChild(row);
+
+    personaSwitcher.appendChild(el('p', 'field-caption', IS_KOLO_AUDIENCE
+      ? 'Персона калібрована на конкретному класі читача — вибір визначає, з чиєї позиції оцінюється структура'
+      : 'Каліброваної персони для цієї аудиторії немає — персонний аудит не виконується'));
+  }
+
+  personaSwitcher.addEventListener('click', function (event) {
+    var btn = event.target.closest('.audience-switcher__pill');
+    if (!btn || btn.disabled) { return; }
+    selectedPersonaKey = btn.dataset.personaKey;
+    renderPersonaSwitcher();
+  });
+
   function renderCurrentRun() {
     if (!isLoggedIn) { showLogin(); return; }
     /* вузол живе між прогонами: без цього раз розгорнутий блок
@@ -3041,10 +3107,12 @@ firebase.initializeApp(firebaseConfig);
     disarmEdit();
     disarmDeleteRun();
     resetMetricsAudience();
+    resetPersonaSelection();
     renderSummary();
     renderAudienceSwitcher();
     renderVariants();
     renderDivergence();
+    renderPersonaSwitcher();
     formScreen.hidden = true;
     confirmScreen.hidden = true;
     runsScreen.hidden = true;
