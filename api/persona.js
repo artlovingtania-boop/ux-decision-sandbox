@@ -17,17 +17,20 @@ export default async function handler(req, res) {
   const { personaKey, structures } = req.body || {};
 
   if (!personaKey || !Object.prototype.hasOwnProperty.call(PERSONAS, personaKey)) {
+    console.error('[persona] невідома persona', personaKey);
     res.status(400).json({ error: 'Невідома персона: ' + personaKey });
     return;
   }
 
   if (!Array.isArray(structures) || structures.length < 3 || structures.length > 4) {
+    console.error('[persona] structures поза межами 3-4', Array.isArray(structures) ? structures.length : typeof structures);
     res.status(400).json({ error: 'structures має містити від 3 до 4 елементів' });
     return;
   }
 
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
+    console.error('[persona] немає ключа на сервері');
     res.status(500).json({ error: 'Ключ не налаштований на сервері' });
     return;
   }
@@ -60,7 +63,7 @@ ${structuresText}
     return VALID_LEVELS.indexOf(level) !== -1;
   }
 
-  function attempt() {
+  function attempt(n) {
     return fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${apiKey}`,
       {
@@ -74,6 +77,11 @@ ${structuresText}
     ).then(function (response) {
       if (!response.ok) {
         return response.text().then(function (errText) {
+          if (response.status === 429) {
+            console.error('[persona] спроба ' + n + ': 429 ліміт Gemini', errText.slice(0, 200));
+          } else {
+            console.error('[persona] спроба ' + n + ': Gemini відповів не-200', response.status, errText.slice(0, 200));
+          }
           throw new Error('Gemini не відповів: ' + errText);
         });
       }
@@ -81,23 +89,38 @@ ${structuresText}
     }).then(function (data) {
       const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
       if (!rawText) {
+        console.error('[persona] спроба ' + n + ': порожня відповідь від моделі');
         throw new Error('Порожня відповідь від моделі');
       }
 
-      const parsed = JSON.parse(rawText);
+      let parsed;
+      try {
+        parsed = JSON.parse(rawText);
+      } catch (parseErr) {
+        console.error('[persona] спроба ' + n + ': JSON.parse rawText упав', rawText.slice(0, 200));
+        throw parseErr;
+      }
+
       if (!Array.isArray(parsed.structures)) {
+        console.error('[persona] спроба ' + n + ': відповідь без structures', JSON.stringify(parsed).slice(0, 200));
         throw new Error('Відповідь не містить structures');
       }
 
       const gotIds = parsed.structures.map(function (s) { return s.id; }).sort().join('|');
       if (gotIds !== validIds) {
+        console.error('[persona] спроба ' + n + ': id не збігаються', 'очікувалось:', validIds, 'отримано:', gotIds);
         throw new Error('id у відповіді не збігаються з надісланими');
       }
 
-      const levelsOk = parsed.structures.every(function (s) {
-        return Array.isArray(s.remarks) && s.remarks.every(function (r) { return isValidLevel(r.level); });
+      const invalidStructure = parsed.structures.find(function (s) {
+        return !Array.isArray(s.remarks) || !s.remarks.every(function (r) { return isValidLevel(r.level); });
       });
-      if (!levelsOk) {
+      if (invalidStructure) {
+        console.error(
+          '[persona] спроба ' + n + ': level поза дозволеними значеннями',
+          'structure id:', invalidStructure.id,
+          'remarks:', JSON.stringify(invalidStructure.remarks).slice(0, 200)
+        );
         throw new Error('level у зауваженні поза дозволеними значеннями');
       }
 
@@ -106,7 +129,7 @@ ${structuresText}
   }
 
   try {
-    const result = await attempt().catch(attempt);
+    const result = await attempt(1).catch(function () { return attempt(2); });
     res.status(200).json({ structures: result });
   } catch (err) {
     res.status(502).json({ error: 'Не вдалось отримати коректну відповідь від моделі', details: String(err) });
