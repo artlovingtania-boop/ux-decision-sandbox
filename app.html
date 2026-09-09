@@ -3064,6 +3064,9 @@ firebase.initializeApp(firebaseConfig);
   /* Коли Gemini не повернув retryDelay (details не в очікуваному форматі) —
      довша, а не коротка пауза: краще почекати зайве, ніж повторити занадто рано. */
   var LIMIT_RETRY_FALLBACK_MS = 35000;
+  /* 503 (UNAVAILABLE) — тимчасове перевантаження сервісу, не ліміт квоти;
+     минає швидше, тому пауза коротша, ніж на ліміті. */
+  var OVERLOAD_RETRY_DELAY_MS = 5000;
 
   function wait(ms) {
     return new Promise(function (resolve) { setTimeout(resolve, ms); });
@@ -3108,6 +3111,9 @@ firebase.initializeApp(firebaseConfig);
             var retryDelayMs = extractRetryDelayMs(data.details);
             err.retryDelayMs = (retryDelayMs !== null ? retryDelayMs + LIMIT_RETRY_BUFFER_MS : LIMIT_RETRY_FALLBACK_MS);
           }
+          if (data && data.overloaded) {
+            err.isOverloaded = true;
+          }
           throw err;
         }
         if (!data || !Array.isArray(data.order)) { throw new Error('Відповідь без order'); }
@@ -3134,6 +3140,9 @@ firebase.initializeApp(firebaseConfig);
     return attempt().catch(function (err) {
       if (err.isLimit) {
         return wait(err.retryDelayMs).then(attempt);
+      }
+      if (err.isOverloaded) {
+        return wait(OVERLOAD_RETRY_DELAY_MS).then(attempt);
       }
       if (err.message === 'order не збігається з блоками') {
         return attempt();
@@ -3254,7 +3263,9 @@ firebase.initializeApp(firebaseConfig);
     }, function (err) {
       generateErrorText = (err && err.isLimit)
         ? 'Вичерпано ліміт запитів до моделі (Gemini Free tier) — зачекайте хвилину і спробуйте ще раз.'
-        : 'Не вдалось згенерувати варіанти — спробуйте ще раз.';
+        : (err && err.isOverloaded)
+          ? 'Модель тимчасово перевантажена — спробуйте ще раз за хвилину.'
+          : 'Не вдалось згенерувати варіанти — спробуйте ще раз.';
       updateMissingSection();
     }).finally(function () {
       generationInProgress = false;

@@ -82,14 +82,18 @@ ${blocksText}
     if (!response.ok) {
       const errText = await response.text();
       const isRateLimit = response.status === 429;
+      const isOverloaded = response.status === 503;
       if (isRateLimit) {
         console.error('[generate] 429 ліміт Gemini', errText.slice(0, 200));
+      } else if (isOverloaded) {
+        console.error('[generate] 503 Gemini перевантажений', errText.slice(0, 200));
       } else {
         console.error('[generate] Gemini відповів не-200', response.status, errText.slice(0, 200));
       }
-      res.status(502).json(isRateLimit
-        ? { error: 'Gemini не відповів', details: errText, limit: true }
-        : { error: 'Gemini не відповів', details: errText });
+      const errorBody = { error: 'Gemini не відповів', details: errText };
+      if (isRateLimit) { errorBody.limit = true; }
+      if (isOverloaded) { errorBody.overloaded = true; }
+      res.status(502).json(errorBody);
       return;
     }
 

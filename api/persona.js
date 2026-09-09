@@ -79,10 +79,14 @@ ${structuresText}
         return response.text().then(function (errText) {
           if (response.status === 429) {
             console.error('[persona] спроба ' + n + ': 429 ліміт Gemini', errText.slice(0, 200));
+          } else if (response.status === 503) {
+            console.error('[persona] спроба ' + n + ': 503 Gemini перевантажений', errText.slice(0, 200));
           } else {
             console.error('[persona] спроба ' + n + ': Gemini відповів не-200', response.status, errText.slice(0, 200));
           }
-          throw new Error('Gemini не відповів: ' + errText);
+          const err = new Error('Gemini не відповів: ' + errText);
+          if (response.status === 503) { err.isOverloaded = true; }
+          throw err;
         });
       }
       return response.json();
@@ -132,6 +136,8 @@ ${structuresText}
     const result = await attempt(1).catch(function () { return attempt(2); });
     res.status(200).json({ structures: result });
   } catch (err) {
-    res.status(502).json({ error: 'Не вдалось отримати коректну відповідь від моделі', details: String(err) });
+    const errorBody = { error: 'Не вдалось отримати коректну відповідь від моделі', details: String(err) };
+    if (err && err.isOverloaded) { errorBody.overloaded = true; }
+    res.status(502).json(errorBody);
   }
 }
