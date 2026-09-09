@@ -4,6 +4,49 @@
 // виконується на сервері Vercel, process.env.GEMINI_API_KEY береться
 // з налаштувань проєкту, не з коду.
 
+// gemini-3.1-flash-lite іноді додає після валідного JSON уламок
+// markdown-огорожі (наприклад "``]}" другим рядком) — JSON.parse на
+// всьому тексті падає, хоча сам об'єкт коректний. Виділяємо перший
+// повний {...} лічильником дужок, а не регуляркою: вкладені об'єкти
+// й лапки в назвах блоків регулярку зламали б. Дужки й лапки всередині
+// рядкових значень ігноруються (з урахуванням екранованих \").
+function extractFirstJsonObject(text) {
+  const start = text.indexOf('{');
+  if (start === -1) { return null; }
+
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+
+  for (let i = start; i < text.length; i++) {
+    const ch = text[i];
+
+    if (inString) {
+      if (escaped) {
+        escaped = false;
+      } else if (ch === '\\') {
+        escaped = true;
+      } else if (ch === '"') {
+        inString = false;
+      }
+      continue;
+    }
+
+    if (ch === '"') {
+      inString = true;
+    } else if (ch === '{') {
+      depth++;
+    } else if (ch === '}') {
+      depth--;
+      if (depth === 0) {
+        return text.slice(start, i + 1);
+      }
+    }
+  }
+
+  return null;
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     res.status(405).json({ error: 'Метод не підтримується' });
@@ -108,10 +151,15 @@ ${blocksText}
 
     let parsed;
     try {
-      parsed = JSON.parse(rawText);
+      const jsonSlice = extractFirstJsonObject(rawText);
+      if (jsonSlice === null) {
+        throw new Error('JSON-об’єкт не знайдено у відповіді');
+      }
+      parsed = JSON.parse(jsonSlice);
     } catch (parseErr) {
       console.error('[generate] JSON.parse rawText упав', rawText.slice(0, 200));
-      throw parseErr;
+      res.status(502).json({ error: 'Не вдалось розпарсити відповідь моделі', details: String(parseErr) });
+      return;
     }
 
     if (!Array.isArray(parsed.order) || parsed.order.length === 0) {
