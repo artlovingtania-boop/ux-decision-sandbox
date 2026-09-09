@@ -2511,6 +2511,68 @@ firebase.initializeApp(firebaseConfig);
     return { max: max, min: min, tasks: sections };
   }
 
+  /* Точки дії — кандидати на кнопку. Той самий обхід order, що
+     computeVariantMetrics(), але шукає ОСТАННІЙ блок, що закриває
+     задачу, не перший (це різні числа з одного обходу), і рахує по
+     ВСІХ аудиторіях одразу, не по одній вибраній: кнопки належать
+     варіанту, а не режиму перегляду метрик, і не мають рухатись при
+     перемиканні аудиторії.
+
+     Кандидат — пара «задача × аудиторія»: та сама задача може
+     закриватись у різних секціях для різних аудиторій (одна аудиторія
+     покрита блоком раніше в order, інша — тільки пізнішим), тож
+     зовнішній цикл іде по аудиторіях, а не по задачах. Умова збігу —
+     та сама, що в computeVariantMetrics, включно з AUDIENCE_ALL_VALUE.
+
+     Кандидати з однаковою секцією зливаються в один: tasks і
+     audienceIds накопичуються списком, без дублів. */
+  function computeActionCandidates(order, state) {
+    var taskItems = state.tasks.filter(function (t) { return t.value.trim() !== ''; });
+    var audienceItems = (state.audiences || []).filter(function (a) { return a.value.trim() !== ''; });
+    if (!taskItems.length || !audienceItems.length) { return []; }
+
+    var blockByName = {};
+    (state.structureBlocks || []).forEach(function (b) { blockByName[b.name] = b; });
+
+    var bySection = {};
+    audienceItems.forEach(function (aud) {
+      taskItems.forEach(function (t) {
+        var lastSection = null;
+        for (var i = 0; i < order.length; i++) {
+          var block = blockByName[order[i]];
+          var links = block && Array.isArray(block.links) ? block.links : [];
+          var covered = links.some(function (l) {
+            return l.taskId === t.id && (l.audienceId === aud.id || l.audienceId === AUDIENCE_ALL_VALUE);
+          });
+          if (covered) { lastSection = i + 1; } // не break — шукаємо останній покриваючий блок
+        }
+        if (lastSection === null) { return; }
+
+        if (!bySection[lastSection]) {
+          bySection[lastSection] = { section: lastSection, tasks: [], audienceIds: [] };
+        }
+        var candidate = bySection[lastSection];
+        if (candidate.tasks.indexOf(t.value) === -1) { candidate.tasks.push(t.value); }
+        if (candidate.audienceIds.indexOf(aud.id) === -1) { candidate.audienceIds.push(aud.id); }
+      });
+    });
+
+    return Object.keys(bySection)
+      .map(function (key) { return bySection[key]; })
+      .sort(function (a, b) { return a.section - b.section; });
+  }
+
+  /* З кандидатів (уже відсортованих за позицією) лишає підмножину за
+     віссю "доказова база до дії". Math.floor(n/2) дає для непарної
+     кількості точну середину, для парної — пізніший із двох середніх
+     (перевірено: n=1 → усі, n=2 → тільки останній, n=3 → два останні). */
+  function selectActionPoints(candidates, evidence) {
+    if (!candidates.length) { return []; }
+    if (evidence === 'мінімальна') { return candidates.slice(); }
+    if (evidence === 'повна') { return candidates.slice(-1); }
+    return candidates.slice(Math.floor(candidates.length / 2));
+  }
+
   /* Найменший "До найдальшої задачі" серед трьох варіантів для тієї самої
      аудиторії — єдина метрика в картці, тож єдине число, не мапа по
      назвах. Варіанти без метрик (null) чи без покритих задач (max: null)
@@ -2648,7 +2710,7 @@ firebase.initializeApp(firebaseConfig);
      Той самий null / {max:null} патерн, що в картках (computeVariantMetrics()):
      null — задач немає взагалі, смуга не рендериться; max: null — жодна
      задача не прив'язана до поточної аудиторії, той самий текст, що в картці. */
-  function renderBaselineStrip(order, metrics) {
+  function renderBaselineStrip(order, metrics, state) {
     baselineStrip.innerHTML = '';
 
     if (!metrics) {
@@ -2657,14 +2719,25 @@ firebase.initializeApp(firebaseConfig);
     }
     baselineStrip.hidden = false;
 
+    /* Точки дії — усі кандидати, без добору за віссю: базова структура
+       не має осі "доказова база до дії", вона не альтернатива, тож
+       і звужувати кандидатів нема за чим (selectActionPoints тут не
+       викликається). */
+    var actionSections = computeActionCandidates(order, state)
+      .map(function (c) { return c.section; });
+
     var left = el('div', 'baseline-strip__col');
     left.appendChild(el('span', 'section-label', 'Твій порядок'));
     left.appendChild(el('p', 'field-caption', 'як введено на Екрані 1 · осей немає'));
     var flow = el('div', 'flow');
     order.forEach(function (name, index) {
-      var item = el('span', 'flow__item');
+      var isAction = actionSections.indexOf(index + 1) !== -1;
+      var item = el('span', 'flow__item' + (isAction ? ' flow__item--action' : ''));
       item.appendChild(el('span', 'flow__index', String(index + 1) + ' ·'));
       item.appendChild(el('span', null, name));
+      if (isAction) {
+        item.appendChild(el('span', 'flow__note', '· точка дії'));
+      }
       flow.appendChild(item);
     });
     left.appendChild(flow);
@@ -2730,7 +2803,7 @@ firebase.initializeApp(firebaseConfig);
       variantsGrid.appendChild(card);
     });
 
-    renderBaselineStrip(baselineOrder, baselineMetrics);
+    renderBaselineStrip(baselineOrder, baselineMetrics, state);
   }
 
   /* Базовий рядок — тим самим способом, що baselineMetrics у
@@ -3320,7 +3393,7 @@ firebase.initializeApp(firebaseConfig);
         axes: axes
       }, validNames);
     }, SEQUENTIAL_CALL_DELAY_MS).then(function (orders) {
-      return buildGenerateResult(orders, axesCombos);
+      return buildGenerateResult(orders, axesCombos, state);
     });
   }
 
@@ -3330,12 +3403,26 @@ firebase.initializeApp(firebaseConfig);
      нижче біля renderMetrics()) з currentRun.input — перемикач аудиторії
      на Екрані 3 інакше вимагав би повторної генерації. remarks/conclusion/
      clean/divergence поки лишаються моковими: реальний розрахунок —
-     наступний крок, не цей. */
-  function buildGenerateResult(orders, axesCombos) {
+     наступний крок, не цей.
+
+     Точки дії — реальні: для кожного варіанта — свої кандидати
+     (computeActionCandidates із його ж order, не з чужого), відібрані
+     за axesCombos[i].evidence саме цього варіанта (selectActionPoints).
+     action не проставляється (не false) на елементах, що не точки дії —
+     той самий формат, що в MOCK_RESULT. */
+  function buildGenerateResult(orders, axesCombos, state) {
     return {
       variants: orders.map(function (order, i) {
         var variant = JSON.parse(JSON.stringify(MOCK_RESULT.variants[i]));
-        variant.flow = order.map(function (name) { return { name: name }; });
+        var actionSections = selectActionPoints(
+          computeActionCandidates(order, state),
+          axesCombos[i].evidence
+        ).map(function (c) { return c.section; });
+        variant.flow = order.map(function (name, index) {
+          var item = { name: name };
+          if (actionSections.indexOf(index + 1) !== -1) { item.action = true; }
+          return item;
+        });
         variant.subtitle = 'Групування ' + axesCombos[i].grouping;
         variant.axes = [
           { name: 'Доказова база до дії', value: axesCombos[i].evidence },
