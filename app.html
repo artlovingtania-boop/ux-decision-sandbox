@@ -2745,9 +2745,26 @@ firebase.initializeApp(firebaseConfig);
       divergenceBody.appendChild(baselineRow);
     }
 
+    /* "Код" — реальний, тим самим способом, що базовий рядок вище:
+       той самий variant.flow, з якого рендериться картка, тож числа
+       в картці й тут не можуть розійтись. Зіставлення з divergence —
+       по variant.id/row.variant ("A"/"Б"/"В"), не по індексу масиву:
+       порядок MOCK_RESULT.variants і MOCK_RESULT.divergence зараз
+       той самий, але це дві незалежні константи, і мовчазний зсув
+       індексу дав би правильні на вигляд числа в неправильному рядку.
+       "Персона" і "Що це означає" лишаються з MOCK_RESULT.divergence —
+       персонного виклику ще немає, тлумачення може не відповідати
+       щойно порахованим числам. */
     currentRun.result.divergence.forEach(function (row) {
+      var variant = currentRun.result.variants.filter(function (v) { return v.id === row.variant; })[0];
+      var order = variant.flow.map(function (b) { return b.name; });
+      var metrics = computeVariantMetrics(order, state, selectedMetricsAudienceId);
+      var codeText = metrics && metrics.max
+        ? ('Кроків до задачі — ' + metrics.max.section + ', розкид ' + (metrics.max.section - metrics.min.section))
+        : 'жодна задача не прив’язана до цієї аудиторії';
+
       var tr = document.createElement('tr');
-      [row.variant, row.code, row.persona, row.meaning].forEach(function (text) {
+      [row.variant, codeText, row.persona, row.meaning].forEach(function (text) {
         tr.appendChild(el('td', null, text));
       });
       divergenceBody.appendChild(tr);
