@@ -2826,7 +2826,7 @@ firebase.initializeApp(firebaseConfig);
      Той самий null / {max:null} патерн, що в картках (computeVariantMetrics()):
      null — задач немає взагалі, смуга не рендериться; max: null — жодна
      задача не прив'язана до поточної аудиторії, той самий текст, що в картці. */
-  function renderBaselineStrip(order, metrics, state) {
+  function renderBaselineStrip(order, metrics) {
     baselineStrip.innerHTML = '';
 
     if (!metrics) {
@@ -2835,25 +2835,20 @@ firebase.initializeApp(firebaseConfig);
     }
     baselineStrip.hidden = false;
 
-    /* Точки дії — усі кандидати, без добору за віссю: базова структура
-       не має осі "доказова база до дії", вона не альтернатива, тож
-       і звужувати кандидатів нема за чим (selectActionPoints тут не
-       викликається). */
-    var actionSections = computeActionCandidates(order, state)
-      .map(function (c) { return c.section; });
-
+    /* Без точок дії: базовий порядок — те, що ввів дизайнер, не
+       пропозиція системи. Кнопки тут розставляла б computeActionCandidates
+       сама, а не дизайнер, і тоді порівнювати систему справді не було б
+       з чим — базовий рядок існує саме як рішення людини поруч із
+       пропозицією системи. Вводу кнопок у формі немає, тож "кнопок
+       немає" — правильна поведінка, не "поставимо свої". */
     var left = el('div', 'baseline-strip__col');
     left.appendChild(el('span', 'section-label', 'Твій порядок'));
     left.appendChild(el('p', 'field-caption', 'як введено на Екрані 1 · осей немає'));
     var flow = el('div', 'flow');
     order.forEach(function (name, index) {
-      var isAction = actionSections.indexOf(index + 1) !== -1;
-      var item = el('span', 'flow__item' + (isAction ? ' flow__item--action' : ''));
+      var item = el('span', 'flow__item');
       item.appendChild(el('span', 'flow__index', String(index + 1) + ' ·'));
       item.appendChild(el('span', null, name));
-      if (isAction) {
-        item.appendChild(el('span', 'flow__note', '· точка дії'));
-      }
       flow.appendChild(item);
     });
     left.appendChild(flow);
@@ -2927,7 +2922,7 @@ firebase.initializeApp(firebaseConfig);
       variantsGrid.appendChild(card);
     });
 
-    renderBaselineStrip(baselineOrder, baselineMetrics, state);
+    renderBaselineStrip(baselineOrder, baselineMetrics);
   }
 
   /* Дописує "доказова база до дії" й "блоків підряд без виходу" до
@@ -2960,6 +2955,17 @@ firebase.initializeApp(firebaseConfig);
       : 'жодна задача не прив’язана до цієї аудиторії';
   }
 
+  /* Той самий текст, що buildDivergenceCodeText(), але для базового
+     рядка — без доказової бази до дії й блоків підряд без виходу:
+     базова структура не має точок дії (вводу кнопок у формі немає),
+     тож обидві метрики точок дії тут порахувати нема з чого. Кроки
+     до задачі й розкид лишаються — вони від кнопок не залежать. */
+  function buildBaselineCodeText(metrics) {
+    return metrics.max
+      ? ('Кроків до задачі — ' + metrics.max.section + ', розкид ' + (metrics.max.section - metrics.min.section) + ', точки дії не задані')
+      : 'жодна задача не прив’язана до цієї аудиторії';
+  }
+
   /* Базовий рядок — тим самим способом, що baselineMetrics у
      renderVariants() (не читається звідти: обидві функції рахують
      наживо з currentRun.input, той самий принцип, що й усюди в цьому
@@ -2984,11 +2990,10 @@ firebase.initializeApp(firebaseConfig);
       variantCell.appendChild(el('p', 'field-caption', 'як введено на Екрані 1 · осей немає'));
       baselineRow.appendChild(variantCell);
 
-      /* Усі кандидати, без добору за віссю — базова структура осі
-         не має, так само як у renderBaselineStrip(). */
-      var baselineActionSections = computeActionCandidates(baselineOrder, state)
-        .map(function (c) { return c.section; });
-      var codeText = buildDivergenceCodeText(baselineOrder, baselineActionSections, state, baselineMetrics);
+      /* Без точок дії — базова структура це рішення дизайнера, не
+         пропозиція системи; кнопок у ній система не розставляє
+         (renderBaselineStrip() тим самим доводом). */
+      var codeText = buildBaselineCodeText(baselineMetrics);
       baselineRow.appendChild(el('td', null, codeText));
       baselineRow.appendChild(el('td', null, formatPersonaColumn(getPersonaResultFor('Г'))));
       baselineRow.appendChild(el('td', null, 'Точка відліку: показники твоєї структури поруч із трьома альтернативами. Осей немає, тому пояснити число через вісь не можна'));
@@ -3323,14 +3328,16 @@ firebase.initializeApp(firebaseConfig);
   });
 
   /* Чотири нейтральні структури для /api/persona: три згенеровані
-     варіанти + базовий порядок як четверта, з тими самими action-
-     позначками, що на екрані (variant.flow для варіантів,
-     computeActionCandidates без добору за віссю для базового —
-     той самий виклик, що в renderDivergence()/renderBaselineStrip()).
-     Титули нейтральні навмисно (Структура 1..4, не назви варіантів) —
-     модель не має знати, який порядок чий, інакше базовий отримає
-     або поблажливість, або зайву прискіпливість. Відповідність
-     тримається по id на клієнті. */
+     варіанти + базовий порядок як четверта. Варіанти несуть ті самі
+     action-позначки, що на екрані (variant.flow). Базова структура —
+     БЕЗ action на жодному блоці: це рішення дизайнера, не пропозиція
+     системи, і вводу кнопок у формі немає — персона має бачити порядок
+     без кнопок, а не розставлені системою (той самий довід, що в
+     renderBaselineStrip()/renderDivergence()). Титули нейтральні
+     навмисно (Структура 1..4, не назви варіантів) — модель не має
+     знати, який порядок чий, інакше базовий отримає або поблажливість,
+     або зайву прискіпливість. Відповідність тримається по id на
+     клієнті. */
   function buildPersonaStructures(run) {
     var state = run.input;
 
@@ -3345,14 +3352,10 @@ firebase.initializeApp(firebaseConfig);
     var baselineOrder = (state.structureBlocks || [])
       .filter(function (b) { return b.name.trim() !== ''; })
       .map(function (b) { return b.name; });
-    var baselineActionSections = computeActionCandidates(baselineOrder, state)
-      .map(function (c) { return c.section; });
     var baselineStructure = {
       id: 'Г',
       title: 'Структура 4',
-      order: baselineOrder.map(function (name, index) {
-        return { name: name, action: baselineActionSections.indexOf(index + 1) !== -1 };
-      })
+      order: baselineOrder.map(function (name) { return { name: name }; })
     };
 
     return variantStructures.concat([baselineStructure]);
