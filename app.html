@@ -1621,6 +1621,7 @@ sl-button[variant="text"]::part(label):hover {
 
   <div class="form-actions">
     <button type="button" id="generate-btn" class="button button--primary" disabled>Згенерувати</button>
+    <p class="field-hint" id="generate-progress-hint" hidden>Це може зайняти до хвилини: три запити йдуть послідовно.</p>
   </div>
 
   </div>
@@ -1894,6 +1895,7 @@ firebase.initializeApp(firebaseConfig);
   var missingList = document.getElementById('missing-list');
   var missingSummary = document.getElementById('missing-summary');
   var generateBtn = document.getElementById('generate-btn');
+  var generateProgressHint = document.getElementById('generate-progress-hint');
   /* опція "усі аудиторії" в дропдауні аудиторії рядка-прив'язки — рядок,
      не id, тож зіткнення зі справжнім genId() практично неможливе */
   var AUDIENCE_ALL_VALUE = '__all__';
@@ -3051,23 +3053,73 @@ firebase.initializeApp(firebaseConfig);
       });
   }
 
-  /* Один запит до /api/generate. Провал мережі чи розбіжність між order
-     і реальними назвами блоків (fetchValidatedOrder) — одна повторна
-     спроба; провал і тоді — відмова піднімається до generateVariants(). */
+  /* Пауза між трьома послідовними викликами /api/generate (розділ 1,
+     "Виправлення під ліміт Gemini") — не запобіжник від дуже точного
+     ліміту, а розтягування трьох запитів у часі, щоб укластись у
+     RPM Free tier. */
+  var SEQUENTIAL_CALL_DELAY_MS = 4000;
+  /* Запас поверх retryDelay, який повертає сам Gemini — щоб не
+     повторити рівно на межі вікна ліміту. */
+  var LIMIT_RETRY_BUFFER_MS = 3000;
+  /* Коли Gemini не повернув retryDelay (details не в очікуваному форматі) —
+     довша, а не коротка пауза: краще почекати зайве, ніж повторити занадто рано. */
+  var LIMIT_RETRY_FALLBACK_MS = 35000;
+
+  function wait(ms) {
+    return new Promise(function (resolve) { setTimeout(resolve, ms); });
+  }
+
+  /* details — сирий текст тіла помилки Gemini (JSON-рядок), у якому
+     RESOURCE_EXHAUSTED кладе google.rpc.RetryInfo з полем retryDelay
+     ("32s"). Повертає мілісекунди або null, якщо цього поля нема чи
+     текст не парситься. */
+  function extractRetryDelayMs(rawDetails) {
+    try {
+      var parsed = JSON.parse(rawDetails);
+      var detailsArr = parsed && parsed.error && Array.isArray(parsed.error.details)
+        ? parsed.error.details
+        : [];
+      var retryInfo = detailsArr.filter(function (d) {
+        return typeof d['@type'] === 'string' && d['@type'].indexOf('RetryInfo') !== -1;
+      })[0];
+      var match = retryInfo && typeof retryInfo.retryDelay === 'string'
+        ? retryInfo.retryDelay.match(/^([\d.]+)s$/)
+        : null;
+      return match ? Math.round(parseFloat(match[1]) * 1000) : null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  /* Один запит до /api/generate. Тіло читається навіть при !res.ok —
+     на 429 сервер кладе limit: true, з нього рахується пауза перед
+     повтором (fetchValidatedOrder). */
   function fetchGenerateOrder(payload) {
     return fetch('/api/generate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
     }).then(function (res) {
-      if (!res.ok) { throw new Error('Запит не вдався'); }
-      return res.json();
-    }).then(function (data) {
-      if (!data || !Array.isArray(data.order)) { throw new Error('Відповідь без order'); }
-      return data.order;
+      return res.json().catch(function () { return null; }).then(function (data) {
+        if (!res.ok) {
+          var err = new Error('Запит не вдався');
+          if (data && data.limit) {
+            err.isLimit = true;
+            var retryDelayMs = extractRetryDelayMs(data.details);
+            err.retryDelayMs = (retryDelayMs !== null ? retryDelayMs + LIMIT_RETRY_BUFFER_MS : LIMIT_RETRY_FALLBACK_MS);
+          }
+          throw err;
+        }
+        if (!data || !Array.isArray(data.order)) { throw new Error('Відповідь без order'); }
+        return data.order;
+      });
     });
   }
 
+  /* Три випадки повтору розділені (розділ 2, "Виправлення під ліміт
+     Gemini"): order не збігається з блоками — дефект відповіді моделі,
+     повтор одразу; ліміт (429) — повтор один раз, але не миттєво,
+     після паузи з retryDelay; будь-яка інша помилка — без повтору. */
   function fetchValidatedOrder(payload, validNames) {
     var validSet = validNames.slice().sort().join('|');
     function attempt() {
@@ -3079,11 +3131,36 @@ firebase.initializeApp(firebaseConfig);
         return trimmed;
       });
     }
-    return attempt().catch(attempt);
+    return attempt().catch(function (err) {
+      if (err.isLimit) {
+        return wait(err.retryDelayMs).then(attempt);
+      }
+      if (err.message === 'order не збігається з блоками') {
+        return attempt();
+      }
+      throw err;
+    });
   }
 
-  /* Три виклики — по одному на комбінацію осей, паралельно; кожен зі
-     своєю валідацією й повторною спробою. */
+  /* Виконує items по черзі, не паралельно (розділ 1, "Виправлення під
+     ліміт Gemini") — Free tier Gemini не витримує три запити одночасно.
+     Результати складаються за індексом, тож порядок на виході завжди
+     відповідає порядку items, незалежно від того, яка пауза чи повтор
+     стався всередині fn. */
+  function runSequentially(items, fn, delayMs) {
+    var results = new Array(items.length);
+    return items.reduce(function (chain, item, i) {
+      return chain.then(function () {
+        return fn(item, i).then(function (result) {
+          results[i] = result;
+          return i < items.length - 1 ? wait(delayMs) : null;
+        });
+      });
+    }, Promise.resolve()).then(function () { return results; });
+  }
+
+  /* Три виклики — по одному на комбінацію осей, послідовно, з паузою
+     між ними; кожен зі своєю валідацією й повторною спробою. */
   function generateVariants(state) {
     var validNames = state.structureBlocks
       .filter(function (b) { return b.name.trim() !== ''; })
@@ -3099,7 +3176,7 @@ firebase.initializeApp(firebaseConfig);
       .map(function (a) { return a.value + ' (' + a.type + ')'; })
       .join('; ');
 
-    var requests = axesCombos.map(function (axes) {
+    return runSequentially(axesCombos, function (axes) {
       return fetchValidatedOrder({
         category: state.category,
         support: state.support,
@@ -3109,9 +3186,7 @@ firebase.initializeApp(firebaseConfig);
         blocks: blocksPayload,
         axes: axes
       }, validNames);
-    });
-
-    return Promise.all(requests).then(function (orders) {
+    }, SEQUENTIAL_CALL_DELAY_MS).then(function (orders) {
       return buildGenerateResult(orders, axesCombos);
     });
   }
@@ -3153,6 +3228,7 @@ firebase.initializeApp(firebaseConfig);
     generateBtn.textContent = 'Генеруємо…';
     generateErrorText = null;
     generationInProgress = true;
+    generateProgressHint.hidden = false;
 
     /* Другий аргумент .then(), не .catch() після — помилка тут має ловити
        тільки провал самого generateVariants(), не будь-яку помилку в
@@ -3175,12 +3251,15 @@ firebase.initializeApp(firebaseConfig);
       saveNotice.open = !saved;
       renderCurrentRun();
       if (saved) { showToast('Прогін збережено в ', true); }
-    }, function () {
-      generateErrorText = 'Не вдалось згенерувати варіанти — спробуйте ще раз.';
+    }, function (err) {
+      generateErrorText = (err && err.isLimit)
+        ? 'Вичерпано ліміт запитів до моделі (Gemini Free tier) — зачекайте хвилину і спробуйте ще раз.'
+        : 'Не вдалось згенерувати варіанти — спробуйте ще раз.';
       updateMissingSection();
     }).finally(function () {
       generationInProgress = false;
       generateBtn.textContent = originalGenerateText;
+      generateProgressHint.hidden = true;
       updateMissingSection();
     });
   }

@@ -81,12 +81,15 @@ ${blocksText}
 
     if (!response.ok) {
       const errText = await response.text();
-      if (response.status === 429) {
+      const isRateLimit = response.status === 429;
+      if (isRateLimit) {
         console.error('[generate] 429 ліміт Gemini', errText.slice(0, 200));
       } else {
         console.error('[generate] Gemini відповів не-200', response.status, errText.slice(0, 200));
       }
-      res.status(502).json({ error: 'Gemini не відповів', details: errText });
+      res.status(502).json(isRateLimit
+        ? { error: 'Gemini не відповів', details: errText, limit: true }
+        : { error: 'Gemini не відповів', details: errText });
       return;
     }
 
