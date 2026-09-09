@@ -1582,7 +1582,8 @@ sl-button[variant="text"]::part(label):hover {
     <div class="form-actions" id="form-actions">
       <button type="button" id="submit-btn" class="button button--primary" disabled>Запустити аналіз</button>
       <button type="button" id="form-reset-btn" class="button button--secondary">Новий прогін</button>
-      <button type="button" id="load-example-btn" class="button button--text">Завантажити приклад</button>
+      <button type="button" id="load-example-home-btn" class="button button--text">Зразок · головна</button>
+      <button type="button" id="load-example-about-btn" class="button button--text">Зразок · про нас</button>
     </div>
 
   </form>
@@ -1754,26 +1755,83 @@ firebase.initializeApp(firebaseConfig);
      прийде від моделі й замінить константу цілком. Осі, рівні зауважень і
      склад метрик узяті з SANDBOX-CORE.md; нічого зі списку «Чого в цій
      версії немає» тут бути не повинно. */
-  /* ТИМЧАСОВІ ДАНІ. Приклад, яким форма заповнюється при першому відкритті —
-     тільки якщо у сховищі нічого немає. Підібраний під MOCK_RESULT, щоб
-     результат читався з описом. Зникне разом із заглушкою. */
-  var EXAMPLE_STATE = {
-    category: 'лендінг громадської організації',
-    support: 'щомісячні звіти про витрачання, реєстр партнерів, архів подій за три роки, сторінки команди',
+  /* ЗРАЗКИ. Форма заповнюється одним із них при першому відкритті (немає
+     нічого у сховищі) і за кліком на «Зразок · головна»/«Зразок · про нас».
+     Явні id на audiences/tasks і готові links на блоках — щоб Екран 2
+     відкривався вже заповненим, без ручного введення прив'язок:
+     migrateState() не чіпає ні одне, ні інше, якщо вони вже задані
+     (audience/task: `if (!a.id)`/`if (!t.id)`; block: `if ('links' in b) return;`). */
+  var EXAMPLE_HOME = {
+    category: 'головна сторінка культурної неприбуткової організації в Квебеку',
+    support: 'зареєстрована благодійна організація з бордом; регулярні події, де культурна програма й гуманітарна підтримка України в одній події; задокументовані звіти про проведені події; залучені й названі артисти; партнери інституційного й громадського рівня',
     audiences: [
-      { value: 'донори, які прийшли після допису в соцмережах', type: 'головна' },
-      { value: 'грантодавці, які перевіряють звітність перед рішенням', type: 'другорядна' }
+      { id: 'home-aud-fondy', value: 'оцінювачі публічних культурних фондів', type: 'головна' },
+      { id: 'home-aud-spilnota', value: 'українська спільнота Монреаля', type: 'другорядна' }
     ],
-    goal: 'разова пожертва або підписка на щомісячну',
-    tasks: ['переказати кошти', 'знайти звіт за минулий рік', 'перевірити, хто партнери'],
-    /* без structureBlocks кнопка «Запустити аналіз» стартувала неактивною —
-       список блоків став обов'язковим полем пізніше, приклад не оновили.
-       Одиниці — з BLOCK_UNITS, підібрані під support вище */
+    goal: 'інституційне представлення для отримання державного фінансування',
+    tasks: [
+      { id: 'home-tt1', value: 'підтвердити легітимність організації' },
+      { id: 'home-tt2', value: 'оцінити культурний та соціальний вплив подій' },
+      { id: 'home-tt3', value: 'знайти інформацію про актуальні заходи' }
+    ],
     structureBlocks: [
-      { name: 'Хто ми', unit: 'абзац', unitOther: '', count: '' },
-      { name: 'Звіти', unit: 'документ/файл', unitOther: '', count: '' },
-      { name: 'Партнери', unit: 'логотип', unitOther: '', count: '' },
-      { name: 'Підтримати', unit: 'тариф/пакет', unitOther: '', count: '' }
+      { name: 'Шапка', unit: 'посилання', unitOther: '', count: '5', links: [] },
+      { name: 'Перше представлення', unit: 'абзац', unitOther: '', count: '2', links: [] },
+      { name: 'Місія і модель', unit: 'абзац', unitOther: '', count: '4',
+        links: [{ taskId: 'home-tt1', audienceId: 'home-aud-fondy' }] },
+      { name: 'Показники діяльності', unit: 'цифра/показник', unitOther: '', count: '4',
+        links: [{ taskId: 'home-tt2', audienceId: 'home-aud-fondy' }] },
+      { name: 'Події', unit: 'картка', unitOther: '', count: '6',
+        links: [
+          { taskId: 'home-tt2', audienceId: 'home-aud-fondy' },
+          { taskId: 'home-tt3', audienceId: 'home-aud-spilnota' }
+        ] },
+      { name: 'Звіт про подію', unit: 'документ/файл', unitOther: '', count: '3',
+        links: [{ taskId: 'home-tt1', audienceId: 'home-aud-fondy' }] },
+      { name: 'Артисти', unit: 'картка', unitOther: '', count: '8',
+        links: [{ taskId: 'home-tt2', audienceId: 'home-aud-fondy' }] },
+      { name: 'Партнери', unit: 'логотип', unitOther: '', count: '9',
+        links: [{ taskId: 'home-tt1', audienceId: 'home-aud-fondy' }] },
+      { name: 'Футер', unit: 'посилання', unitOther: '', count: '6', links: [] }
+    ]
+  };
+
+  /* TT3 навмисно не має блоку для аудиторії "спонсори" — сторінка «Про нас»
+     не містить майбутніх подій. Робочий приклад незакритої задачі,
+     не помилка даних — не «виправляти» додаванням зв'язку. */
+  var EXAMPLE_ABOUT = {
+    category: 'сторінка «Про нас» культурної неприбуткової організації',
+    support: 'зареєстрована організація з волонтерським бордом; історія від заснування з першою подією й переломними моментами; гібридна модель — культурна програма й гуманітарний збір в одній події; названі люди команди з ролями; визнання території корінних народів',
+    audiences: [
+      { id: 'about-aud-sponsor', value: 'спонсори і грантодавці', type: 'головна' },
+      { id: 'about-aud-spilnota', value: 'українська спільнота Монреаля', type: 'другорядна' }
+    ],
+    goal: 'щоб спонсор перейшов до партнерства, а спільнота — до подій',
+    tasks: [
+      { id: 'about-tt1', value: 'перевірити юридичний статус та легітимність організації' },
+      { id: 'about-tt2', value: 'оцінити досвід та вплив через історію діяльності' },
+      { id: 'about-tt3', value: 'знайти інформацію про майбутні культурні події' }
+    ],
+    structureBlocks: [
+      { name: 'Шапка', unit: 'посилання', unitOther: '', count: '5', links: [] },
+      { name: 'Hero сторінки', unit: 'абзац', unitOther: '', count: '1', links: [] },
+      { name: 'Місія', unit: 'абзац', unitOther: '', count: '4',
+        links: [{ taskId: 'about-tt1', audienceId: 'about-aud-sponsor' }] },
+      { name: 'Наша історія', unit: 'крок/етап', unitOther: '', count: '5',
+        links: [
+          { taskId: 'about-tt2', audienceId: 'about-aud-sponsor' },
+          { taskId: 'about-tt2', audienceId: 'about-aud-spilnota' }
+        ] },
+      { name: 'Модель Kolo', unit: 'абзац', unitOther: '', count: '3',
+        links: [{ taskId: 'about-tt2', audienceId: 'about-aud-sponsor' }] },
+      { name: 'Команда', unit: 'картка', unitOther: '', count: '6',
+        links: [
+          { taskId: 'about-tt1', audienceId: 'about-aud-sponsor' },
+          { taskId: 'about-tt3', audienceId: 'about-aud-spilnota' }
+        ] },
+      { name: 'Визнання корінних народів', unit: 'абзац', unitOther: '', count: '3',
+        links: [{ taskId: 'about-tt1', audienceId: 'about-aud-sponsor' }] },
+      { name: 'Футер', unit: 'посилання', unitOther: '', count: '6', links: [] }
     ]
   };
 
@@ -1881,7 +1939,8 @@ firebase.initializeApp(firebaseConfig);
   var addTaskBtn = document.getElementById('add-task');
   var addBlockBtn = document.getElementById('add-block');
   var submitBtn = document.getElementById('submit-btn');
-  var loadExampleBtn = document.getElementById('load-example-btn');
+  var loadExampleHomeBtn = document.getElementById('load-example-home-btn');
+  var loadExampleAboutBtn = document.getElementById('load-example-about-btn');
 
   var formScreen = document.getElementById('form-screen');
   var resultScreen = document.getElementById('result-screen');
@@ -2142,7 +2201,7 @@ firebase.initializeApp(firebaseConfig);
 
     /* приклад підставляється лише при справді першому відкритті:
        якщо стан збережений — навіть порожній після «Нового прогону» — він і виграє */
-    state = state || (stored === null ? EXAMPLE_STATE : {});
+    state = state || (stored === null ? EXAMPLE_HOME : {});
     state = migrateState(state);
     runs.forEach(function (run) { migrateState(run.input); });
     applyFormState(state);
@@ -4470,8 +4529,10 @@ firebase.initializeApp(firebaseConfig);
   }
 
   function disarmLoadExample() {
-    loadExampleBtn.dataset.armed = '';
-    loadExampleBtn.textContent = 'Завантажити приклад';
+    loadExampleHomeBtn.dataset.armed = '';
+    loadExampleHomeBtn.textContent = 'Зразок · головна';
+    loadExampleAboutBtn.dataset.armed = '';
+    loadExampleAboutBtn.textContent = 'Зразок · про нас';
   }
 
   function isDraftEmpty() {
@@ -4717,21 +4778,37 @@ firebase.initializeApp(firebaseConfig);
   /* той самий патерн дворазового озброєння, що в «Новий прогін»: не
      деструктивно в сенсі даних застосунку (нічого на сервері), але так само
      тихо заміняє чернетку — підтвердження для узгодженості з сусідньою дією */
-  loadExampleBtn.addEventListener('click', function () {
-    if (loadExampleBtn.dataset.armed !== 'yes') {
+  /* Озброюються незалежно одна від одної (dataset.armed кожної своєї
+     кнопки), щоб випадковий клік по одній не стер форму через іншу.
+     Клік по одній під час озброєння іншої знімає її озброєння —
+     disarmLoadExample() скидає обидві, тут-таки озброюється саме та,
+     що клікнули. */
+  function loadExample(btn, exampleState) {
+    if (btn.dataset.armed !== 'yes') {
       disarmReset();
       disarmEdit();
-      loadExampleBtn.dataset.armed = 'yes';
-      loadExampleBtn.textContent = 'Точно завантажити приклад?';
+      disarmLoadExample();
+      btn.dataset.armed = 'yes';
+      btn.textContent = 'Точно завантажити?';
       return;
     }
     disarmLoadExample();
     /* той самий шлях, що для будь-якого іншого стану: migrateState()
-       піднімає старий формат EXAMPLE_STATE (tasks-рядки, audiences без id),
-       applyFormState() перемальовує форму */
-    applyFormState(migrateState(EXAMPLE_STATE));
+       не чіпає явні id audiences/tasks і вже задані links на блоках
+       (обидва зразки написані одразу в поточному форматі — не старому,
+       на відміну від колишнього EXAMPLE_STATE), applyFormState()
+       перемальовує форму */
+    applyFormState(migrateState(exampleState));
     saveState();
     updateSubmitState();
+  }
+
+  loadExampleHomeBtn.addEventListener('click', function () {
+    loadExample(loadExampleHomeBtn, EXAMPLE_HOME);
+  });
+
+  loadExampleAboutBtn.addEventListener('click', function () {
+    loadExample(loadExampleAboutBtn, EXAMPLE_ABOUT);
   });
 
   /* копіювання звіту: без мережі, лише буфер обміну браузера */
