@@ -1100,6 +1100,20 @@ textarea.field-input {
   font-size: 16px;
   line-height: 1.5;
   color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+/* два нові рядки метрик (доказова база до дії, блоків підряд без
+   виходу) — помітно дрібніші за "До найдальшої задачі": 14px, той
+   самий, що .field-hint, реальна пара сусідніх розмірів у файлі, не
+   вигадане число. .metric-row__value саму не чіпаємо — вистраждана
+   верстка карток (BUGS.md), перед захистом такі правки не робимо.
+   white-space: nowrap — перелік "0,33 · 0,67 · 1,00" довший за
+   підпис зліва, без цього ламається на два рядки; підпис
+   (.metric-label) не звужується. */
+.metric-row__value--secondary {
+  font-size: 14px;
+  white-space: nowrap;
 }
 
 /* ---------- персонний аудит ---------- */
@@ -2573,6 +2587,64 @@ firebase.initializeApp(firebaseConfig);
     return candidates.slice(Math.floor(candidates.length / 2));
   }
 
+  /* Доказова база до дії (ядро, "Точки дії"). Доказовий блок — той,
+     що обслуговує хоч одну задачу (має links); шапка, футер, перше
+     представлення доказовими не є. Для кожної точки дії — частка
+     доказових блоків від початку потоку до цієї точки включно серед
+     усіх доказових блоків структури. Перелік по кожній точці в
+     порядку позицій, не одне число. Приймає order (масив назв) і вже
+     готовий actionSections (1-indexed позиції) — не рахує кандидатів
+     сама: картка бере їх із variant.flow (action уже проставлено),
+     базовий рядок — зі свіжого computeActionCandidates(). Точок
+     немає → порожній масив, метрика не показується. */
+  function computeEvidenceRatios(order, actionSections, state) {
+    var blockByName = {};
+    (state.structureBlocks || []).forEach(function (b) { blockByName[b.name] = b; });
+
+    var isEvidence = order.map(function (name) {
+      var b = blockByName[name];
+      return !!(b && Array.isArray(b.links) && b.links.length > 0);
+    });
+
+    var totalEvidence = isEvidence.filter(Boolean).length;
+    if (totalEvidence === 0) { return []; }
+
+    var ratios = [];
+    var running = 0;
+    order.forEach(function (name, index) {
+      if (isEvidence[index]) { running++; }
+      if (actionSections.indexOf(index + 1) !== -1) {
+        ratios.push(running / totalEvidence);
+      }
+    });
+
+    return ratios;
+  }
+
+  /* Найдовший відрізок потоку без точки дії — три види відрізків:
+     від початку до першої точки, між двома сусідніми, від останньої
+     до кінця. Точок немає → увесь потік один відрізок, результат —
+     довжина потоку. */
+  function computeLongestGapWithoutAction(orderLength, actionSections) {
+    if (!actionSections.length) { return orderLength; }
+
+    var sorted = actionSections.slice().sort(function (a, b) { return a - b; });
+    var longest = sorted[0] - 1;
+    for (var i = 1; i < sorted.length; i++) {
+      var gap = sorted[i] - sorted[i - 1] - 1;
+      if (gap > longest) { longest = gap; }
+    }
+    var tail = orderLength - sorted[sorted.length - 1];
+    if (tail > longest) { longest = tail; }
+
+    return longest;
+  }
+
+  /* "0,33" — кома десятковий роздільник, два знаки після неї. */
+  function formatRatio(ratio) {
+    return ratio.toFixed(2).replace('.', ',');
+  }
+
   /* Найменший "До найдальшої задачі" серед трьох варіантів для тієї самої
      аудиторії — єдина метрика в картці, тож єдине число, не мапа по
      назвах. Варіанти без метрик (null) чи без покритих задач (max: null)
@@ -2630,8 +2702,9 @@ firebase.initializeApp(firebaseConfig);
      виклику), тож 7-рядковий subgrid карток не розсинхронізується.
      metrics.max === null (задачі є, жодна не прив'язана до цієї
      аудиторії) — секція лишається, число заміняється поясненням. */
-  function renderMetrics(metrics, minSection, flowLength, baselineMetrics) {
+  function renderMetrics(metrics, minSection, flow, state, baselineMetrics) {
     if (!metrics) { return null; }
+    var flowLength = flow.length;
 
     var section = el('div', 'card-section card-section--divided');
     section.appendChild(el('span', 'section-label', 'Порівняльні метрики'));
@@ -2673,6 +2746,30 @@ firebase.initializeApp(firebaseConfig);
       shortestTag.classList.add('variant-card__badge--empty');
     }
     section.appendChild(shortestTag);
+
+    /* Дві нові метрики — після наявного блоку цілком (число, тег,
+       різниця, пояснення), не всередині нього. Точки дії беруться
+       з flow, де action уже проставлено (buildGenerateResult) —
+       кандидатів тут заново не рахує. "Порогу немає" вгорі секції
+       стосується вже всіх трьох метрик, тут не дублюється. */
+    var actionSections = [];
+    flow.forEach(function (b, i) { if (b.action) { actionSections.push(i + 1); } });
+    var order = flow.map(function (b) { return b.name; });
+
+    var evidenceRatios = computeEvidenceRatios(order, actionSections, state);
+    if (evidenceRatios.length) {
+      var evidenceRow = el('div', 'metric-row');
+      evidenceRow.appendChild(el('span', 'metric-label', 'Доказова база до дії'));
+      evidenceRow.appendChild(el('span', 'metric-row__value metric-row__value--secondary',
+        evidenceRatios.map(formatRatio).join(' · ')));
+      section.appendChild(evidenceRow);
+    }
+
+    var gapRow = el('div', 'metric-row');
+    gapRow.appendChild(el('span', 'metric-label', 'Блоків підряд без виходу'));
+    gapRow.appendChild(el('span', 'metric-row__value metric-row__value--secondary',
+      String(computeLongestGapWithoutAction(order.length, actionSections))));
+    section.appendChild(gapRow);
 
     return section;
   }
@@ -2795,7 +2892,7 @@ firebase.initializeApp(firebaseConfig);
 
       card.appendChild(renderFlow(variant));
       card.appendChild(renderAxes(variant));
-      var metricsSection = renderMetrics(metricsList[index], mins, variant.flow.length, baselineMetrics);
+      var metricsSection = renderMetrics(metricsList[index], mins, variant.flow, state, baselineMetrics);
       if (metricsSection) { card.appendChild(metricsSection); }
       card.appendChild(renderRemarks(variant));
       card.appendChild(renderConclusion(variant));
@@ -2804,6 +2901,21 @@ firebase.initializeApp(firebaseConfig);
     });
 
     renderBaselineStrip(baselineOrder, baselineMetrics, state);
+  }
+
+  /* Дописує "доказова база до дії" й "блоків підряд без виходу" до
+     наявного тексту "Кроків до задачі — N, розкид M", тим самим
+     рядком-переліком — не окремою колонкою. Перше значення пропущене,
+     якщо точок дії немає (computeEvidenceRatios поверне []); друге —
+     завжди, за визначенням (порожній масив точок теж дає число,
+     довжину потоку). */
+  function appendActionMetrics(baseText, order, actionSections, state) {
+    var evidenceRatios = computeEvidenceRatios(order, actionSections, state);
+    var evidencePart = evidenceRatios.length
+      ? ', доказова база до дії ' + evidenceRatios.map(formatRatio).join(' · ')
+      : '';
+    var gapPart = ', блоків підряд без виходу ' + computeLongestGapWithoutAction(order.length, actionSections);
+    return baseText + evidencePart + gapPart;
   }
 
   /* Базовий рядок — тим самим способом, що baselineMetrics у
@@ -2830,8 +2942,15 @@ firebase.initializeApp(firebaseConfig);
       variantCell.appendChild(el('p', 'field-caption', 'як введено на Екрані 1 · осей немає'));
       baselineRow.appendChild(variantCell);
 
+      /* Усі кандидати, без добору за віссю — базова структура осі
+         не має, так само як у renderBaselineStrip(). */
+      var baselineActionSections = computeActionCandidates(baselineOrder, state)
+        .map(function (c) { return c.section; });
       var codeText = baselineMetrics.max
-        ? ('Кроків до задачі — ' + baselineMetrics.max.section + ', розкид ' + (baselineMetrics.max.section - baselineMetrics.min.section))
+        ? appendActionMetrics(
+            'Кроків до задачі — ' + baselineMetrics.max.section + ', розкид ' + (baselineMetrics.max.section - baselineMetrics.min.section),
+            baselineOrder, baselineActionSections, state
+          )
         : 'жодна задача не прив’язана до цієї аудиторії';
       baselineRow.appendChild(el('td', null, codeText));
       baselineRow.appendChild(el('td', null, 'персонний аудит не виконується'));
@@ -2854,8 +2973,16 @@ firebase.initializeApp(firebaseConfig);
       var variant = currentRun.result.variants.filter(function (v) { return v.id === row.variant; })[0];
       var order = variant.flow.map(function (b) { return b.name; });
       var metrics = computeVariantMetrics(order, state, selectedMetricsAudienceId);
+
+      /* Точки дії — з variant.flow, де action уже проставлено
+         (buildGenerateResult), кандидатів тут заново не рахує. */
+      var actionSections = [];
+      variant.flow.forEach(function (b, i) { if (b.action) { actionSections.push(i + 1); } });
       var codeText = metrics && metrics.max
-        ? ('Кроків до задачі — ' + metrics.max.section + ', розкид ' + (metrics.max.section - metrics.min.section))
+        ? appendActionMetrics(
+            'Кроків до задачі — ' + metrics.max.section + ', розкид ' + (metrics.max.section - metrics.min.section),
+            order, actionSections, state
+          )
         : 'жодна задача не прив’язана до цієї аудиторії';
 
       var tr = document.createElement('tr');
