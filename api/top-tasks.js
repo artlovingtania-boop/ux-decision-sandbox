@@ -3,6 +3,47 @@
 // Ключ ніколи не потрапляє в браузер: ця функція виконується на сервері Vercel,
 // process.env.GEMINI_API_KEY береться з налаштувань проєкту, не з коду.
 
+// gemini-3.1-flash-lite іноді додає після валідного JSON уламок
+// markdown-огорожі — той самий підхід, що в api/generate.js (коміт
+// 36e5960): виділяємо перший повний {...} лічильником дужок, а не
+// регуляркою.
+function extractFirstJsonObject(text) {
+  const start = text.indexOf('{');
+  if (start === -1) { return null; }
+
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+
+  for (let i = start; i < text.length; i++) {
+    const ch = text[i];
+
+    if (inString) {
+      if (escaped) {
+        escaped = false;
+      } else if (ch === '\\') {
+        escaped = true;
+      } else if (ch === '"') {
+        inString = false;
+      }
+      continue;
+    }
+
+    if (ch === '"') {
+      inString = true;
+    } else if (ch === '{') {
+      depth++;
+    } else if (ch === '}') {
+      depth--;
+      if (depth === 0) {
+        return text.slice(start, i + 1);
+      }
+    }
+  }
+
+  return null;
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     res.status(405).json({ error: 'Метод не підтримується' });
@@ -12,12 +53,14 @@ export default async function handler(req, res) {
   const { category, support, audience, goal } = req.body || {};
 
   if (!category || !support || !audience || !goal) {
+    console.error('[top-tasks] нема обов’язкових полів', { category: !!category, support: !!support, audience: !!audience, goal: !!goal });
     res.status(400).json({ error: 'Не вистачає полів: category, support, audience, goal' });
     return;
   }
 
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
+    console.error('[top-tasks] немає ключа на сервері');
     res.status(500).json({ error: 'Ключ не налаштований на сервері' });
     return;
   }
@@ -40,7 +83,7 @@ export default async function handler(req, res) {
 
   try {
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite:generateContent?key=${apiKey}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -53,7 +96,19 @@ export default async function handler(req, res) {
 
     if (!response.ok) {
       const errText = await response.text();
-      res.status(502).json({ error: 'Gemini не відповів', details: errText });
+      const isRateLimit = response.status === 429;
+      const isOverloaded = response.status === 503;
+      if (isRateLimit) {
+        console.error('[top-tasks] 429 ліміт Gemini', errText.slice(0, 200));
+      } else if (isOverloaded) {
+        console.error('[top-tasks] 503 Gemini перевантажений', errText.slice(0, 200));
+      } else {
+        console.error('[top-tasks] Gemini відповів не-200', response.status, errText.slice(0, 200));
+      }
+      const errorBody = { error: 'Gemini не відповів', details: errText };
+      if (isRateLimit) { errorBody.limit = true; }
+      if (isOverloaded) { errorBody.overloaded = true; }
+      res.status(502).json(errorBody);
       return;
     }
 
@@ -61,13 +116,26 @@ export default async function handler(req, res) {
     const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
 
     if (!rawText) {
+      console.error('[top-tasks] порожня відповідь від моделі');
       res.status(502).json({ error: 'Порожня відповідь від моделі' });
       return;
     }
 
-    const parsed = JSON.parse(rawText);
+    let parsed;
+    try {
+      const jsonSlice = extractFirstJsonObject(rawText);
+      if (jsonSlice === null) {
+        throw new Error('JSON-об’єкт не знайдено у відповіді');
+      }
+      parsed = JSON.parse(jsonSlice);
+    } catch (parseErr) {
+      console.error('[top-tasks] JSON.parse rawText упав', rawText.slice(0, 200));
+      res.status(502).json({ error: 'Не вдалось розпарсити відповідь моделі', details: String(parseErr) });
+      return;
+    }
 
     if (!Array.isArray(parsed.tasks) || parsed.tasks.length === 0) {
+      console.error('[top-tasks] tasks не масив або порожній', 'отримано:', JSON.stringify(parsed.tasks).slice(0, 200));
       res.status(502).json({ error: 'Відповідь не містить tasks' });
       return;
     }
