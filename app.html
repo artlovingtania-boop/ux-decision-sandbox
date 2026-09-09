@@ -1204,13 +1204,19 @@ textarea.field-input {
 }
 
 .divergence td:first-child {
-  width: 96px;
+  width: 148px;
   font-weight: 700;
   color: var(--text-primary);
 }
 
 .divergence tr:last-child td {
   border-bottom: 0;
+}
+
+/* базовий рядок — точка відліку, не альтернатива; та сама заливка,
+   що в .baseline-strip, з тієї самої причини */
+.divergence tr.divergence__row--baseline {
+  background: var(--surface-card);
 }
 
 /* ---------- екран 2: картки блоків ---------- */
@@ -2705,8 +2711,40 @@ firebase.initializeApp(firebaseConfig);
     renderBaselineStrip(baselineOrder, baselineMetrics);
   }
 
+  /* Базовий рядок — тим самим способом, що baselineMetrics у
+     renderVariants() (не читається звідти: обидві функції рахують
+     наживо з currentRun.input, той самий принцип, що й усюди в цьому
+     файлі). Той самий null / {max:null} патерн: задач немає взагалі —
+     рядка нема; жодна задача не прив'язана до поточної аудиторії —
+     той самий текст, що в картках і смузі, замість чисел. */
   function renderDivergence() {
     divergenceBody.innerHTML = '';
+
+    var state = currentRun.input;
+    var baselineOrder = (state.structureBlocks || [])
+      .filter(function (b) { return b.name.trim() !== ''; })
+      .map(function (b) { return b.name; });
+    var baselineMetrics = computeVariantMetrics(baselineOrder, state, selectedMetricsAudienceId);
+
+    if (baselineMetrics) {
+      var baselineRow = document.createElement('tr');
+      baselineRow.className = 'divergence__row--baseline';
+
+      var variantCell = el('td', null);
+      variantCell.appendChild(el('p', null, 'Твій порядок'));
+      variantCell.appendChild(el('p', 'field-caption', 'як введено на Екрані 1 · осей немає'));
+      baselineRow.appendChild(variantCell);
+
+      var codeText = baselineMetrics.max
+        ? ('Кроків до задачі — ' + baselineMetrics.max.section + ', розкид ' + (baselineMetrics.max.section - baselineMetrics.min.section))
+        : 'жодна задача не прив’язана до цієї аудиторії';
+      baselineRow.appendChild(el('td', null, codeText));
+      baselineRow.appendChild(el('td', null, 'персонний аудит не виконується'));
+      baselineRow.appendChild(el('td', null, 'Точка відліку: показники твоєї структури поруч із трьома альтернативами. Осей немає, тому пояснити число через вісь не можна'));
+
+      divergenceBody.appendChild(baselineRow);
+    }
+
     currentRun.result.divergence.forEach(function (row) {
       var tr = document.createElement('tr');
       [row.variant, row.code, row.persona, row.meaning].forEach(function (text) {
@@ -2974,6 +3012,7 @@ firebase.initializeApp(firebaseConfig);
     selectedMetricsAudienceId = btn.dataset.audienceId;
     renderAudienceSwitcher();
     renderVariants();
+    renderDivergence();
   });
 
   function renderCurrentRun() {
