@@ -848,11 +848,24 @@ textarea.field-input {
   gap: var(--spacing-12);
 }
 
+/* padding рядків нижче дає власний відступ — спільний .summary-rows
+   gap (12px) тут дублював би його. #confirm-summary-body (16px) —
+   інша розкладка (стос, не grid-колонки) — цей рядок не займає. */
+#summary-body {
+  gap: 0;
+}
+
 #summary-body .summary-row {
   display: grid;
   grid-template-columns: 200px 1fr;
   gap: var(--spacing-16);
   align-items: baseline;
+  padding: var(--spacing-12) 0;
+  border-bottom: 1px solid var(--border-card);
+}
+
+#summary-body .summary-row:last-child {
+  border-bottom: none;
 }
 
 .summary-row {
@@ -872,6 +885,45 @@ textarea.field-input {
   display: flex;
   flex-direction: column;
   gap: var(--spacing-4);
+}
+
+/* "Перелік блоків" у "Вхідному описі" — той самий патерн, що .advanced
+   (details/summary, стандартний маркер прибраний, plus/minus замість
+   нього), тільки в масштабі рядка підсумку, не секції: типографія
+   значення — та сама, що .summary-row__value, іконки — ті самі
+   asset-файли, що в .advanced, лише 16px замість 24. */
+.block-summary__toggle {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-8);
+  cursor: pointer;
+  list-style: none;
+  font-size: 16px;
+  line-height: 1.5;
+  color: var(--text-primary);
+}
+
+.block-summary__toggle::-webkit-details-marker {
+  display: none;
+}
+
+.block-summary__icon {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+
+.block-summary__icon--minus,
+.block-summary[open] .block-summary__icon--plus {
+  display: none;
+}
+
+.block-summary[open] .block-summary__icon--minus {
+  display: block;
+}
+
+.block-summary .summary-list {
+  margin-top: var(--spacing-4);
 }
 
 /* ---------- перемикач аудиторії (метрики) ---------- */
@@ -2483,6 +2535,18 @@ firebase.initializeApp(firebaseConfig);
     return row;
   }
 
+  /* plus/minus для .block-summary__toggle — ті самі asset-файли, що
+     .advanced__icon, тут менші й побудовані в JS, бо рядок динамічний */
+  function blockSummaryIcon(kind) {
+    var img = document.createElement('img');
+    img.className = 'block-summary__icon block-summary__icon--' + kind;
+    img.src = 'assets/icon-' + kind + '.svg';
+    img.alt = '';
+    img.width = 16;
+    img.height = 16;
+    return img;
+  }
+
   function renderSummary() {
     /* показуємо вхід того прогону, що відкритий, а не поточну чернетку форми */
     var state = currentRun.input;
@@ -2518,18 +2582,34 @@ firebase.initializeApp(firebaseConfig);
       summaryBody.appendChild(taskRow);
     }
 
-    /* перелік блоків: рядок лише якщо є хоч один блок із назвою */
+    /* перелік блоків: рядок лише якщо є хоч один блок із назвою.
+       Значення згорнуте за замовчуванням (details без open) — той самий
+       патерн, що .advanced, у масштабі рядка: N блоків + plus/minus,
+       розгорнутий стан — той самий .summary-list, що був тут завжди. */
     var namedBlocks = (state.structureBlocks || []).filter(function (b) { return b.name.trim() !== ''; });
     if (namedBlocks.length) {
       var blockRow = el('div', 'summary-row');
       blockRow.appendChild(el('span', 'field-caption', 'Перелік блоків'));
+
+      var blockDetails = document.createElement('details');
+      blockDetails.className = 'block-summary';
+
+      var blockToggle = document.createElement('summary');
+      blockToggle.className = 'block-summary__toggle';
+      blockToggle.appendChild(document.createTextNode(namedBlocks.length + ' блоків'));
+      blockToggle.appendChild(blockSummaryIcon('plus'));
+      blockToggle.appendChild(blockSummaryIcon('minus'));
+      blockDetails.appendChild(blockToggle);
+
       var blockValues = el('div', 'summary-list');
       namedBlocks.forEach(function (b) {
         var unitLabel = b.unit === 'інше' ? b.unitOther : b.unit;
         var desc = unitLabel ? (' — ' + unitLabel + (b.count ? ' × ' + b.count : '')) : '';
         blockValues.appendChild(el('p', 'summary-row__value', b.name + desc));
       });
-      blockRow.appendChild(blockValues);
+      blockDetails.appendChild(blockValues);
+
+      blockRow.appendChild(blockDetails);
       summaryBody.appendChild(blockRow);
     }
   }
