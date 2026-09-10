@@ -1517,7 +1517,6 @@ sl-button[variant="text"]::part(label):hover {
         <input class="field-input" type="text" id="category" data-limit="80" placeholder="тип сторінки або продукту одним рядком">
         <button type="button" class="field-clear" aria-label="Очистити поле">✕</button>
       </div>
-      <span class="field-counter"></span>
     </div>
 
     <div class="form-group">
@@ -1542,7 +1541,6 @@ sl-button[variant="text"]::part(label):hover {
         <input class="field-input" type="text" id="goal" data-limit="120" placeholder="що має статися після візиту">
         <button type="button" class="field-clear" aria-label="Очистити поле">✕</button>
       </div>
-      <span class="field-counter"></span>
     </div>
 
     <div class="form-group">
@@ -2278,8 +2276,7 @@ firebase.initializeApp(firebaseConfig);
       '<sl-option value="другорядна">другорядна</sl-option>' +
       '</sl-select>' +
       '<button type="button" class="audience-remove" aria-label="Видалити аудиторію">✕</button>' +
-      '</div>' +
-      '<span class="field-counter"></span>';
+      '</div>';
     item.querySelector('.audience-input').value = value || '';
     item.querySelector('.audience-remove').addEventListener('click', function () {
       item.remove();
@@ -2315,8 +2312,7 @@ firebase.initializeApp(firebaseConfig);
       '<button type="button" class="field-clear" aria-label="Очистити поле">✕</button>' +
       '</div>' +
       '<button type="button" class="task-remove" aria-label="Видалити задачу">✕</button>' +
-      '</div>' +
-      '<span class="field-counter"></span>';
+      '</div>';
     item.querySelector('.task-input').value = value || '';
     item.querySelector('.task-remove').addEventListener('click', function () {
       item.remove();
