@@ -409,7 +409,11 @@ textarea.field-input {
 .block-item {
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-4);
+  gap: var(--spacing-8);
+  padding: var(--spacing-16);
+  background: var(--surface-card);
+  border: 1px solid var(--border-card);
+  border-radius: var(--radius-md);
 }
 
 .block-row {
@@ -2370,7 +2374,6 @@ firebase.initializeApp(firebaseConfig);
       '</div>' +
       '<button type="button" class="block-remove" aria-label="Видалити блок">✕</button>' +
       '</div>' +
-      '<span class="field-counter"></span>' +
       '<div class="block-desc-row">' +
       '<sl-select class="block-unit" placeholder="одиниця" clearable>' + unitOptions + '</sl-select>' +
       '<sl-input class="block-unit-other" placeholder="своя назва одиниці" hidden></sl-input>' +
