@@ -269,6 +269,17 @@ textarea.field-input {
   overflow-y: hidden;
 }
 
+/* Поля документів — виняток із правила вище: бриф буває на ~12 тис.
+   символів, авторіст розтягнув би поле на сотні рядків і відсунув решту
+   форми. Стеля — 10 рядків: 240px = 10 × висота рядка поля (16px × 1.5 =
+   24px, .field-input вище). Токена для висоти немає — такого випадку не
+   було. Вище стелі — прокрутка всередині поля */
+#brief,
+#page-description {
+  max-height: 240px;
+  overflow-y: auto;
+}
+
 .field:focus-within {
   outline: none;
   border-color: var(--border-focus);
@@ -427,7 +438,7 @@ textarea.field-input {
   min-width: 0;
 }
 
-/* "опис" блоку: одиниця, своя одиниця (тільки при "інше"), кількість */
+/* "опис" блоку: одиниця (вільний текст), кількість */
 .block-desc-row {
   display: flex;
   align-items: flex-start;
@@ -435,11 +446,6 @@ textarea.field-input {
 }
 
 .block-desc-row .block-unit {
-  width: 240px;
-  flex-shrink: 0;
-}
-
-.block-desc-row .block-unit-other {
   flex: 1;
   min-width: 0;
 }
@@ -447,6 +453,12 @@ textarea.field-input {
 .block-desc-row .block-count {
   width: 120px;
   flex-shrink: 0;
+}
+
+/* прапорець нижчий за поля (40px) — по центру рядка, не по верху */
+.block-desc-row .block-countable {
+  flex-shrink: 0;
+  align-self: center;
 }
 
 /* Видалення рядка — значок, видимий завжди: показ лише при наведенні робив
@@ -1564,6 +1576,28 @@ sl-button[variant="text"]::part(label):hover {
   <form id="app-form" class="app-form" novalidate>
 
     <div class="form-group">
+      <label class="field-label" for="brief">Контекст проєкту</label>
+      <div class="field field-wrap">
+        <textarea class="field-input" id="brief" rows="3"></textarea>
+        <button type="button" class="field-clear" aria-label="Очистити поле">✕</button>
+      </div>
+      <p class="field-hint">бриф: вставляється раз, лишається для всіх сторінок проєкту</p>
+    </div>
+
+    <div class="form-group">
+      <label class="field-label" for="page-description">Опис сторінки</label>
+      <div class="field field-wrap">
+        <textarea class="field-input" id="page-description" rows="3"></textarea>
+        <button type="button" class="field-clear" aria-label="Очистити поле">✕</button>
+      </div>
+      <p class="field-hint">блоки з ролями, одиниці й кількість</p>
+    </div>
+
+    <div class="form-actions">
+      <button type="button" id="parse-btn" class="button button--secondary" disabled>Розібрати</button>
+    </div>
+
+    <div class="form-group">
       <label class="field-label" for="category">Категорія продукту</label>
       <div class="field field-wrap">
         <input class="field-input" type="text" id="category" data-limit="80" placeholder="тип сторінки або продукту одним рядком">
@@ -1585,6 +1619,7 @@ sl-button[variant="text"]::part(label):hover {
       <label class="field-label">Цільова аудиторія</label>
       <div id="audience-list" class="audience-list"></div>
       <button type="button" id="add-audience" class="field-add-btn">+ Додати другу аудиторію</button>
+      <p class="field-hint" id="dropped-audiences" hidden></p>
     </div>
 
     <div class="form-group">
@@ -1599,6 +1634,7 @@ sl-button[variant="text"]::part(label):hover {
       <label class="field-label">Перелік блоків</label>
       <div id="block-list" class="block-list"></div>
       <button type="button" id="add-block" class="field-add-btn">+ Додати блок</button>
+      <p class="field-hint">Одиниця — те, що повторюється в блоці: іменник в однині, коротко.</p>
     </div>
 
     <div class="advanced">
@@ -1829,24 +1865,24 @@ firebase.initializeApp(firebaseConfig);
       { id: 'home-tt3', value: 'знайти інформацію про актуальні заходи' }
     ],
     structureBlocks: [
-      { name: 'Шапка', unit: 'посилання', unitOther: '', count: '5', links: [] },
-      { name: 'Перше представлення', unit: 'абзац', unitOther: '', count: '2', links: [] },
-      { name: 'Місія і модель', unit: 'абзац', unitOther: '', count: '4',
+      { name: 'Шапка', unit: 'посилання', count: '5', countable: true, links: [] },
+      { name: 'Перше представлення', unit: 'абзац', count: '2', countable: false, links: [] },
+      { name: 'Місія і модель', unit: 'абзац', count: '4', countable: false,
         links: [{ taskId: 'home-tt1', audienceId: 'home-aud-fondy' }] },
-      { name: 'Показники діяльності', unit: 'цифра/показник', unitOther: '', count: '4',
+      { name: 'Показники діяльності', unit: 'показник', count: '4', countable: false,
         links: [{ taskId: 'home-tt2', audienceId: 'home-aud-fondy' }] },
-      { name: 'Події', unit: 'картка', unitOther: '', count: '6',
+      { name: 'Події', unit: 'картка', count: '6', countable: true,
         links: [
           { taskId: 'home-tt2', audienceId: 'home-aud-fondy' },
           { taskId: 'home-tt3', audienceId: 'home-aud-spilnota' }
         ] },
-      { name: 'Звіт про подію', unit: 'документ/файл', unitOther: '', count: '3',
+      { name: 'Звіт про подію', unit: 'документ', count: '3', countable: true,
         links: [{ taskId: 'home-tt1', audienceId: 'home-aud-fondy' }] },
-      { name: 'Артисти', unit: 'картка', unitOther: '', count: '8',
+      { name: 'Артисти', unit: 'картка', count: '8', countable: true,
         links: [{ taskId: 'home-tt2', audienceId: 'home-aud-fondy' }] },
-      { name: 'Партнери', unit: 'логотип', unitOther: '', count: '9',
+      { name: 'Партнери', unit: 'логотип', count: '9', countable: false,
         links: [{ taskId: 'home-tt1', audienceId: 'home-aud-fondy' }] },
-      { name: 'Футер', unit: 'посилання', unitOther: '', count: '6', links: [] }
+      { name: 'Футер', unit: 'посилання', count: '6', countable: true, links: [] }
     ]
   };
 
@@ -1867,25 +1903,25 @@ firebase.initializeApp(firebaseConfig);
       { id: 'about-tt3', value: 'знайти інформацію про майбутні культурні події' }
     ],
     structureBlocks: [
-      { name: 'Шапка', unit: 'посилання', unitOther: '', count: '5', links: [] },
-      { name: 'Hero сторінки', unit: 'абзац', unitOther: '', count: '1', links: [] },
-      { name: 'Місія', unit: 'абзац', unitOther: '', count: '4',
+      { name: 'Шапка', unit: 'посилання', count: '5', countable: true, links: [] },
+      { name: 'Hero сторінки', unit: 'абзац', count: '1', countable: false, links: [] },
+      { name: 'Місія', unit: 'абзац', count: '4', countable: false,
         links: [{ taskId: 'about-tt1', audienceId: 'about-aud-sponsor' }] },
-      { name: 'Наша історія', unit: 'крок/етап', unitOther: '', count: '5',
+      { name: 'Наша історія', unit: 'етап', count: '5', countable: true,
         links: [
           { taskId: 'about-tt2', audienceId: 'about-aud-sponsor' },
           { taskId: 'about-tt2', audienceId: 'about-aud-spilnota' }
         ] },
-      { name: 'Модель Kolo', unit: 'абзац', unitOther: '', count: '3',
+      { name: 'Модель Kolo', unit: 'абзац', count: '3', countable: false,
         links: [{ taskId: 'about-tt2', audienceId: 'about-aud-sponsor' }] },
-      { name: 'Команда', unit: 'картка', unitOther: '', count: '6',
+      { name: 'Команда', unit: 'картка', count: '6', countable: true,
         links: [
           { taskId: 'about-tt1', audienceId: 'about-aud-sponsor' },
           { taskId: 'about-tt3', audienceId: 'about-aud-spilnota' }
         ] },
-      { name: 'Визнання корінних народів', unit: 'абзац', unitOther: '', count: '3',
+      { name: 'Визнання корінних народів', unit: 'абзац', count: '3', countable: false,
         links: [{ taskId: 'about-tt1', audienceId: 'about-aud-sponsor' }] },
-      { name: 'Футер', unit: 'посилання', unitOther: '', count: '6', links: [] }
+      { name: 'Футер', unit: 'посилання', count: '6', countable: true, links: [] }
     ]
   };
 
@@ -1995,6 +2031,13 @@ firebase.initializeApp(firebaseConfig);
   var submitBtn = document.getElementById('submit-btn');
   var loadExampleHomeBtn = document.getElementById('load-example-home-btn');
   var loadExampleAboutBtn = document.getElementById('load-example-about-btn');
+  var briefInput = document.getElementById('brief');
+  var pageDescInput = document.getElementById('page-description');
+  var parseBtn = document.getElementById('parse-btn');
+  var droppedAudiencesHint = document.getElementById('dropped-audiences');
+  /* true під час виклику /api/parse — кнопка лишається вимкненою, навіть
+     якщо дизайнер тим часом правитиме опис сторінки */
+  var parseInProgress = false;
 
   var formScreen = document.getElementById('form-screen');
   var resultScreen = document.getElementById('result-screen');
@@ -2105,6 +2148,13 @@ firebase.initializeApp(firebaseConfig);
 
   /* ---------- єдине місце роботи зі сховищем ---------- */
 
+  /* Порядок ключів тут — частина контракту, не стиль. Стан порівнюється
+     через JSON.stringify (дедуплікація прогонів, «опис змінено»), а він
+     чутливий до порядку. migrateState() дописує відсутні ключі старих
+     прогонів у кінець об'єкта — тому новий ключ додається тільки в кінець,
+     і тут, і в блоці, а не «де логічніше». Інакше мігрований прогін
+     розійдеться з формою за самим лише порядком, і дедуплікація зламається
+     так, що причину важко знайти. */
   function collectState() {
     return {
       category: document.getElementById('category').value,
@@ -2128,14 +2178,23 @@ firebase.initializeApp(firebaseConfig);
         return {
           name: item.querySelector('.block-name').value,
           unit: item.querySelector('.block-unit').value,
-          unitOther: item.querySelector('.block-unit-other').value,
           count: item.querySelector('.block-count').value,
-          links: JSON.parse(item.dataset.links || 'null')
+          links: JSON.parse(item.dataset.links || 'null'),
+          /* останнім — див. порядок ключів над collectState() */
+          countable: item.querySelector('.block-countable').checked
         };
       }),
       /* 'designer' | 'gemini' — звідки прийшли tasks цього стану; тримається
          в dataset форми, щоб саме collectState() лишався єдиним читачем */
-      tasksSource: form.dataset.tasksSource || 'designer'
+      tasksSource: form.dataset.tasksSource || 'designer',
+      /* два документи дизайнера — вхід /api/parse. Лежать і в стані
+         прогону: видно, з чого виведено, і можна перерозібрати */
+      brief: briefInput.value,
+      pageDescription: pageDescInput.value,
+      /* аудиторії, які розбір не вмістив у дві, — обмеження прогону;
+         у dataset форми, як tasksSource, щоб collectState() лишався
+         єдиним читачем */
+      droppedAudiences: JSON.parse(form.dataset.droppedAudiences || '[]')
     };
   }
 
@@ -2184,6 +2243,31 @@ firebase.initializeApp(firebaseConfig);
       state.tasksSource = 'designer';
     }
 
+    /* одиниця була вибором зі списку (BLOCK_UNITS) плюс вільним unitOther
+       при 'інше'; тепер це один вільний текст. Без міграції старий прогін
+       показував би одиницею слово «інше», а ключ unitOther у runs[0].input
+       розходився б зі свіжим collectState() — порівняння JSON хибно бачило б
+       змінений опис і ламало дедуплікацію прогонів. Слаги старого списку
+       з дефісом замість пробілу стають словами; решта значень списку й так
+       збігалась зі своїм підписом. Чіпаємо лише блоки старого формату —
+       ті, де ще є ключ unitOther */
+    var OLD_UNIT_SLUGS = {
+      'пункт-списку': 'пункт списку',
+      'рядок-таблиці': 'рядок таблиці',
+      'поле-форми': 'поле форми'
+    };
+    if (Array.isArray(state.structureBlocks)) {
+      state.structureBlocks.forEach(function (b) {
+        if (!('unitOther' in b)) { return; }
+        if (b.unit === 'інше') {
+          b.unit = b.unitOther || '';
+        } else if (OLD_UNIT_SLUGS.hasOwnProperty(b.unit)) {
+          b.unit = OLD_UNIT_SLUGS[b.unit];
+        }
+        delete b.unitOther;
+      });
+    }
+
     /* taskIds/audienceIds (два незалежні списки) → links (масив пар
        {taskId, audienceId}) — декартів добуток, те саме припущення,
        з яким код і так працював, тепер явно записане в дані замість
@@ -2221,6 +2305,26 @@ firebase.initializeApp(firebaseConfig);
         delete b.audienceIds;
       });
     }
+
+    /* countable (чи одиницю читають поштучно) з'явився пізніше. Форма пише
+       ключ завжди, тож блок без нього розходився б з формою в порівнянні
+       JSON. false — те, що показує незнятий прапорець, коли старий прогін
+       відкривають через «Змінити опис», і що форма збереже назад. Стоїть
+       після міграції links, бо та теж дописує ключ у кінець: так порядок
+       виходить той самий, що в collectState() — links, потім countable */
+    if (Array.isArray(state.structureBlocks)) {
+      state.structureBlocks.forEach(function (b) {
+        if (!('countable' in b)) { b.countable = false; }
+      });
+    }
+
+    /* brief, pageDescription, droppedAudiences з'явились разом із розбором
+       документів. Дописуються в кінець у тому самому порядку, що в
+       collectState() — інакше старий прогін розійшовся б із формою за
+       самим лише порядком ключів */
+    if (typeof state.brief !== 'string') { state.brief = ''; }
+    if (typeof state.pageDescription !== 'string') { state.pageDescription = ''; }
+    if (!Array.isArray(state.droppedAudiences)) { state.droppedAudiences = []; }
 
     return state;
   }
@@ -2264,6 +2368,10 @@ firebase.initializeApp(firebaseConfig);
   /* ---------- заповнення форми ---------- */
 
   function applyFormState(state) {
+    briefInput.value = state.brief || '';
+    pageDescInput.value = state.pageDescription || '';
+    form.dataset.droppedAudiences = JSON.stringify(Array.isArray(state.droppedAudiences) ? state.droppedAudiences : []);
+    renderDroppedAudiences();
     document.getElementById('category').value = state.category || '';
     document.getElementById('support').value = state.support || '';
     document.getElementById('goal').value = state.goal || '';
@@ -2274,7 +2382,7 @@ firebase.initializeApp(firebaseConfig);
     var audiences = (state.audiences && state.audiences.length)
       ? state.audiences.slice(0, MAX_AUDIENCES)
       : [{ value: '', type: 'головна' }];
-    audiences.forEach(function (a) { addAudienceRow(a.value, a.type, a.id); });
+    var audienceTypesReady = audiences.map(function (a) { return addAudienceRow(a.value, a.type, a.id); });
 
     taskList.innerHTML = '';
     (state.tasks || []).forEach(function (t) { addTaskRow(t.value, t.id); });
@@ -2285,11 +2393,18 @@ firebase.initializeApp(firebaseConfig);
     /* стара форма зберігала рядок, не масив — не мігруємо, просто ігноруємо */
     var blocks = (Array.isArray(state.structureBlocks) && state.structureBlocks.length)
       ? state.structureBlocks
-      : [{ name: '', unit: '', unitOther: '', count: '', links: null }];
-    blocks.forEach(function (b) { addBlockRow(b.name, b.unit, b.unitOther, b.count, b.links); });
+      : [{ name: '', unit: '', count: '', links: null, countable: false }];
+    blocks.forEach(function (b) { addBlockRow(b.name, b.unit, b.count, b.countable, b.links); });
 
     refreshFieldUi();
     autoGrowAll();
+    updateParseState();
+    /* Тип аудиторії в sl-select встановлюється асинхронно (setSlSelectValue).
+       collectState(), викликаний одразу після applyFormState(), бачить ще
+       порожній тип — і saveState() записав би "", який після перезавантаження
+       став би «головна» в обох аудиторій. Хто зберігає стан одразу після
+       заповнення форми — має дочекатись цього промісу (BUGS.md, 2026-09-13) */
+    return Promise.all(audienceTypesReady);
   }
 
   /* ---------- динамічні рядки ---------- */
@@ -2338,9 +2453,12 @@ firebase.initializeApp(firebaseConfig);
       updateEditNotice();
     });
     audienceList.appendChild(item);
-    setSlSelectValue(item.querySelector('.audience-select'), type || 'головна');
+    /* тип стає справжнім значенням селекта лише після цього промісу;
+       хто зберігає стан одразу після рядка — має його дочекатись */
+    var typeReady = setSlSelectValue(item.querySelector('.audience-select'), type || 'головна');
     updateAudienceControls();
     refreshFieldUi();
+    return typeReady;
   }
 
   /* єдине місце, де вирішується видимість керувань блоку аудиторій:
@@ -2368,6 +2486,8 @@ firebase.initializeApp(firebaseConfig);
     item.querySelector('.task-input').value = value || '';
     item.querySelector('.task-remove').addEventListener('click', function () {
       item.remove();
+      /* склад задач змінив дизайнер — див. обробник input нижче */
+      form.dataset.tasksSource = 'designer';
       saveState();
       updateSubmitState();
       updateEditNotice();
@@ -2376,43 +2496,22 @@ firebase.initializeApp(firebaseConfig);
     refreshFieldUi();
   }
 
-  /* значення = value, підпис = label; список фіксований, редагується тут одним місцем */
-  var BLOCK_UNITS = [
-    { value: 'абзац', label: 'абзац' },
-    { value: 'логотип', label: 'логотип' },
-    { value: 'картка', label: 'картка (фото/зображення)' },
-    { value: 'пункт-списку', label: 'пункт списку' },
-    { value: 'цифра/показник', label: 'цифра/показник' },
-    { value: 'рядок-таблиці', label: 'рядок таблиці' },
-    { value: 'відгук/цитата', label: 'відгук/цитата' },
-    { value: 'крок/етап', label: 'крок/етап' },
-    { value: 'питання-відповідь', label: 'питання-відповідь' },
-    { value: 'посилання', label: 'посилання' },
-    { value: 'поле-форми', label: 'поле форми' },
-    { value: 'документ/файл', label: 'документ/файл' },
-    { value: 'відео', label: 'відео' },
-    { value: 'фотографія', label: 'фотографія (без картки)' },
-    { value: 'тариф/пакет', label: 'тариф/пакет' },
-    { value: 'інше', label: 'інше (вільний ввід)' }
-  ];
-
-  /* "опис" необов'язковий на рівні блоку: якщо одиниця не обрана і кількість
-     порожня — підпис каже це прямо, а не мовчить і не підставляє число */
+  /* "опис" необов'язковий на рівні блоку: якщо одиниця й кількість
+     порожні — підпис каже це прямо, а не мовчить і не підставляє число */
   function updateBlockCaption(item) {
     var unit = item.querySelector('.block-unit').value;
     var count = item.querySelector('.block-count').value;
     item.querySelector('.block-caption').hidden = !(unit === '' && count === '');
   }
 
-  function addBlockRow(name, unit, unitOther, count, links) {
+  /* одиниця — вільний текст, не вибір зі списку: список притискав прочитане
+     до найближчого варіанта («велика картка звіту з фото й посиланням»
+     ставала просто «карткою») */
+  function addBlockRow(name, unit, count, countable, links) {
     var item = document.createElement('div');
     item.className = 'block-item';
     /* прив'язки Екрана 2 — null, поки дизайнер їх не торкався там */
     item.dataset.links = JSON.stringify(links === undefined ? null : links);
-
-    var unitOptions = BLOCK_UNITS.map(function (u) {
-      return '<sl-option value="' + u.value + '">' + u.label + '</sl-option>';
-    }).join('');
 
     item.innerHTML =
       '<div class="block-row">' +
@@ -2423,9 +2522,9 @@ firebase.initializeApp(firebaseConfig);
       '<button type="button" class="block-remove" aria-label="Видалити блок">✕</button>' +
       '</div>' +
       '<div class="block-desc-row">' +
-      '<sl-select class="block-unit" placeholder="одиниця" clearable>' + unitOptions + '</sl-select>' +
-      '<sl-input class="block-unit-other" placeholder="своя назва одиниці" hidden></sl-input>' +
+      '<sl-input class="block-unit" placeholder="одиниця"></sl-input>' +
       '<sl-input class="block-count" type="number" min="0" step="1" placeholder="кількість"></sl-input>' +
+      '<sl-checkbox class="block-countable">читають поштучно</sl-checkbox>' +
       '</div>' +
       '<p class="field-hint block-caption">не визначено — можна пропустити</p>';
 
@@ -2438,17 +2537,7 @@ firebase.initializeApp(firebaseConfig);
       updateEditNotice();
     });
 
-    /* повернення з "інше" на будь-яку іншу одиницю очищає вільний ввід —
-       інакше стара вільна назва підставилась би сама при випадковому поверненні на "інше" */
-    item.querySelector('.block-unit').addEventListener('sl-change', function (event) {
-      var isOther = event.target.value === 'інше';
-      var otherInput = item.querySelector('.block-unit-other');
-      otherInput.hidden = !isOther;
-      if (!isOther) { otherInput.value = ''; }
-      updateBlockCaption(item);
-    });
-
-    item.querySelector('.block-unit-other').addEventListener('sl-input', function () {
+    item.querySelector('.block-unit').addEventListener('sl-input', function () {
       updateBlockCaption(item);
     });
 
@@ -2458,16 +2547,16 @@ firebase.initializeApp(firebaseConfig);
 
     blockList.appendChild(item);
     /* sl-input (на відміну від sl-select) приймає .value одразу після
-       appendChild — підключення до DOM для нього досить */
-    item.querySelector('.block-unit-other').value = unitOther || '';
-    item.querySelector('.block-unit-other').hidden = (unit || '') !== 'інше';
+       appendChild — підключення до DOM для нього досить, тому й підпис
+       "не визначено" можна рахувати одразу, без setSlSelectValue */
+    item.querySelector('.block-unit').value = unit || '';
     item.querySelector('.block-count').value = count || '';
-    /* підпис "не визначено" залежить від значення block-unit, а воно
-       встановлюється асинхронно (див. setSlSelectValue) — тому рахуємо
-       підпис тільки після реального встановлення, а не одразу */
-    setSlSelectValue(item.querySelector('.block-unit'), unit || '').then(function () {
-      updateBlockCaption(item);
-    });
+    /* countable — чи одиницю читають поштучно (картки, посилання), чи
+       сканують як одне поле (логотипи, показники, абзаци): поріг Міллера
+       стосується лише першого. Поле готується наперед, метрика окремим
+       етапом. sl-checkbox, як і sl-input, приймає властивість одразу */
+    item.querySelector('.block-countable').checked = countable === true;
+    updateBlockCaption(item);
     refreshFieldUi();
   }
 
@@ -2567,6 +2656,13 @@ firebase.initializeApp(firebaseConfig);
     audienceRow.appendChild(audienceValues);
     summaryBody.appendChild(audienceRow);
 
+    /* аудиторії, які розбір не вмістив у дві, — обмеження прогону: у виході
+       видно, кого аналіз не враховував */
+    var dropped = state.droppedAudiences || [];
+    if (dropped.length) {
+      summaryBody.appendChild(summaryRow('Поза аналізом', dropped.map(function (a) { return a.value; }).join('; ')));
+    }
+
     summaryBody.appendChild(summaryRow('Бізнес-ціль', state.goal));
 
     /* задачі необов'язкові: якщо їх немає, рядка теж немає */
@@ -2603,8 +2699,7 @@ firebase.initializeApp(firebaseConfig);
 
       var blockValues = el('div', 'summary-list');
       namedBlocks.forEach(function (b) {
-        var unitLabel = b.unit === 'інше' ? b.unitOther : b.unit;
-        var desc = unitLabel ? (' — ' + unitLabel + (b.count ? ' × ' + b.count : '')) : '';
+        var desc = b.unit ? (' — ' + b.unit + (b.count ? ' × ' + b.count : '')) : '';
         blockValues.appendChild(el('p', 'summary-row__value', b.name + desc));
       });
       blockDetails.appendChild(blockValues);
@@ -3233,6 +3328,10 @@ firebase.initializeApp(firebaseConfig);
     state.audiences.forEach(function (a) {
       lines.push('Цільова аудиторія: ' + a.value + ' · ' + a.type);
     });
+    var droppedAudiences = state.droppedAudiences || [];
+    if (droppedAudiences.length) {
+      lines.push('Поза аналізом: ' + droppedAudiences.map(function (a) { return a.value; }).join('; '));
+    }
     lines.push('Бізнес-ціль: ' + state.goal);
     var namedAudiences = state.audiences.filter(function (a) { return a.value.trim() !== ''; });
     var tasks = state.tasks.filter(function (t) { return t.value.trim() !== ''; });
@@ -3242,8 +3341,7 @@ firebase.initializeApp(firebaseConfig);
     var namedBlocks = (state.structureBlocks || []).filter(function (b) { return b.name.trim() !== ''; });
     if (namedBlocks.length) {
       lines.push('Перелік блоків: ' + namedBlocks.map(function (b) {
-        var unitLabel = b.unit === 'інше' ? b.unitOther : b.unit;
-        var desc = unitLabel ? (' — ' + unitLabel + (b.count ? ' × ' + b.count : '')) : '';
+        var desc = b.unit ? (' — ' + b.unit + (b.count ? ' × ' + b.count : '')) : '';
         return b.name + desc;
       }).join('; '));
     }
@@ -3709,17 +3807,16 @@ firebase.initializeApp(firebaseConfig);
     ];
   }
 
-  /* Блоки для запиту моделі: назва, обсяг (unitOther замість unit, коли
-     unit === 'інше' — той самий вибір, що й в решті коду) і назви задач,
-     які блок закриває — з links, без дублів, без audienceId (моделі тут
-     потрібен лише зв'язок блок→задача, не блок→аудиторія) */
+  /* Блоки для запиту моделі: назва, обсяг (одиниця — вільний текст,
+     передається як є) і назви задач, які блок закриває — з links, без
+     дублів, без audienceId (моделі тут потрібен лише зв'язок блок→задача,
+     не блок→аудиторія) */
   function buildBlocksPayload(state) {
     var taskById = {};
     state.tasks.forEach(function (t) { taskById[t.id] = t.value; });
     return state.structureBlocks
       .filter(function (b) { return b.name.trim() !== ''; })
       .map(function (b) {
-        var unit = b.unit === 'інше' ? b.unitOther : b.unit;
         var taskNames = [];
         if (Array.isArray(b.links)) {
           b.links.forEach(function (link) {
@@ -3727,7 +3824,7 @@ firebase.initializeApp(firebaseConfig);
             if (name && taskNames.indexOf(name) === -1) { taskNames.push(name); }
           });
         }
-        return { name: b.name, unit: unit, count: b.count, tasks: taskNames };
+        return { name: b.name, unit: b.unit, count: b.count, tasks: taskNames };
       });
   }
 
@@ -3977,9 +4074,14 @@ firebase.initializeApp(firebaseConfig);
     var state = collectState();
     var hasTasks = state.tasks.some(function (t) { return t.value.trim() !== ''; });
     /* тримається в dataset форми (не лише на локальному state), щоб
-       наступний collectState() — зокрема на Екрані 2 — бачив те саме джерело */
-    form.dataset.tasksSource = hasTasks ? 'designer' : 'gemini';
-    state.tasksSource = form.dataset.tasksSource;
+       наступний collectState() — зокрема на Екрані 2 — бачив те саме джерело.
+       Задачі є — джерело лишається те, що вже записане: 'gemini' після
+       розбору чи /api/top-tasks, 'designer', якщо дизайнер вводив або правив
+       їх сам (перемикається в обробниках рядків задач). Було безумовне
+       hasTasks ? 'designer' : 'gemini' — і задачі від моделі на повторному
+       запуску ставали «заданими дизайнером» */
+    if (!hasTasks) { form.dataset.tasksSource = 'gemini'; }
+    state.tasksSource = form.dataset.tasksSource || 'designer';
 
     if (hasTasks) {
       showConfirm(state);
@@ -4117,6 +4219,7 @@ firebase.initializeApp(firebaseConfig);
     disarmReset();
     disarmEdit();
     disarmLoadExample();
+    disarmParse();
     runConfirm.hidden = true;
     formActions.hidden = false;
     /* поки екран був прихований, textarea не мали висоти */
@@ -4395,14 +4498,11 @@ firebase.initializeApp(firebaseConfig);
       /* обсяг — тільки перегляд того, що вже задано на формі, не поле
          вводу; редагування лишається на Екрані 1. Рядка нема, якщо unit
          і count обидва порожні — та сама умова, що "не визначено" на формі
-         (updateBlockCaption). unitOther замість unit, коли unit === 'інше' —
-         той самий вибір, що вже робить renderSummary()/buildReportText() */
+         (updateBlockCaption) */
       var blockUnit = blockItem.querySelector('.block-unit').value;
-      var blockUnitOther = blockItem.querySelector('.block-unit-other').value;
       var blockCount = blockItem.querySelector('.block-count').value;
-      var blockUnitLabel = blockUnit === 'інше' ? blockUnitOther : blockUnit;
-      if (blockUnitLabel) {
-        row.appendChild(el('p', 'field-caption', blockUnitLabel + (blockCount ? ' · ' + blockCount : '')));
+      if (blockUnit) {
+        row.appendChild(el('p', 'field-caption', blockUnit + (blockCount ? ' · ' + blockCount : '')));
       }
 
       var links = JSON.parse(blockItem.dataset.links || 'null');
@@ -4639,10 +4739,13 @@ firebase.initializeApp(firebaseConfig);
     }
 
     editingRun = currentRun;
-    applyFormState(runInput);
-    updateSubmitState();
-    saveState();
-    updateEditNotice();
+    /* зберігаємо й порівнюємо з прогоном лише після того, як типи аудиторій
+       встали в селекти — див. кінець applyFormState() */
+    applyFormState(runInput).then(function () {
+      updateSubmitState();
+      saveState();
+      updateEditNotice();
+    });
     showForm();
   }
 
@@ -4688,15 +4791,25 @@ firebase.initializeApp(firebaseConfig);
     }
     revertBtn.dataset.armed = '';
     revertBtn.textContent = 'Скасувати зміни';
-    applyFormState(editingRun.input);
-    updateSubmitState();
-    saveState();
-    /* editingRun лишається: якщо після скасування знову щось змінити,
-       попередження має з'явитись удруге */
-    updateEditNotice();
+    /* зберігаємо лише після того, як типи аудиторій встали в селекти —
+       див. кінець applyFormState() */
+    applyFormState(editingRun.input).then(function () {
+      updateSubmitState();
+      saveState();
+      /* editingRun лишається: якщо після скасування знову щось змінити,
+         попередження має з'явитись удруге */
+      updateEditNotice();
+    });
   }
 
   function clearForm() {
+    /* бриф не чиститься: він один на проєкт і лишається для всіх його
+       сторінок (так і сказано в підказці під полем). Новий прогін — нова
+       сторінка, тож чиститься опис сторінки й усе, що з нього виведено */
+    pageDescInput.value = '';
+    form.dataset.droppedAudiences = '[]';
+    renderDroppedAudiences();
+    disarmParse();
     document.getElementById('category').value = '';
     document.getElementById('support').value = '';
     document.getElementById('goal').value = '';
@@ -4706,20 +4819,124 @@ firebase.initializeApp(firebaseConfig);
     addAudienceRow('', 'головна');
     taskList.innerHTML = '';
     blockList.innerHTML = '';
-    addBlockRow('', '', '', '');
+    addBlockRow('', '', '', false);
 
     refreshFieldUi();
     autoGrowAll();
     saveState();
     updateSubmitState();
+    updateParseState();
     /* порівнювати вже нема з чим */
     editingRun = null;
     updateEditNotice();
   }
 
+  /* ---------- розбір документів (/api/parse) ---------- */
+
+  /* рядок під аудиторіями: хто з брифу не вмістився в дві аудиторії форми.
+     Порожній список — рядка немає */
+  function renderDroppedAudiences() {
+    var dropped = JSON.parse(form.dataset.droppedAudiences || '[]');
+    droppedAudiencesHint.hidden = dropped.length === 0;
+    droppedAudiencesHint.textContent = dropped.length
+      ? 'Не ввійшли з брифу (форма приймає дві аудиторії): ' +
+        dropped.map(function (a) { return a.value; }).join('; ')
+      : '';
+  }
+
+  /* «Розібрати» доступна, лише коли є опис сторінки (без нього /api/parse
+     відповідає 400) і розбір не йде вже */
+  function updateParseState() {
+    parseBtn.disabled = parseInProgress || pageDescInput.value.trim() === '';
+  }
+
+  function disarmParse() {
+    if (parseInProgress) { return; }
+    parseBtn.dataset.armed = '';
+    parseBtn.textContent = 'Розібрати';
+  }
+
+  /* Результат іде тим самим шляхом, що будь-який стан: знімок форми →
+     заміна полів розбору → applyFormState(). Замінюються всі поля розбору,
+     разом із порожніми: форма показує, що є в документах, а дизайнер далі
+     перевіряє й править. «Обмеження» розбір не чіпає, документи лишаються
+     в полях. Блоки — без прив'язок (links: null): склад задач теж новий */
+  function applyParseResult(data) {
+    var state = collectState();
+    state.category = data.category || '';
+    state.support = data.support || '';
+    state.audiences = (data.audiences || []).map(function (a) {
+      return { id: genId(), value: a.value, type: a.type };
+    });
+    state.goal = data.goal || '';
+    state.tasks = (data.tasks || []).map(function (t) {
+      return { id: genId(), value: t.value };
+    });
+    state.structureBlocks = (data.blocks || []).map(function (b) {
+      return { name: b.name, unit: b.unit, count: b.count, links: null, countable: b.countable === true };
+    });
+    /* задачі від моделі — те саме джерело, що з /api/top-tasks: нового
+       значення не вводимо (позначки джерела — окремий етап) */
+    if (state.tasks.length) { state.tasksSource = 'gemini'; }
+    state.droppedAudiences = (data.droppedAudiences || []).map(function (a) {
+      return { value: a.value };
+    });
+    /* зберігаємо лише після того, як типи аудиторій справді встали в
+       селекти — див. кінець applyFormState() */
+    return applyFormState(state).then(function () {
+      saveState();
+      updateSubmitState();
+      updateEditNotice();
+    });
+  }
+
+  /* Стан кнопки й повідомлення — як у виклику /api/top-tasks. Заповнену
+     форму мовчки не затираємо: перший клік перепитує в самій кнопці, як
+     «Змінити опис» і «Новий прогін» */
+  function parseDocuments() {
+    if (parseInProgress || pageDescInput.value.trim() === '') { return; }
+    if (!isDraftEmpty() && parseBtn.dataset.armed !== 'yes') {
+      disarmReset();
+      disarmLoadExample();
+      parseBtn.dataset.armed = 'yes';
+      parseBtn.textContent = 'Замінити заповнені поля?';
+      return;
+    }
+
+    parseBtn.dataset.armed = '';
+    parseInProgress = true;
+    parseBtn.textContent = 'Розбираємо…';
+    updateParseState();
+
+    fetch('/api/parse', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ brief: briefInput.value, pageDescription: pageDescInput.value })
+    })
+      .then(function (res) {
+        if (!res.ok) { throw new Error('Запит не вдався'); }
+        return res.json();
+      })
+      /* провал ловить лише другий аргумент — не помилку в обробнику успіху:
+         той уже встиг би заповнити поля, а повідомлення неправдиво сказало б
+         «не вдалось» (той самий урок, що з generateVariants()) */
+      .then(function (data) {
+        applyParseResult(data);
+        showToast('Поля заповнено з документів — перевір і виправ', false);
+      }, function () {
+        showToast('Не вдалось розібрати документи — спробуй ще раз', false);
+      })
+      .finally(function () {
+        parseInProgress = false;
+        parseBtn.textContent = 'Розібрати';
+        updateParseState();
+      });
+  }
+
   /* ---------- обробники ---------- */
 
   submitBtn.addEventListener('click', requestRun);
+  parseBtn.addEventListener('click', parseDocuments);
   confirmRunBtn.addEventListener('click', runAnalysis);
   cancelRunBtn.addEventListener('click', function () {
     runConfirm.hidden = true;
@@ -4867,6 +5084,7 @@ firebase.initializeApp(firebaseConfig);
       disarmReset();
       disarmEdit();
       disarmLoadExample();
+      disarmParse();
       btn.dataset.armed = 'yes';
       btn.textContent = 'Точно завантажити?';
       return;
@@ -4876,10 +5094,19 @@ firebase.initializeApp(firebaseConfig);
        не чіпає явні id audiences/tasks і вже задані links на блоках
        (обидва зразки написані одразу в поточному форматі — не старому,
        на відміну від колишнього EXAMPLE_STATE), applyFormState()
-       перемальовує форму */
-    applyFormState(migrateState(exampleState));
-    saveState();
-    updateSubmitState();
+       перемальовує форму.
+       Копія, не сама константа: migrateState() змінює об'єкт на місці, а
+       бриф нижче записується в стан — без копії він осів би в зразку й
+       повертався б при наступних завантаженнях. Бриф лишається поточним:
+       він один на проєкт; опис сторінки й решта полів — зі зразка */
+    var state = migrateState(JSON.parse(JSON.stringify(exampleState)));
+    state.brief = briefInput.value;
+    /* зберігаємо лише після того, як типи аудиторій встали в селекти —
+       див. кінець applyFormState() */
+    applyFormState(state).then(function () {
+      saveState();
+      updateSubmitState();
+    });
   }
 
   loadExampleHomeBtn.addEventListener('click', function () {
@@ -4926,13 +5153,15 @@ firebase.initializeApp(firebaseConfig);
 
   addTaskBtn.addEventListener('click', function () {
     addTaskRow('');
+    /* склад задач змінив дизайнер — див. обробник input нижче */
+    form.dataset.tasksSource = 'designer';
     saveState();
     updateSubmitState();
     updateEditNotice();
   });
 
   addBlockBtn.addEventListener('click', function () {
-    addBlockRow('', '', '', '');
+    addBlockRow('', '', '', false);
     saveState();
     updateSubmitState();
     updateEditNotice();
@@ -4953,10 +5182,18 @@ firebase.initializeApp(firebaseConfig);
     if (event.target.tagName === 'TEXTAREA') {
       autoGrow(event.target);
     }
+    /* задачу від моделі (розбір чи /api/top-tasks) дизайнер правив сам —
+       чесне значення джерела для цього поля 'designer', інакше Екран 2
+       назвав би його правку «виведено системою, не підтверджено».
+       Кнопка очищення поля віддає сюди ту саму подію input */
+    if (event.target.classList.contains('task-input')) {
+      form.dataset.tasksSource = 'designer';
+    }
     refreshFieldUi();
     saveState();
     updateSubmitState();
     updateEditNotice();
+    updateParseState();
   });
 
   form.addEventListener('change', function () {
