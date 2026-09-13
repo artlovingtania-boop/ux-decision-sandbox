@@ -1648,16 +1648,6 @@ sl-button[variant="text"]::part(label):hover {
           <p class="field-hint">Якщо не заповните — система виведе сама з аудиторії й бізнес-цілі. Формат: дієслово + об'єкт.</p>
         </div>
 
-        <div class="form-group">
-          <label class="field-label" for="constraints">Обмеження й особливості</label>
-          <div class="field field-wrap">
-            <textarea class="field-input" id="constraints" rows="3" data-limit="400"></textarea>
-            <button type="button" class="field-clear" aria-label="Очистити поле">✕</button>
-          </div>
-          <span class="field-counter"></span>
-          <p class="field-hint">Що вже вирішено або обмежено ззовні: законом, домовленостями, наявними каналами, ризиками для людей.</p>
-        </div>
-
       </div>
     </div>
 
@@ -1710,11 +1700,6 @@ sl-button[variant="text"]::part(label):hover {
       <span class="summary-hint" id="confirm-tasks-source"></span>
     </div>
     <div class="summary-list" id="confirm-tasks-body"></div>
-  </section>
-
-  <section class="result-section result-section--card">
-    <h2 class="result-section__title">Обмеження</h2>
-    <div id="confirm-constraints-body"></div>
   </section>
 
   <section class="result-section">
@@ -2068,7 +2053,6 @@ firebase.initializeApp(firebaseConfig);
   var confirmSummaryBody = document.getElementById('confirm-summary-body');
   var confirmTasksSource = document.getElementById('confirm-tasks-source');
   var confirmTasksBody = document.getElementById('confirm-tasks-body');
-  var confirmConstraintsBody = document.getElementById('confirm-constraints-body');
   var confirmBlocksBody = document.getElementById('confirm-blocks-body');
   var missingAlert = document.getElementById('missing-alert');
   var missingList = document.getElementById('missing-list');
@@ -2170,7 +2154,6 @@ firebase.initializeApp(firebaseConfig);
       tasks: Array.from(taskList.querySelectorAll('.task-item')).map(function (item) {
         return { id: item.dataset.id, value: item.querySelector('.task-input').value };
       }),
-      constraints: document.getElementById('constraints').value,
       /* links — прив'язки Екрана 2, живуть у dataset самого block-item;
          null, поки дизайнер їх не торкався. Кожен елемент — пара
          {taskId, audienceId}, не незалежні списки id (Екран 2) */
@@ -2326,6 +2309,11 @@ firebase.initializeApp(firebaseConfig);
     if (typeof state.pageDescription !== 'string') { state.pageDescription = ''; }
     if (!Array.isArray(state.droppedAudiences)) { state.droppedAudiences = []; }
 
+    /* поле обмежень прибране: структури складає дизайнер, який обмеження
+       й так знає. Ключ видаляється зі старих станів і прогонів — інакше
+       вони розійшлися б із формою в порівнянні JSON */
+    delete state.constraints;
+
     return state;
   }
 
@@ -2375,7 +2363,6 @@ firebase.initializeApp(firebaseConfig);
     document.getElementById('category').value = state.category || '';
     document.getElementById('support').value = state.support || '';
     document.getElementById('goal').value = state.goal || '';
-    document.getElementById('constraints').value = state.constraints || '';
 
     audienceList.innerHTML = '';
     /* у сховищі може лежати більше двох аудиторій, збережених до введення обмеження */
@@ -4258,19 +4245,6 @@ firebase.initializeApp(firebaseConfig);
       });
   }
 
-  /* порожнє поле показуємо явно ("обмеження не задані"), не ховаємо секцію:
-     ядро вимагає, щоб дизайнер бачив, що систему не враховує обмежень,
-     а не сам вирішив, що їх немає */
-  function renderConfirmConstraints(state) {
-    confirmConstraintsBody.innerHTML = '';
-    var text = state.constraints.trim();
-    if (text) {
-      confirmConstraintsBody.appendChild(el('p', 'summary-row__value', text));
-    } else {
-      confirmConstraintsBody.appendChild(el('p', 'field-caption', 'обмеження не задані'));
-    }
-  }
-
   /* текст задачі/аудиторії — від дизайнера, тому textContent, не innerHTML-конкатенація */
   function makeOption(value, label) {
     var opt = document.createElement('sl-option');
@@ -4671,7 +4645,6 @@ firebase.initializeApp(firebaseConfig);
     generateErrorText = null;
     renderConfirmSummary(state);
     renderConfirmTasks(state);
-    renderConfirmConstraints(state);
     renderConfirmBlocks();
     window.scrollTo(0, 0);
   }
@@ -4716,7 +4689,7 @@ firebase.initializeApp(firebaseConfig);
 
   function isDraftEmpty() {
     var s = collectState();
-    var filled = [s.category, s.support, s.goal, s.constraints]
+    var filled = [s.category, s.support, s.goal]
       .some(function (v) { return v.trim() !== ''; });
     return !filled &&
       !s.audiences.some(function (a) { return a.value.trim() !== ''; }) &&
@@ -4813,7 +4786,6 @@ firebase.initializeApp(firebaseConfig);
     document.getElementById('category').value = '';
     document.getElementById('support').value = '';
     document.getElementById('goal').value = '';
-    document.getElementById('constraints').value = '';
 
     audienceList.innerHTML = '';
     addAudienceRow('', 'головна');
@@ -4859,8 +4831,8 @@ firebase.initializeApp(firebaseConfig);
   /* Результат іде тим самим шляхом, що будь-який стан: знімок форми →
      заміна полів розбору → applyFormState(). Замінюються всі поля розбору,
      разом із порожніми: форма показує, що є в документах, а дизайнер далі
-     перевіряє й править. «Обмеження» розбір не чіпає, документи лишаються
-     в полях. Блоки — без прив'язок (links: null): склад задач теж новий */
+     перевіряє й править. Документи лишаються в полях. Блоки — без
+     прив'язок (links: null): склад задач теж новий */
   function applyParseResult(data) {
     var state = collectState();
     state.category = data.category || '';
