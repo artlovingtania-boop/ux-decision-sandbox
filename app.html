@@ -861,8 +861,7 @@ textarea.field-input {
 }
 
 /* padding рядків нижче дає власний відступ — спільний .summary-rows
-   gap (12px) тут дублював би його. #confirm-summary-body (16px) —
-   інша розкладка (стос, не grid-колонки) — цей рядок не займає. */
+   gap (12px) тут дублював би його. */
 #summary-body {
   gap: 0;
 }
@@ -1301,11 +1300,28 @@ textarea.field-input {
   background: var(--surface-card);
 }
 
-/* ---------- екран 2: картки блоків ---------- */
-/* назва, обсяг, ряд селектів — щільніше за типовий .confirm (16px),
-   картка тут не форма-запитання, а компактний перегляд+прив'язка */
-.confirm-block {
+/* ---------- Узгодження: прив'язки задача↔аудиторія в картці блоку ---------- */
+/* Живуть усередині .block-item (етап 3а: об'єднано з колишньою окремою
+   карткою .confirm.confirm-block) — власних padding/фону/рамки не треба,
+   картка вже їх має. :empty ховає порожній контейнер повністю: інакше
+   flex-контейнер без дітей усе одно займав би свій gap у .block-item,
+   даючи зайвий відступ під підказкою, коли прив'язок ще нема (порожня назва) */
+.confirm-links {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
   gap: var(--spacing-8);
+}
+
+.confirm-links:empty {
+  display: none;
+}
+
+/* Блок без задачі (links === null) — слабший сигнал, не помилка (ядро:
+   шапка, футер, перше представлення задач не обслуговують). Ліва смуга —
+   щоб 10 карток можна було сканувати, не читаючи кожен текст «Не вистачає» */
+.block-item--unlinked {
+  border-left: 3px solid var(--border-medium);
 }
 
 /* один рядок-прив'язка: задача ▾ "для" аудиторія ▾ ✕ — усі елементи
@@ -1359,55 +1375,6 @@ textarea.field-input {
   cursor: pointer;
 }
 
-/* заголовок "Задачі" і мітка джерела під ним — не в одному рядку,
-   тому мітка не читається як частина заголовка. Той самий gap-4, що
-   в .summary-row між підписом і значенням */
-.confirm-tasks-heading {
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-4);
-}
-
-/* "Задачі" — заголовок + мітка джерела разом важать більше, ніж голий
-   h2 у "З твоїх слів", тож той самий .result-section gap (24) до списку
-   під ними відчувається задовге. Тут — 16, той самий крок, що вже
-   розділяє пари в #confirm-summary-body */
-.result-section--tight {
-  gap: var(--spacing-16);
-}
-
-/* "Блоки" — єдина робоча секція Екрана 2 (решта — тільки перегляд),
-   візуально важча за той самий .result-section__title. 900 — наявна
-   вага DM Sans, уже використана в .topbar__logo, нових значень нема */
-.result-section__title--heavy {
-  font-weight: 900;
-}
-
-/* "З твоїх слів" і "Задачі" — тільки перегляд, рамка без заливки
-   (--surface-page — той самий колір, що фон сторінки, тобто візуально
-   без фону; "Блоки" лишається на --surface-card із заливкою — контраст
-   переглядове/робоче). Значення — ті самі, що вже дає .variant-card на
-   result-screen, тут без grid/subgrid, які там специфічні до сітки варіантів */
-.result-section--card {
-  padding: var(--spacing-16);
-  background: var(--surface-page);
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-ml);
-}
-
-/* тільки Екран 2 — .result спільний з result-screen, де 48px між великими
-   секціями (вхідний опис/картки варіантів/розходження) лишається доречним */
-#confirm-screen .result {
-  gap: var(--spacing-24);
-}
-
-/* тільки "З твоїх слів": пари лейбл-значення мають читатись групами.
-   4px усередині пари (.summary-row, поріг шкали — менше нема) лишається,
-   тут — розрив МІЖ парами, навмисно далі від нього, а не той самий .summary-rows,
-   що на result-screen (там інша розкладка — grid-колонки, не стос) */
-#confirm-summary-body {
-  gap: var(--spacing-16);
-}
 </style>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.20.1/cdn/themes/light.css">
 <script type="module" src="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.20.1/cdn/shoelace-autoloader.js"></script>
@@ -1570,10 +1537,10 @@ sl-button[variant="text"]::part(label):hover {
 <div class="container">
   <header class="app-head">
     <h1 class="app-head__title">Опис сторінки</h1>
-    <p class="app-head__lead">Заповніть параметри, щоб система вивела структуру й перевірила її</p>
+    <p class="app-head__lead">Вставте документи — систем розкладе їх у поля на екрані узгодження</p>
   </header>
 
-  <form id="app-form" class="app-form" novalidate>
+  <form id="doc-form" class="app-form" novalidate>
 
     <div class="form-group">
       <label class="field-label" for="brief">Контекст проєкту</label>
@@ -1594,8 +1561,22 @@ sl-button[variant="text"]::part(label):hover {
     </div>
 
     <div class="form-actions">
-      <button type="button" id="parse-btn" class="button button--secondary" disabled>Розібрати</button>
+      <button type="button" id="parse-btn" class="button button--primary" disabled>Розібрати</button>
+      <button type="button" id="load-example-btn" class="button button--text">Зразок · «Ватра»</button>
     </div>
+
+  </form>
+</div>
+</div>
+
+<div id="confirm-screen" hidden>
+<div class="container">
+  <header class="app-head">
+    <button type="button" id="confirm-back-btn" class="button button--text">← Назад до документів</button>
+    <h1 class="app-head__title">Узгодження</h1>
+  </header>
+
+  <form id="app-form" class="app-form" novalidate>
 
     <div class="form-group">
       <label class="field-label" for="category">Категорія продукту</label>
@@ -1654,19 +1635,18 @@ sl-button[variant="text"]::part(label):hover {
       </div>
     </div>
 
-    <div class="confirm" id="run-confirm" hidden>
-      <p class="confirm__text">Опис змінено. Це буде новий прогін, попередній лишиться в історії</p>
-      <div class="confirm__actions">
-        <button type="button" id="confirm-run-btn" class="button button--primary">Запустити</button>
-        <button type="button" id="cancel-run-btn" class="button button--text">Скасувати</button>
-      </div>
-    </div>
+    <section class="result-section">
+      <h2 class="result-section__title">Не вистачає</h2>
+      <sl-alert variant="warning" open id="missing-alert">
+        <div class="summary-list" id="missing-list"></div>
+        <p id="missing-summary" hidden>Усі блоки готові — можна генерувати.</p>
+      </sl-alert>
+    </section>
 
-    <div class="form-actions" id="form-actions">
-      <button type="button" id="submit-btn" class="button button--primary" disabled>Запустити аналіз</button>
+    <div class="form-actions">
+      <button type="button" id="generate-btn" class="button button--primary" disabled>Згенерувати</button>
       <button type="button" id="form-reset-btn" class="button button--secondary">Новий прогін</button>
-      <button type="button" id="load-example-home-btn" class="button button--text">Зразок · головна</button>
-      <button type="button" id="load-example-about-btn" class="button button--text">Зразок · про нас</button>
+      <p class="field-hint" id="generate-progress-hint" hidden>Це може зайняти до хвилини: три запити йдуть послідовно.</p>
     </div>
 
   </form>
@@ -1680,51 +1660,6 @@ sl-button[variant="text"]::part(label):hover {
       <button type="button" id="revert-btn" class="button button--text">Скасувати зміни</button>
     </span>
   </sl-alert>
-</div>
-</div>
-
-<div id="confirm-screen" hidden>
-<div class="container">
-  <header class="app-head">
-    <button type="button" id="confirm-back-btn" class="button button--text">← Назад до форми</button>
-    <h1 class="app-head__title">Підтвердження перед генерацією</h1>
-  </header>
-
-  <div class="result">
-
-  <section class="result-section result-section--card">
-    <h2 class="result-section__title">З твоїх слів</h2>
-    <div class="summary-rows" id="confirm-summary-body"></div>
-  </section>
-
-  <section class="result-section result-section--card result-section--tight">
-    <div class="confirm-tasks-heading">
-      <h2 class="result-section__title">Задачі</h2>
-      <span class="summary-hint" id="confirm-tasks-source"></span>
-    </div>
-    <div class="summary-list" id="confirm-tasks-body"></div>
-  </section>
-
-  <section class="result-section">
-    <h2 class="result-section__title result-section__title--heavy">Блоки</h2>
-    <div class="block-list" id="confirm-blocks-body"></div>
-  </section>
-
-  <section class="result-section">
-    <h2 class="result-section__title">Не вистачає</h2>
-    <sl-alert variant="warning" open id="missing-alert">
-      <div class="summary-list" id="missing-list"></div>
-      <p id="missing-summary" hidden>Усі блоки готові — можна генерувати.</p>
-    </sl-alert>
-  </section>
-
-  <div class="form-actions">
-    <button type="button" id="generate-btn" class="button button--primary" disabled>Згенерувати</button>
-    <p class="field-hint" id="generate-progress-hint" hidden>Це може зайняти до хвилини: три запити йдуть послідовно.</p>
-  </div>
-
-  </div>
-
 </div>
 </div>
 
@@ -1833,85 +1768,14 @@ firebase.initializeApp(firebaseConfig);
      прийде від моделі й замінить константу цілком. Осі, рівні зауважень і
      склад метрик узяті з SANDBOX-CORE.md; нічого зі списку «Чого в цій
      версії немає» тут бути не повинно. */
-  /* ЗРАЗКИ. Форма заповнюється одним із них лише за кліком на «Зразок ·
-     головна»/«Зразок · про нас» — при першому відкритті форма порожня
-     (див. loadState()).
-     Явні id на audiences/tasks і готові links на блоках — щоб Екран 2
-     відкривався вже заповненим, без ручного введення прив'язок:
-     migrateState() не чіпає ні одне, ні інше, якщо вони вже задані
-     (audience/task: `if (!a.id)`/`if (!t.id)`; block: `if ('links' in b) return;`). */
-  var EXAMPLE_HOME = {
-    category: 'головна сторінка культурної неприбуткової організації в Квебеку',
-    support: 'зареєстрована благодійна організація з бордом; регулярні події, де культурна програма й гуманітарна підтримка України в одній події; задокументовані звіти про проведені події; залучені й названі артисти; партнери інституційного й громадського рівня',
-    audiences: [
-      { id: 'home-aud-fondy', value: 'оцінювачі публічних культурних фондів', type: 'головна' },
-      { id: 'home-aud-spilnota', value: 'українська спільнота Монреаля', type: 'другорядна' }
-    ],
-    goal: 'інституційне представлення для отримання державного фінансування',
-    tasks: [
-      { id: 'home-tt1', value: 'підтвердити легітимність організації' },
-      { id: 'home-tt2', value: 'оцінити культурний та соціальний вплив подій' },
-      { id: 'home-tt3', value: 'знайти інформацію про актуальні заходи' }
-    ],
-    structureBlocks: [
-      { name: 'Шапка', unit: 'посилання', count: '5', countable: true, links: [] },
-      { name: 'Перше представлення', unit: 'абзац', count: '2', countable: false, links: [] },
-      { name: 'Місія і модель', unit: 'абзац', count: '4', countable: false,
-        links: [{ taskId: 'home-tt1', audienceId: 'home-aud-fondy' }] },
-      { name: 'Показники діяльності', unit: 'показник', count: '4', countable: false,
-        links: [{ taskId: 'home-tt2', audienceId: 'home-aud-fondy' }] },
-      { name: 'Події', unit: 'картка', count: '6', countable: true,
-        links: [
-          { taskId: 'home-tt2', audienceId: 'home-aud-fondy' },
-          { taskId: 'home-tt3', audienceId: 'home-aud-spilnota' }
-        ] },
-      { name: 'Звіт про подію', unit: 'документ', count: '3', countable: true,
-        links: [{ taskId: 'home-tt1', audienceId: 'home-aud-fondy' }] },
-      { name: 'Артисти', unit: 'картка', count: '8', countable: true,
-        links: [{ taskId: 'home-tt2', audienceId: 'home-aud-fondy' }] },
-      { name: 'Партнери', unit: 'логотип', count: '9', countable: false,
-        links: [{ taskId: 'home-tt1', audienceId: 'home-aud-fondy' }] },
-      { name: 'Футер', unit: 'посилання', count: '6', countable: true, links: [] }
-    ]
-  };
-
-  /* TT3 навмисно не має блоку для аудиторії "спонсори" — сторінка «Про нас»
-     не містить майбутніх подій. Робочий приклад незакритої задачі,
-     не помилка даних — не «виправляти» додаванням зв'язку. */
-  var EXAMPLE_ABOUT = {
-    category: 'сторінка «Про нас» культурної неприбуткової організації',
-    support: 'зареєстрована організація з волонтерським бордом; історія від заснування з першою подією й переломними моментами; гібридна модель — культурна програма й гуманітарний збір в одній події; названі люди команди з ролями; визнання території корінних народів',
-    audiences: [
-      { id: 'about-aud-sponsor', value: 'спонсори і грантодавці', type: 'головна' },
-      { id: 'about-aud-spilnota', value: 'українська спільнота Монреаля', type: 'другорядна' }
-    ],
-    goal: 'щоб спонсор перейшов до партнерства, а спільнота — до подій',
-    tasks: [
-      { id: 'about-tt1', value: 'перевірити юридичний статус та легітимність організації' },
-      { id: 'about-tt2', value: 'оцінити досвід та вплив через історію діяльності' },
-      { id: 'about-tt3', value: 'знайти інформацію про майбутні культурні події' }
-    ],
-    structureBlocks: [
-      { name: 'Шапка', unit: 'посилання', count: '5', countable: true, links: [] },
-      { name: 'Hero сторінки', unit: 'абзац', count: '1', countable: false, links: [] },
-      { name: 'Місія', unit: 'абзац', count: '4', countable: false,
-        links: [{ taskId: 'about-tt1', audienceId: 'about-aud-sponsor' }] },
-      { name: 'Наша історія', unit: 'етап', count: '5', countable: true,
-        links: [
-          { taskId: 'about-tt2', audienceId: 'about-aud-sponsor' },
-          { taskId: 'about-tt2', audienceId: 'about-aud-spilnota' }
-        ] },
-      { name: 'Модель Kolo', unit: 'абзац', count: '3', countable: false,
-        links: [{ taskId: 'about-tt2', audienceId: 'about-aud-sponsor' }] },
-      { name: 'Команда', unit: 'картка', count: '6', countable: true,
-        links: [
-          { taskId: 'about-tt1', audienceId: 'about-aud-sponsor' },
-          { taskId: 'about-tt3', audienceId: 'about-aud-spilnota' }
-        ] },
-      { name: 'Визнання корінних народів', unit: 'абзац', count: '3', countable: false,
-        links: [{ taskId: 'about-tt1', audienceId: 'about-aud-sponsor' }] },
-      { name: 'Футер', unit: 'посилання', count: '6', countable: true, links: [] }
-    ]
+  /* ЗРАЗОК ДОКУМЕНТІВ. Одна кнопка на Екрані 1 заповнює нею «Контекст
+     проєкту» й «Опис сторінки» — далі дизайнер сам натискає «Розібрати»,
+     як зі своїми документами. Вигадана організація «Ватра», текст можна
+     публікувати. Замінив EXAMPLE_HOME/EXAMPLE_ABOUT (заповнювали всю форму
+     зразком одразу, без розбору) — етап 3а, перебудова потоку. */
+  var EXAMPLE_VATRA = {
+    brief: "Контекст проєкту — вебсайт «Ватра»\n\n1. Про організацію\n\n«Ватра» — неприбуткова культурна організація в Торонто, зареєстрована\nяк благодійна. Місія: зберігати й показувати українську музичну традицію\nв Онтаріо.\n\nПоточний канал — сторінка в соцмережі. Вона працює для спільноти, але\nне годиться як інституційне обличчя перед фондами й спонсорами. Цей\nпроєкт — перший вебсайт організації.\n\nМодель «Ватри»: жива музика й навчання поєднані в одній події. Концерт\nзавжди супроводжується відкритою майстернею, де публіка пробує інструмент\nабо спів. Це частина моделі, а не додаток до неї.\n\n2. Цілі\n\nГоловна: інституційне представлення для отримання культурних грантів\nі корпоративної підтримки.\n\nВторинні: каталог подій із реєстрацією, короткі звіти про проведені\nподії, каталог музикантів, збір пожертв, збір email-адрес.\n\n3. Аудиторії (за пріоритетом)\n\nФонди, грантодавці, корпоративні спонсори — муніципальні й провінційні\nкультурні ради, корпоративні програми підтримки. Шукають професійність,\nпрозорість, відповідність мандатам.\n\nСпільнота — українська діаспора Онтаріо, музиканти, канадці з інтересом\nдо фольклорної музики. Шукають події та реєстрацію.\n\nПартнери й музиканти — інші організації, музиканти для каталогу.\n\n4. Модель подій\n\nТип 1 — регулярні майстерні. Тільки картка на сторінці подій, кнопка веде\nна зовнішню реєстрацію. Без окремої сторінки й без звіту.\n\nТип 2 — великі концерти, 3–5 на рік. Повна сторінка на сайті, нативна\nреєстрація, обов'язковий звіт після події.\n\n5. Скоуп MVP\n\nСторінки: Головна, Про нас, Програми, Події, Сторінка події (Тип 2),\nЗвіти, Музиканти, Підтримати, Партнери, Контакти.\n\nКонтент на запуск: 10+ музикантів у каталозі, 3–5 майбутніх подій,\n3–5 звітів про минулі події.\n\n6. Структура сайту\n\nПринципи: без багаторівневого меню, кожна сторінка досяжна за два кліки\nз головної, постійна кнопка «Підтримати» в шапці.\n\nВерхня навігація: Про нас · Програми · Події · Музиканти · Партнери ·\nКонтакти.\n\nГоловна сторінка — послідовність блоків:\n\n1. Шапка — лого, навігація, кнопка «Підтримати». Аудиторія: усі.\n2. Hero — слоган і фото або типографічний фолбек, без кнопки.\n   Аудиторія: спонсори і спільнота.\n3. Коротко про «Ватру» — цитата і два речення контексту, посилання\n   «Про нас». Аудиторія: усі.\n4. «Ватра» в цифрах — три показники для спонсора. Аудиторія: спонсори.\n5. Події і підписка — картки найближчих подій і форма підписки.\n   Аудиторія: спільнота для подій, усі для підписки.\n6. Музиканти — ротація карток із каталогу. Аудиторія: партнери\n   і спільнота.\n7. Виділений звіт — велика картка обраного звіту, за якістю, не за датою.\n   Аудиторія: усі.\n8. Долучайся — дві дії: «Стати спонсором» і «Стати волонтером».\n   Аудиторія: спонсори і спільнота.\n9. Смуга партнерів — логотипи партнерів, громадські й інституційні\n   рівні за вагою. Аудиторія: спонсори.\n10. Футер — контакти, адреса, соцмережі. Аудиторія: усі.\n\n7. Редакційні принципи\n\nДати не на першому плані: виділений звіт на головній обирається за\nякістю, а не за свіжістю; картки музикантів не показують дату публікації.\n\nОдне фото не використовується на сайті більше двох разів.",
+    pageDescription: "«Ватра» — головна сторінка\n\nОпис блоків\n\nБлок 1 — Шапка\n\nТа сама на всіх сторінках. Логотип, навігація, кнопка «Підтримати».\n\nБлок 2 — Hero\n\nРоль. Перше, що бачить відвідувач. Говорить спонсору і грантодавцю,\nхто такі «Ватра». Без анонсів подій і реєстрацій.\n\nАудиторія. Насамперед спонсори і грантодавці. Але і спільнота теж.\n\nОбсяг. Один слоган. Фото або типографічний фолбек. Без кнопки.\n\nБлок 3 — Коротко про «Ватру»\n\nРоль. Розкриває, хто такі «Ватра», після Hero. Два виміри одночасно —\nтепло для спільноти, конкретно для спонсора.\n\nАудиторія. Всі.\n\nОбсяг. Одна цитата плюс два речення контексту і посилання «Про нас».\n\nБлок 4 — «Ватра» в цифрах\n\nРоль. Доводить спонсору і грантодавцю спроможність організації.\nНе фінансовий результат — операційна активність.\n\nАудиторія. Насамперед спонсори і грантодавці.\n\nОбсяг. Три показники з короткими підписами. Не більше.\n\nБлок 5 — Події і підписка\n\nРоль. Підтверджує, що організація працює регулярно. Підписка дає прямий\nканал до аудиторії незалежно від соцмереж.\n\nАудиторія. Спільнота — для подій. Всі — для підписки.\n\nОбсяг. Три-чотири картки подій. Форма підписки — одне поле і кнопка.\n\nБлок 6 — Музиканти\n\nРоль. Показує, що «Ватра» — це середовище для музикантів, а не просто\nорганізатор концертів. Сигнал культурної мережі для спонсорів і партнерів.\n\nАудиторія. Спонсори, партнери, нові музиканти.\n\nОбсяг. Чотири-шість карток із каталогу і посилання «Усі музиканти».\n\nБлок 7 — Виділений звіт\n\nРоль. Підтверджує, що організація документує роботу і звітує. Важливий\nсигнал для грантодавців.\n\nАудиторія. Насамперед грантодавці і спонсори. Але і спільнота — як живий\nмомент організації.\n\nОбсяг. Одна велика картка: фото, заголовок, два-три речення, посилання\n«Читати звіт».\n\nБлок 8 — Долучайся\n\nРоль. Заклик до дії. Два типи участі — не лише гроші.\n\nАудиторія. Спонсори — через першу дію. Спільнота і волонтери — через другу.\n\nОбсяг. Одне-два речення над кнопками.\n\nБлок 9 — Смуга партнерів\n\nРоль. Сигнал легітимності й мережі. Це позиціювання, не декор.\n\nАудиторія. Насамперед спонсори і грантодавці.\n\nОбсяг. Логотипи партнерів в один ряд. Громадські та інституційні рівні\nза візуальною вагою.\n\nБлок 10 — Футер\n\nРоль. Базова інформація і контакти.\n\nОбсяг. Мінімум: контакти, адреса, соцмережі.\n\nВідкриті питання\n\nБлок 2 — який слоган?\nБлок 3 — яка цитата? Чи є відповідне фото?\nБлок 4 — реальні цифри для трьох показників.\nБлок 5 — яке речення для підписки?\nБлок 8 — куди веде «Стати волонтером»?\nБлок 9 — які партнери готові до запуску?"
   };
 
   var MOCK_RESULT = {
@@ -2017,9 +1881,8 @@ firebase.initializeApp(firebaseConfig);
   var addAudienceBtn = document.getElementById('add-audience');
   var addTaskBtn = document.getElementById('add-task');
   var addBlockBtn = document.getElementById('add-block');
-  var submitBtn = document.getElementById('submit-btn');
-  var loadExampleHomeBtn = document.getElementById('load-example-home-btn');
-  var loadExampleAboutBtn = document.getElementById('load-example-about-btn');
+  var loadExampleBtn = document.getElementById('load-example-btn');
+  var docForm = document.getElementById('doc-form');
   var briefInput = document.getElementById('brief');
   var pageDescInput = document.getElementById('page-description');
   var parseBtn = document.getElementById('parse-btn');
@@ -2061,10 +1924,6 @@ firebase.initializeApp(firebaseConfig);
 
   var confirmScreen = document.getElementById('confirm-screen');
   var confirmBackBtn = document.getElementById('confirm-back-btn');
-  var confirmSummaryBody = document.getElementById('confirm-summary-body');
-  var confirmTasksSource = document.getElementById('confirm-tasks-source');
-  var confirmTasksBody = document.getElementById('confirm-tasks-body');
-  var confirmBlocksBody = document.getElementById('confirm-blocks-body');
   var missingAlert = document.getElementById('missing-alert');
   var missingList = document.getElementById('missing-list');
   var missingSummary = document.getElementById('missing-summary');
@@ -2100,10 +1959,6 @@ firebase.initializeApp(firebaseConfig);
   var editNoticeAlert = document.getElementById('edit-notice-alert');
   var revertBtn = document.getElementById('revert-btn');
   var rerunBtn = document.getElementById('rerun-btn');
-  var runConfirm = document.getElementById('run-confirm');
-  var formActions = document.getElementById('form-actions');
-  var confirmRunBtn = document.getElementById('confirm-run-btn');
-  var cancelRunBtn = document.getElementById('cancel-run-btn');
   var toast = document.getElementById('toast');
   var toastText = document.getElementById('toast-text');
   var toastLink = document.getElementById('toast-link');
@@ -2479,7 +2334,7 @@ firebase.initializeApp(firebaseConfig);
       item.remove();
       updateAudienceControls();
       saveState();
-      updateSubmitState();
+      refreshAgreementLinks();
       updateEditNotice();
     });
     audienceList.appendChild(item);
@@ -2519,7 +2374,7 @@ firebase.initializeApp(firebaseConfig);
     item.querySelector('.task-remove').addEventListener('click', function () {
       item.remove();
       saveState();
-      updateSubmitState();
+      refreshAgreementLinks();
       updateEditNotice();
     });
     taskList.appendChild(item);
@@ -2559,14 +2414,15 @@ firebase.initializeApp(firebaseConfig);
       '<sl-checkbox class="block-countable">читають поштучно</sl-checkbox>' +
       '</div>' +
       '<p class="field-caption" data-source-mark hidden></p>' +
-      '<p class="field-hint block-caption">не визначено — можна пропустити</p>';
+      '<p class="field-hint block-caption">не визначено — можна пропустити</p>' +
+      '<div class="confirm-links"></div>';
 
     item.querySelector('.block-name').value = name || '';
 
     item.querySelector('.block-remove').addEventListener('click', function () {
       item.remove();
       saveState();
-      updateSubmitState();
+      refreshAgreementLinks();
       updateEditNotice();
     });
 
@@ -2591,6 +2447,10 @@ firebase.initializeApp(firebaseConfig);
     item.querySelector('.block-countable').checked = countable === true;
     updateBlockCaption(item);
     refreshFieldUi();
+    /* прив'язки задача↔аудиторія — одразу, щоб картка була повною з моменту
+       появи; task-list/audience-list на цей момент уже наповнені (порядок
+       у applyFormState(): аудиторії, задачі, потім блоки) */
+    renderBlockLinks(item);
   }
 
   /* ---------- ріст textarea, лічильники, очищення ---------- */
@@ -2601,44 +2461,39 @@ firebase.initializeApp(firebaseConfig);
     textarea.style.height = textarea.scrollHeight + 'px';
   }
 
+  /* Дві форми тепер — doc-form (документи, Екран 1) і app-form (Узгодження):
+     обидва утиліти проходять по обох, інакше поля документів лишились би
+     без авторосту/лічильників після переїзду решти полів на інший екран */
+  var FIELD_FORMS = [docForm, form];
+
   function autoGrowAll() {
-    Array.from(form.querySelectorAll('textarea.field-input')).forEach(autoGrow);
+    FIELD_FORMS.forEach(function (container) {
+      Array.from(container.querySelectorAll('textarea.field-input')).forEach(autoGrow);
+    });
   }
 
   /* видимість кнопок очищення й стан лічильників — один прохід по всіх полях */
   function refreshFieldUi() {
-    Array.from(form.querySelectorAll('.field-input')).forEach(function (input) {
-      var wrap = input.closest('.field-wrap');
-      var clearBtn = wrap ? wrap.querySelector('.field-clear') : null;
-      if (clearBtn) {
-        clearBtn.classList.toggle('field-clear--hidden', input.value.length === 0);
-      }
+    FIELD_FORMS.forEach(function (container) {
+      Array.from(container.querySelectorAll('.field-input')).forEach(function (input) {
+        var wrap = input.closest('.field-wrap');
+        var clearBtn = wrap ? wrap.querySelector('.field-clear') : null;
+        if (clearBtn) {
+          clearBtn.classList.toggle('field-clear--hidden', input.value.length === 0);
+        }
 
-      var group = input.closest('.form-group, .audience-item, .task-item, .block-item');
-      var counter = group ? group.querySelector(':scope > .field-counter') : null;
-      if (counter && input.dataset.limit) {
-        var limit = Number(input.dataset.limit);
-        counter.textContent = input.value.length + ' / ' + limit;
-        /* орієнтир, не обмеження: ввід не блокується, змінюється лише вигляд */
-        counter.classList.toggle('field-counter--over', input.value.length > limit);
-      }
+        var group = input.closest('.form-group, .audience-item, .task-item, .block-item');
+        var counter = group ? group.querySelector(':scope > .field-counter') : null;
+        if (counter && input.dataset.limit) {
+          var limit = Number(input.dataset.limit);
+          counter.textContent = input.value.length + ' / ' + limit;
+          /* орієнтир, не обмеження: ввід не блокується, змінюється лише вигляд */
+          counter.classList.toggle('field-counter--over', input.value.length > limit);
+        }
+      });
     });
   }
 
-  function updateSubmitState() {
-    var category = document.getElementById('category').value.trim();
-    var support = document.getElementById('support').value.trim();
-    var firstAudienceInput = audienceList.querySelector('.audience-input');
-    var audience = firstAudienceInput ? firstAudienceInput.value.trim() : '';
-    var goal = document.getElementById('goal').value.trim();
-    var hasBlock = Array.from(blockList.querySelectorAll('.block-name')).some(function (input) {
-      return input.value.trim() !== '';
-    });
-    var ready = !!(category && support && audience && goal && hasBlock);
-    submitBtn.disabled = !ready;
-    /* з банера теж не можна запустити аналіз на неповному описі */
-    rerunBtn.disabled = !ready;
-  }
 
   /* ---------- екран результату ---------- */
 
@@ -3838,18 +3693,6 @@ firebase.initializeApp(firebaseConfig);
      між цим кліком і записом прогону, і його не можна пропускати навіть
      коли вхід не змінився. Порівняння зі свіжим collectState() тепер у
      generateBtn нижче, після того, як дизайнер реально пройшов Екран 2. */
-  function requestRun() {
-    var unchanged = runs.length && JSON.stringify(runs[0].input) === JSON.stringify(collectState());
-    if (!runs.length || unchanged) {
-      runAnalysis();
-      return;
-    }
-    /* панель стає на місце ряду кнопок, а не додається до нього:
-       інакше на екрані одночасно «Запустити» і «Запустити аналіз» */
-    formActions.hidden = true;
-    runConfirm.hidden = false;
-  }
-
   /* Три комбінації осей для трьох варіантів — кожне значення evidence й
      grouping зустрічається рівно раз; розподіл ваги — TT1/TT2/рівний,
      доповнюється "рівний", якщо реальних задач менше двох (звідки взяти
@@ -4072,15 +3915,12 @@ firebase.initializeApp(firebaseConfig);
     };
   }
 
-  /* Раніше — локальна finish() усередині runAnalysis(). Тепер між виведенням
-     Top Tasks і записом прогону став Екран 2, тож цю дію викликає кнопка
-     «Згенерувати» зі свіжим collectState() — функція винесена на рівень
-     модуля і читає category з finalState, а не із зовнішньої змінної.
-     Асинхронна: спершу три виклики /api/generate, потім запис прогону.
-     На час запиту — той самий патерн блокування кнопки, що в runAnalysis()
-     для confirmRunBtn. */
+  /* Викликається з startGeneration() зі свіжим collectState() — читає
+     category з finalState, а не із зовнішньої змінної. Асинхронна: спершу
+     три виклики /api/generate, потім запис прогону. */
   function finishRun(finalState) {
     generateBtn.disabled = true;
+    rerunBtn.disabled = true;
     var originalGenerateText = generateBtn.textContent;
     generateBtn.textContent = 'Генеруємо…';
     generateErrorText = null;
@@ -4118,14 +3958,20 @@ firebase.initializeApp(firebaseConfig);
     }).finally(function () {
       generationInProgress = false;
       generateBtn.textContent = originalGenerateText;
+      rerunBtn.disabled = false;
       generateProgressHint.hidden = true;
       updateMissingSection();
     });
   }
 
-  function runAnalysis() {
-    runConfirm.hidden = true;
-    formActions.hidden = false;
+  /* Одна дія на «Згенерувати» (низ Узгодження) і «Запустити заново» (банер
+     «Опис змінено») — обидві кнопки роблять те саме: перевірити задачі,
+     за потреби вивести моделлю, згенерувати. Дедуп на однаковому вході
+     свідомо не додається: генерація недетермінована (три виклики
+     /api/generate під ту саму комбінацію осей можуть дати інший порядок),
+     повторний запуск на тому самому вході — легітимна дія, не дубль
+     (те саме рішення, що вже було на generateBtn до етапу 3а — PROGRESS.md) */
+  function startGeneration() {
     /* новий прогін закриває режим редагування — попередження більше не про що */
     editingRun = null;
     updateEditNotice();
@@ -4134,19 +3980,22 @@ firebase.initializeApp(firebaseConfig);
     var hasTasks = state.tasks.some(function (t) { return t.value.trim() !== ''; });
 
     if (hasTasks) {
-      showConfirm(state);
+      finishRun(state);
       return;
     }
 
     /* Top Tasks не задані — виводимо їх через /api/top-tasks (див. CLAUDE.md,
-       розділ «Дозволено в app.html»): ключ моделі лишається на сервері */
-    submitBtn.disabled = true;
-    confirmRunBtn.disabled = true;
-    var originalConfirmText = confirmRunBtn.textContent;
-    confirmRunBtn.textContent = 'Виводимо задачі…';
+       розділ «Дозволено в app.html»): ключ моделі лишається на сервері.
+       Рідкісний, але живий випадок: розбір сам повертає три задачі,
+       сюди доходимо, лише якщо дизайнер стер їх усі на Узгодженні */
+    generateBtn.disabled = true;
+    rerunBtn.disabled = true;
+    var originalGenerateText = generateBtn.textContent;
+    generateBtn.textContent = 'Виводимо задачі…';
     /* див. formVersion: якщо форму замінили, поки йде запит, задачі не
-       кладуться в нову форму й Екран 2 зі старим станом не відкривається.
-       Застарілість — у момент відповіді, у cancelled (як у parseDocuments) */
+       кладуться в нову форму. Застарілість — у момент відповіді, у cancelled
+       (finally не порівнює версію сам: успішний finishRun() теж її не міняє,
+       але про всяк випадок той самий патерн, що в parseDocuments()) */
     var startedAt = formVersion;
     var cancelled = false;
 
@@ -4173,7 +4022,7 @@ firebase.initializeApp(firebaseConfig);
         if (startedAt !== formVersion) { cancelled = true; return; }
         if (Array.isArray(data.tasks) && data.tasks.length) {
           /* задачі мають потрапити у форму, не лишитись у локальній змінній:
-             їх читає collectState() — і тут одразу, і пізніше з Екрана 2 */
+             їх читає collectState() — і тут одразу, і пізніше finishRun() */
           taskList.innerHTML = '';
           /* виведені з аудиторії й цілі — у документах дослівно їх немає */
           data.tasks.forEach(function (t) { addTaskRow(t, genId(), 'agent'); });
@@ -4189,17 +4038,15 @@ firebase.initializeApp(firebaseConfig);
         showToast('Не вдалось звернутись до Gemini — прогін без Top Tasks', false);
       })
       .finally(function () {
-        confirmRunBtn.disabled = false;
-        confirmRunBtn.textContent = originalConfirmText;
+        generateBtn.textContent = originalGenerateText;
         if (cancelled) {
-          /* форма вже інша (скорше за все порожня) — стан кнопки рахуємо
-             з неї, а не вмикаємо примусово */
-          updateSubmitState();
+          /* форма вже інша — стан кнопок рахуємо з неї, а не вмикаємо примусово */
+          refreshAgreementLinks();
           showToast('Виведення задач скасовано: форму змінено', false);
           return;
         }
-        submitBtn.disabled = false;
-        showConfirm(state);
+        rerunBtn.disabled = false;
+        finishRun(state);
       });
   }
 
@@ -4285,47 +4132,12 @@ firebase.initializeApp(firebaseConfig);
     disarmEdit();
     disarmLoadExample();
     disarmParse();
-    runConfirm.hidden = true;
-    formActions.hidden = false;
     /* поки екран був прихований, textarea не мали висоти */
     autoGrowAll();
   }
 
   /* ---------- екран 2: підтвердження перед генерацією ---------- */
 
-  function renderConfirmSummary(state) {
-    confirmSummaryBody.innerHTML = '';
-    confirmSummaryBody.appendChild(summaryRow('Категорія продукту', state.category));
-    confirmSummaryBody.appendChild(summaryRow('Чим підкріплюється діяльність', state.support));
-
-    var audienceRow = el('div', 'summary-row');
-    audienceRow.appendChild(el('span', 'field-caption', 'Цільова аудиторія'));
-    var audienceValues = el('div', 'summary-list');
-    state.audiences.forEach(function (a) {
-      audienceValues.appendChild(el('p', 'summary-row__value', a.value + ' · ' + a.type));
-    });
-    audienceRow.appendChild(audienceValues);
-    confirmSummaryBody.appendChild(audienceRow);
-
-    confirmSummaryBody.appendChild(summaryRow('Бізнес-ціль', state.goal));
-  }
-
-  function renderConfirmTasks(state) {
-    /* джерело — з самих задач: хоч одна від агента (розбір чи /api/top-tasks),
-       не правлена дизайнером, — секція невідтверджена. Назви моделі тут
-       немає: дизайнеру вона нічого не каже, а міняється частіше за механізм */
-    var fromAgent = state.tasks.some(function (t) { return t.value.trim() !== '' && t.source === 'agent'; });
-    confirmTasksSource.textContent = fromAgent
-      ? 'виведено агентом, не підтверджено'
-      : 'задано дизайнером';
-
-    confirmTasksBody.innerHTML = '';
-    state.tasks
-      .filter(function (t) { return t.value.trim() !== ''; })
-      .forEach(function (t) {
-        confirmTasksBody.appendChild(el('p', 'summary-row__value', t.value));
-      });
-  }
 
   /* текст задачі/аудиторії — від дизайнера, тому textContent, не innerHTML-конкатенація */
   function makeOption(value, label) {
@@ -4354,6 +4166,12 @@ firebase.initializeApp(firebaseConfig);
      аудиторії у формі (дропдаун тоді не рендериться — рядок сам собою
      має посилатись на неї). Викликається на початку кожного
      renderConfirmBlocks() — тобто щоразу при вході на Екран 2. */
+  /* Висячі посилання: аудиторія/задача, яку видалили деінде на екрані,
+     не має лишатись у links якогось блоку. Примусова аудиторія — коли у
+     формі лишилась одна аудиторія (дропдаун тоді не рендериться взагалі,
+     рядок сам собою має посилатись на неї). Викликається з
+     refreshAgreementLinks() і showAgreement() — тобто при вході на
+     Узгодження й після кожної зміни аудиторій/задач/блоків. */
   function pruneConfirmRefs() {
     var validTaskIds = Array.from(taskList.querySelectorAll('.task-item'))
       .filter(function (item) { return item.querySelector('.task-input').value.trim() !== ''; })
@@ -4375,12 +4193,34 @@ firebase.initializeApp(firebaseConfig);
     saveState();
   }
 
-  /* Дві перевірки — блок без задачі, задача без блоку (тільки коли хоч
-     одна пара вже є — на порожньому старті це не помилка). "Блок без
-     аудиторії" не існує окремо: аудиторія тепер частина пари, не може
-     бути порожньою сама по собі. Блокує «Згенерувати», поки є хоч один
-     рядок. */
+  /* Картка блоку без задачі (links === null) — слабший сигнал, не помилка:
+     ядро прямо каже, що шапка, футер чи перше представлення задач не
+     обслуговують, і це не зупинка, а питання. Позначається лише візуально
+     на самій картці, не блокує «Згенерувати» (updateMissingSection) */
+  function updateBlockProblemMark(item) {
+    var name = item.querySelector('.block-name').value.trim();
+    var links = JSON.parse(item.dataset.links || 'null');
+    item.classList.toggle('block-item--unlinked', !!name && links === null);
+  }
+
+  /* Дві блокуючі перевірки — порожні обов'язкові поля («ти не дозаповнив»)
+     і задача без блоку («система знайшла дірку», рахується лише коли хоч
+     одна пара вже є — на порожньому старті це очевидність, не недогляд).
+     Порядок фіксований: спершу поля, потім покриття — вони читаються
+     по-різному. Блок без задачі в цей список НЕ входить і кнопку не
+     блокує (updateBlockProblemMark вище) — до 2026-09-XX перевірка була
+     симетричною й суперечила ядру: задача без блоку — знахідка, вища за
+     будь-яке порушення порогу (зміст, який нема куди переставити), блок
+     без задачі — ні (PROGRESS.md, зміна поведінки). Рядок про нього все
+     одно лишається в списку — контекст, не блокер; чи лишати його тут
+     назавжди, чи прибрати — відкрите питання (PROGRESS.md). */
   function updateMissingSection() {
+    var category = document.getElementById('category').value.trim();
+    var support = document.getElementById('support').value.trim();
+    var firstAudienceInput = audienceList.querySelector('.audience-input');
+    var audience = firstAudienceInput ? firstAudienceInput.value.trim() : '';
+    var goal = document.getElementById('goal').value.trim();
+
     var taskItems = Array.from(taskList.querySelectorAll('.task-item')).filter(function (item) {
       return item.querySelector('.task-input').value.trim() !== '';
     });
@@ -4396,25 +4236,31 @@ firebase.initializeApp(firebaseConfig);
       }
     });
 
-    var rows = [];
-
-    blockItems.forEach(function (item) {
-      var name = item.querySelector('.block-name').value.trim();
-      var links = JSON.parse(item.dataset.links || 'null');
-      if (links === null) {
-        rows.push('Блок «' + name + '» ще не має задачі.');
-      }
-    });
+    var blockingRows = [];
+    if (!category) { blockingRows.push('Категорія продукту не заповнена.'); }
+    if (!support) { blockingRows.push('Чим підкріплюється діяльність не заповнено.'); }
+    if (!audience) { blockingRows.push('Цільова аудиторія не заповнена.'); }
+    if (!goal) { blockingRows.push('Бізнес-ціль не заповнена.'); }
+    if (!blockItems.length) { blockingRows.push('Перелік блоків порожній.'); }
 
     if (coveredTaskIds.length > 0) {
       taskItems.forEach(function (item) {
         if (coveredTaskIds.indexOf(item.dataset.id) === -1) {
-          rows.push('Задачу «' + item.querySelector('.task-input').value.trim() + '» не покриває жоден блок.');
+          blockingRows.push('Задачу «' + item.querySelector('.task-input').value.trim() + '» не покриває жоден блок.');
         }
       });
     }
 
-    var ready = rows.length === 0;
+    var advisoryRows = [];
+    blockItems.forEach(function (item) {
+      var links = JSON.parse(item.dataset.links || 'null');
+      if (links === null) {
+        advisoryRows.push('Блок «' + item.querySelector('.block-name').value.trim() + '» ще не має задачі.');
+      }
+    });
+
+    var ready = blockingRows.length === 0;
+    var rows = blockingRows.concat(advisoryRows);
 
     /* провал /api/generate не належить до чек-листа — не блокує кнопку
        (це не причина, чому генерувати не можна, а привід спробувати ще
@@ -4431,10 +4277,15 @@ firebase.initializeApp(firebaseConfig);
     missingAlert.variant = generateErrorText ? 'danger' : (ready ? 'neutral' : 'warning');
     missingList.hidden = rows.length === 0;
     missingSummary.hidden = !(ready && !generateErrorText);
-    /* generationInProgress тримає кнопку заблокованою, навіть якщо
+    /* generationInProgress тримає кнопки заблокованими, навіть якщо
        checklist саме зараз став готовим (дизайнер щось поправив, поки
-       йде запит) — інакше можна запустити другу генерацію поверх першої */
+       йде запит) — інакше можна запустити другу генерацію поверх першої.
+       Обидві кнопки — «Згенерувати» і «Запустити заново» — роблять ту
+       саму дію (startGeneration), тож і гейт той самий */
     generateBtn.disabled = !ready || generationInProgress;
+    rerunBtn.disabled = !ready || generationInProgress;
+
+    blockItems.forEach(function (item) { updateBlockProblemMark(item); });
   }
 
   /* Один рядок-прив'язка: "задача ▾ для аудиторія ▾ ✕". Аудиторія й
@@ -4524,12 +4375,16 @@ firebase.initializeApp(firebaseConfig);
     return linkRow;
   }
 
-  /* Картки Екрана 2 — власна розмітка, будується наново при кожному
-     showConfirm(). Джерело істини лишається одне: dataset.links на
-     самому .block-item з #block-list — картка тримає лише живе
-     посилання на нього (row.blockItemRef), не копію значень. */
-  function renderConfirmBlocks() {
-    pruneConfirmRefs();
+  /* Прив'язки задача↔аудиторія — рядки всередині картки блоку, нижче
+     одиниці й кількості (етап 3а: об'єднання з колишнім Екраном 2, одне
+     джерело істини — .block-item, не дві розмітки того самого блоку).
+     Оновлює лише .confirm-links цієї картки, поля name/unit/count/countable
+     не чіпаються — фокус і курсор під час друку не губляться. */
+  function renderBlockLinks(blockItem) {
+    var container = blockItem.querySelector('.confirm-links');
+    var name = blockItem.querySelector('.block-name').value.trim();
+    container.innerHTML = '';
+    if (!name) { updateBlockProblemMark(blockItem); return; }
 
     var taskItems = Array.from(taskList.querySelectorAll('.task-item')).filter(function (item) {
       return item.querySelector('.task-input').value.trim() !== '';
@@ -4539,65 +4394,56 @@ firebase.initializeApp(firebaseConfig);
     });
     var showAudienceSelect = audienceItems.length > 1;
 
-    var blockItems = Array.from(blockList.querySelectorAll('.block-item')).filter(function (item) {
-      return item.querySelector('.block-name').value.trim() !== '';
-    });
+    var links = JSON.parse(blockItem.dataset.links || 'null');
+    var hasLinks = Array.isArray(links) && links.length > 0;
 
-    confirmBlocksBody.innerHTML = '';
+    if (hasLinks) {
+      links.forEach(function (link, index) {
+        container.appendChild(buildLinkRow(blockItem, links, index, taskItems, audienceItems, showAudienceSelect));
+      });
+    }
 
-    blockItems.forEach(function (blockItem) {
-      var row = el('div', 'confirm confirm-block');
-      row.blockItemRef = blockItem;
+    /* "+ прив'язати задачу", поки рядків нема; "+ ще одна прив'язка",
+       коли вже є хоч один; нема опції взагалі — нема самих задач,
+       прив'язувати нічого */
+    if (taskItems.length > 0 && (links === null || hasLinks)) {
+      var addBtn = document.createElement('button');
+      addBtn.type = 'button';
+      addBtn.className = 'confirm-add-link';
+      addBtn.textContent = hasLinks ? "+ ще одна прив'язка" : "+ прив'язати задачу";
+      container.appendChild(addBtn);
+    }
 
-      row.appendChild(el('p', 'field-label', blockItem.querySelector('.block-name').value));
+    var checkbox = document.createElement('sl-checkbox');
+    checkbox.className = 'confirm-no-links-checkbox';
+    checkbox.textContent = 'блок не обслуговує задач';
+    if (Array.isArray(links) && links.length === 0) {
+      checkbox.setAttribute('checked', '');
+    }
+    container.appendChild(checkbox);
 
-      /* обсяг — тільки перегляд того, що вже задано на формі, не поле
-         вводу; редагування лишається на Екрані 1. Рядка нема, якщо unit
-         і count обидва порожні — та сама умова, що "не визначено" на формі
-         (updateBlockCaption) */
-      var blockUnit = blockItem.querySelector('.block-unit').value;
-      var blockCount = blockItem.querySelector('.block-count').value;
-      if (blockUnit) {
-        row.appendChild(el('p', 'field-caption', blockUnit + (blockCount ? ' · ' + blockCount : '')));
-      }
+    updateBlockProblemMark(blockItem);
+  }
 
-      var links = JSON.parse(blockItem.dataset.links || 'null');
-      var hasLinks = Array.isArray(links) && links.length > 0;
+  function renderAllBlockLinks() {
+    Array.from(blockList.querySelectorAll('.block-item')).forEach(renderBlockLinks);
+  }
 
-      if (hasLinks) {
-        links.forEach(function (link, index) {
-          row.appendChild(buildLinkRow(blockItem, links, index, taskItems, audienceItems, showAudienceSelect));
-        });
-      }
-
-      /* "+ прив'язати задачу", поки рядків нема; "+ ще одна прив'язка",
-         коли вже є хоч один; нема опції взагалі — нема самих задач,
-         прив'язувати нічого */
-      if (taskItems.length > 0 && (links === null || hasLinks)) {
-        var addBtn = document.createElement('button');
-        addBtn.type = 'button';
-        addBtn.className = 'confirm-add-link';
-        addBtn.textContent = hasLinks ? "+ ще одна прив'язка" : "+ прив'язати задачу";
-        row.appendChild(addBtn);
-      }
-
-      var checkbox = document.createElement('sl-checkbox');
-      checkbox.className = 'confirm-no-links-checkbox';
-      checkbox.textContent = 'блок не обслуговує задач';
-      if (Array.isArray(links) && links.length === 0) {
-        checkbox.setAttribute('checked', '');
-      }
-      row.appendChild(checkbox);
-
-      confirmBlocksBody.appendChild(row);
-    });
-
+  /* Виклик після будь-якої зміни аудиторії/задачі/блоку деінде на екрані:
+     видаляє висячі посилання, перебудовує рядки прив'язок у всіх картках
+     (дропдауни могли змінитись) і перераховує «Не вистачає». Дешево на
+     10 блоках, рахується на кожну зміну, не лише при вході на екран. */
+  function refreshAgreementLinks() {
+    pruneConfirmRefs();
+    renderAllBlockLinks();
     updateMissingSection();
   }
 
-  /* Один делегований sl-change на контейнер карток — для селектів
-     усередині рядків-прив'язок і для чекбокса. */
-  confirmBlocksBody.addEventListener('sl-change', function (event) {
+  /* Один делегований sl-change на #block-list — для селектів усередині
+     рядків-прив'язок і для чекбокса «блок не обслуговує задач». Кожна
+     зміна оновлює лише .confirm-links свого блоку (renderBlockLinks), не
+     всі картки — на відміну від колишнього renderConfirmBlocks(). */
+  blockList.addEventListener('sl-change', function (event) {
     var target = event.target;
 
     if (target.classList.contains('confirm-link-task-select')) {
@@ -4624,7 +4470,8 @@ firebase.initializeApp(firebaseConfig);
         draftLinks.push({ taskId: target.value, audienceId: newAudienceId });
         linkRow.blockItemRef.dataset.links = JSON.stringify(draftLinks);
         saveState();
-        renderConfirmBlocks();
+        renderBlockLinks(linkRow.blockItemRef);
+        updateMissingSection();
         return;
       }
 
@@ -4659,24 +4506,24 @@ firebase.initializeApp(firebaseConfig);
     }
 
     if (target.classList.contains('confirm-no-links-checkbox')) {
-      var row = target.closest('.confirm-block');
-      if (!row || !row.blockItemRef) { return; }
+      var blockItem = target.closest('.block-item');
+      if (!blockItem) { return; }
       /* позначено → [] (свідомо без задачі), рядки ховаються; знято →
          null (не обрано, знову блокує), а не назад у порожній масив */
-      row.blockItemRef.dataset.links = JSON.stringify(target.checked ? [] : null);
+      blockItem.dataset.links = JSON.stringify(target.checked ? [] : null);
       saveState();
-      renderConfirmBlocks();
+      renderBlockLinks(blockItem);
+      updateMissingSection();
     }
   });
 
   /* click, не sl-change: "+ прив'язати"/"+ ще одна" і "✕" — звичайні
      кнопки, не Shoelace-компоненти */
-  confirmBlocksBody.addEventListener('click', function (event) {
+  blockList.addEventListener('click', function (event) {
     var addBtn = event.target.closest('.confirm-add-link');
     if (addBtn) {
-      var blockRow = addBtn.closest('.confirm-block');
-      if (!blockRow || !blockRow.blockItemRef) { return; }
-      var blockItem = blockRow.blockItemRef;
+      var blockItem = addBtn.closest('.block-item');
+      if (!blockItem) { return; }
 
       var liveTaskItems = Array.from(taskList.querySelectorAll('.task-item')).filter(function (item) {
         return item.querySelector('.task-input').value.trim() !== '';
@@ -4690,7 +4537,7 @@ firebase.initializeApp(firebaseConfig);
          плейсхолдером "оберіть задачу". Пара з'явиться, коли дизайнер
          справді щось обере (sl-change на .confirm-link-task-select) */
       var draftRow = buildDraftLinkRow(blockItem, liveTaskItems, liveAudienceItems, liveAudienceItems.length > 1);
-      blockRow.insertBefore(draftRow, addBtn);
+      addBtn.parentNode.insertBefore(draftRow, addBtn);
       return;
     }
 
@@ -4712,11 +4559,16 @@ firebase.initializeApp(firebaseConfig);
          той самий принцип, що й у pruneBlockLinks() */
       linkRow.blockItemRef.dataset.links = JSON.stringify(links2.length ? links2 : null);
       saveState();
-      renderConfirmBlocks();
+      renderBlockLinks(linkRow.blockItemRef);
+      updateMissingSection();
     }
   });
 
-  function showConfirm(state) {
+  /* Вхід на Узгодження (перейменований колишній Екран 2, «Підтвердження
+     перед генерацією»): категорія…блоки — тепер самі поля форми, не
+     переказ, тому render-функцій для них тут більше нема. Аргумент не
+     потрібен — усе читається з живого DOM. */
+  function showAgreement() {
     if (!isLoggedIn) { showLogin(); return; }
     formScreen.hidden = true;
     runsScreen.hidden = true;
@@ -4725,22 +4577,14 @@ firebase.initializeApp(firebaseConfig);
     confirmScreen.hidden = false;
     /* новий вхід на екран — стара помилка генерації більше не про поточну спробу */
     generateErrorText = null;
-    renderConfirmSummary(state);
-    renderConfirmTasks(state);
-    renderConfirmBlocks();
+    refreshAgreementLinks();
     window.scrollTo(0, 0);
   }
 
   confirmBackBtn.addEventListener('click', showForm);
 
-  /* Дедуплікація на однаковому вході прибрана: генерація недетермінована
-     (три виклики /api/generate під ту саму комбінацію осей можуть дати
-     інший порядок), повторний запуск на тому самому вході — легітимна
-     дія, не дубль. Раніше звіряли JSON.stringify(runs[0].input) проти
-     свіжого collectState() і відкривали старий прогін замість нового. */
-  generateBtn.addEventListener('click', function () {
-    finishRun(collectState());
-  });
+  generateBtn.addEventListener('click', startGeneration);
+
 
   /* очищення форми: перший клік по «Новий прогін» лише озброює кнопку,
      виконує другий — підтвердження живе в самій кнопці, без нативного діалогу.
@@ -4763,10 +4607,8 @@ firebase.initializeApp(firebaseConfig);
   }
 
   function disarmLoadExample() {
-    loadExampleHomeBtn.dataset.armed = '';
-    loadExampleHomeBtn.textContent = 'Зразок · головна';
-    loadExampleAboutBtn.dataset.armed = '';
-    loadExampleAboutBtn.textContent = 'Зразок · про нас';
+    loadExampleBtn.dataset.armed = '';
+    loadExampleBtn.textContent = 'Зразок · «Ватра»';
   }
 
   function isDraftEmpty() {
@@ -4795,13 +4637,16 @@ firebase.initializeApp(firebaseConfig);
 
     editingRun = currentRun;
     /* зберігаємо й порівнюємо з прогоном лише після того, як типи аудиторій
-       встали в селекти — див. кінець applyFormState() */
+       встали в селекти — див. кінець applyFormState(). «Змінити опис»
+       веде одразу на Узгодження, з готовими полями, без повторного
+       розбору — позначки джерела лишаються тими, що були в прогоні:
+       у цьому й сенс простежуваності, вона має пережити повернення до
+       прогону. Документи лишаються доступними на Екрані 1 */
     applyFormState(runInput).then(function () {
-      updateSubmitState();
       saveState();
       updateEditNotice();
+      showAgreement();
     });
-    showForm();
   }
 
   /* попередження показується, лише поки форма справді розходиться з прогоном:
@@ -4849,7 +4694,7 @@ firebase.initializeApp(firebaseConfig);
     /* зберігаємо лише після того, як типи аудиторій встали в селекти —
        див. кінець applyFormState() */
     applyFormState(editingRun.input).then(function () {
-      updateSubmitState();
+      refreshAgreementLinks();
       saveState();
       /* editingRun лишається: якщо після скасування знову щось змінити,
          попередження має з'явитись удруге */
@@ -4881,7 +4726,6 @@ firebase.initializeApp(firebaseConfig);
     autoGrowAll();
     renderSourceMarks();
     saveState();
-    updateSubmitState();
     updateParseState();
     /* порівнювати вже нема з чим */
     editingRun = null;
@@ -5064,8 +4908,8 @@ firebase.initializeApp(firebaseConfig);
        селекти — див. кінець applyFormState() */
     return applyFormState(state).then(function () {
       saveState();
-      updateSubmitState();
       updateEditNotice();
+      showAgreement();
     });
   }
 
@@ -5128,13 +4972,7 @@ firebase.initializeApp(firebaseConfig);
 
   /* ---------- обробники ---------- */
 
-  submitBtn.addEventListener('click', requestRun);
   parseBtn.addEventListener('click', parseDocuments);
-  confirmRunBtn.addEventListener('click', runAnalysis);
-  cancelRunBtn.addEventListener('click', function () {
-    runConfirm.hidden = true;
-    formActions.hidden = false;
-  });
 
   editBtn.addEventListener('click', editDescription);
 
@@ -5157,7 +4995,7 @@ firebase.initializeApp(firebaseConfig);
   });
 
   revertBtn.addEventListener('click', revertToRun);
-  rerunBtn.addEventListener('click', runAnalysis);
+  rerunBtn.addEventListener('click', startGeneration);
 
   logoBtn.addEventListener('click', function () {
     window.location.href = 'index.html';
@@ -5257,58 +5095,39 @@ firebase.initializeApp(firebaseConfig);
         btn.textContent = 'Точно очистити?';
         return;
       }
-      var onResult = !resultScreen.hidden;
       clearForm();
-      /* з форми екран не перемикаємо — ми вже на ній */
-      if (onResult) { showForm(); } else { disarmReset(); }
+      /* «Новий прогін» тепер живе на Узгодженні (декан #1 етапу 3а) — на
+         Екрані 1 їй нема що чистити, там два поля й хрестики на них. Тому
+         завжди йдемо на Екран 1 після очищення, незалежно від того, звідки
+         клікнули (Екран 3 чи Узгодження) — той самий перехід, що раніше
+         робився лише з Екрана 3 */
+      showForm();
     });
   });
 
-  /* той самий патерн дворазового озброєння, що в «Новий прогін»: не
-     деструктивно в сенсі даних застосунку (нічого на сервері), але так само
-     тихо заміняє чернетку — підтвердження для узгодженості з сусідньою дією */
-  /* Озброюються незалежно одна від одної (dataset.armed кожної своєї
-     кнопки), щоб випадковий клік по одній не стер форму через іншу.
-     Клік по одній під час озброєння іншої знімає її озброєння —
-     disarmLoadExample() скидає обидві, тут-таки озброюється саме та,
-     що клікнули. */
-  function loadExample(btn, exampleState) {
-    if (btn.dataset.armed !== 'yes') {
+  /* Зразок документів «Ватра» — заповнює лише «Контекст проєкту» й «Опис
+     сторінки», далі дизайнер сам натискає «Розібрати», як зі своїми
+     документами (етап 3а: раніше два зразки заповнювали всю форму одразу,
+     без розбору — тоді неможливо було відрізнити «розбір спрацював» від
+     «тут просто лежав зразок»). Підтвердження лише якщо в документах уже
+     щось є — той самий принцип, що в parseDocuments()/editDescription() */
+  function loadExampleDocs() {
+    var docsEmpty = briefInput.value.trim() === '' && pageDescInput.value.trim() === '';
+    if (!docsEmpty && loadExampleBtn.dataset.armed !== 'yes') {
       disarmReset();
-      disarmEdit();
-      disarmLoadExample();
       disarmParse();
-      btn.dataset.armed = 'yes';
-      btn.textContent = 'Точно завантажити?';
+      loadExampleBtn.dataset.armed = 'yes';
+      loadExampleBtn.textContent = 'Точно завантажити?';
       return;
     }
     disarmLoadExample();
-    /* той самий шлях, що для будь-якого іншого стану: migrateState()
-       не чіпає явні id audiences/tasks і вже задані links на блоках
-       (обидва зразки написані одразу в поточному форматі — не старому,
-       на відміну від колишнього EXAMPLE_STATE), applyFormState()
-       перемальовує форму.
-       Копія, не сама константа: migrateState() змінює об'єкт на місці, а
-       бриф нижче записується в стан — без копії він осів би в зразку й
-       повертався б при наступних завантаженнях. Бриф лишається поточним:
-       він один на проєкт; опис сторінки й решта полів — зі зразка */
-    var state = migrateState(JSON.parse(JSON.stringify(exampleState)));
-    state.brief = briefInput.value;
-    /* зберігаємо лише після того, як типи аудиторій встали в селекти —
-       див. кінець applyFormState() */
-    applyFormState(state).then(function () {
-      saveState();
-      updateSubmitState();
-    });
+    briefInput.value = EXAMPLE_VATRA.brief;
+    pageDescInput.value = EXAMPLE_VATRA.pageDescription;
+    briefInput.dispatchEvent(new Event('input', { bubbles: true }));
+    pageDescInput.dispatchEvent(new Event('input', { bubbles: true }));
   }
 
-  loadExampleHomeBtn.addEventListener('click', function () {
-    loadExample(loadExampleHomeBtn, EXAMPLE_HOME);
-  });
-
-  loadExampleAboutBtn.addEventListener('click', function () {
-    loadExample(loadExampleAboutBtn, EXAMPLE_ABOUT);
-  });
+  loadExampleBtn.addEventListener('click', loadExampleDocs);
 
   /* копіювання звіту: без мережі, лише буфер обміну браузера */
   copyReportBtn.addEventListener('click', function () {
@@ -5340,21 +5159,21 @@ firebase.initializeApp(firebaseConfig);
     if (audienceList.querySelectorAll('.audience-row').length >= MAX_AUDIENCES) { return; }
     addAudienceRow('', 'головна');
     saveState();
-    updateSubmitState();
+    refreshAgreementLinks();
     updateEditNotice();
   });
 
   addTaskBtn.addEventListener('click', function () {
     addTaskRow('');
     saveState();
-    updateSubmitState();
+    refreshAgreementLinks();
     updateEditNotice();
   });
 
   addBlockBtn.addEventListener('click', function () {
     addBlockRow('', '', '', false);
     saveState();
-    updateSubmitState();
+    refreshAgreementLinks();
     updateEditNotice();
   });
 
@@ -5379,14 +5198,14 @@ firebase.initializeApp(firebaseConfig);
     renderSourceMarks();
     refreshFieldUi();
     saveState();
-    updateSubmitState();
+    refreshAgreementLinks();
     updateEditNotice();
     updateParseState();
   });
 
   form.addEventListener('change', function () {
     saveState();
-    updateSubmitState();
+    refreshAgreementLinks();
     updateEditNotice();
   });
 
@@ -5397,7 +5216,7 @@ firebase.initializeApp(firebaseConfig);
     markDesignerSource(event.target);
     renderSourceMarks();
     saveState();
-    updateSubmitState();
+    refreshAgreementLinks();
     updateEditNotice();
   });
 
@@ -5407,12 +5226,37 @@ firebase.initializeApp(firebaseConfig);
     markDesignerSource(event.target);
     renderSourceMarks();
     saveState();
-    updateSubmitState();
+    refreshAgreementLinks();
+    updateEditNotice();
+  });
+
+  /* Документи (бриф, опис сторінки) — окрема форма на Екрані 1, поза
+     #app-form: свій делегований обробник, не пов'язаний з рештою полів
+     (категорія…блоки — тепер на Узгодженні, інший екран). Той самий
+     принцип кнопки очищення, що на #app-form. Ні markDesignerSource
+     (позначки джерела рахуються лише для полів /api/parse), ні
+     refreshAgreementLinks (документи не впливають на прив'язки) тут
+     не потрібні */
+  docForm.addEventListener('click', function (event) {
+    var clearBtn = event.target.closest('.field-clear');
+    if (!clearBtn) { return; }
+    var input = clearBtn.closest('.field-wrap').querySelector('.field-input');
+    input.value = '';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    input.focus();
+  });
+
+  docForm.addEventListener('input', function (event) {
+    if (event.target.tagName === 'TEXTAREA') {
+      autoGrow(event.target);
+    }
+    refreshFieldUi();
+    saveState();
+    updateParseState();
     updateEditNotice();
   });
 
   loadState();
-  updateSubmitState();
   updateLoginModeUi();
 
   /* Єдине джерело істини для того, який екран показано. До появи входу це
