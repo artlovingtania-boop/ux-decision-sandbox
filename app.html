@@ -1833,8 +1833,9 @@ firebase.initializeApp(firebaseConfig);
      прийде від моделі й замінить константу цілком. Осі, рівні зауважень і
      склад метрик узяті з SANDBOX-CORE.md; нічого зі списку «Чого в цій
      версії немає» тут бути не повинно. */
-  /* ЗРАЗКИ. Форма заповнюється одним із них при першому відкритті (немає
-     нічого у сховищі) і за кліком на «Зразок · головна»/«Зразок · про нас».
+  /* ЗРАЗКИ. Форма заповнюється одним із них лише за кліком на «Зразок ·
+     головна»/«Зразок · про нас» — при першому відкритті форма порожня
+     (див. loadState()).
      Явні id на audiences/tasks і готові links на блоках — щоб Екран 2
      відкривався вже заповненим, без ручного введення прив'язок:
      migrateState() не чіпає ні одне, ні інше, якщо вони вже задані
@@ -2026,6 +2027,13 @@ firebase.initializeApp(firebaseConfig);
   /* true під час виклику /api/parse — кнопка лишається вимкненою, навіть
      якщо дизайнер тим часом правитиме опис сторінки */
   var parseInProgress = false;
+  /* Версія форми: збільшується при кожній повній заміні її вмісту —
+     clearForm() і applyFormState() (вхід, розбір, «Зразок», «Змінити опис»,
+     «Скасувати зміни»). Асинхронний запит (/api/parse, /api/top-tasks)
+     запам'ятовує версію на старті; якщо до відповіді її змінили, відповідь
+     застаріла й поверх нової форми не кладеться (BUGS.md, 2026-09-13).
+     Ручні правки полів версію не змінюють */
+  var formVersion = 0;
 
   var formScreen = document.getElementById('form-screen');
   var resultScreen = document.getElementById('result-screen');
@@ -2374,9 +2382,11 @@ firebase.initializeApp(firebaseConfig);
       }
     });
 
-    /* приклад підставляється лише при справді першому відкритті:
-       якщо стан збережений — навіть порожній після «Нового прогону» — він і виграє */
-    state = state || (stored === null ? EXAMPLE_HOME : {});
+    /* При першому відкритті форма порожня — зразок сюди не підставляється:
+       з ним не відрізнити «розбір спрацював» від «тут просто лежав зразок».
+       Документи вставляються вручну один раз — бриф переживає і «Новий
+       прогін», і перезавантаження. Зразки — лише за кнопками */
+    state = state || {};
     state = migrateState(state);
     runs.forEach(function (run) { migrateState(run.input); });
     applyFormState(state);
@@ -2385,6 +2395,7 @@ firebase.initializeApp(firebaseConfig);
   /* ---------- заповнення форми ---------- */
 
   function applyFormState(state) {
+    formVersion++;
     briefInput.value = state.brief || '';
     pageDescInput.value = state.pageDescription || '';
     form.dataset.droppedAudiences = JSON.stringify(Array.isArray(state.droppedAudiences) ? state.droppedAudiences : []);
@@ -4133,6 +4144,11 @@ firebase.initializeApp(firebaseConfig);
     confirmRunBtn.disabled = true;
     var originalConfirmText = confirmRunBtn.textContent;
     confirmRunBtn.textContent = 'Виводимо задачі…';
+    /* див. formVersion: якщо форму замінили, поки йде запит, задачі не
+       кладуться в нову форму й Екран 2 зі старим станом не відкривається.
+       Застарілість — у момент відповіді, у cancelled (як у parseDocuments) */
+    var startedAt = formVersion;
+    var cancelled = false;
 
     var audienceText = state.audiences
       .filter(function (a) { return a.value.trim() !== ''; })
@@ -4154,6 +4170,7 @@ firebase.initializeApp(firebaseConfig);
         return res.json();
       })
       .then(function (data) {
+        if (startedAt !== formVersion) { cancelled = true; return; }
         if (Array.isArray(data.tasks) && data.tasks.length) {
           /* задачі мають потрапити у форму, не лишитись у локальній змінній:
              їх читає collectState() — і тут одразу, і пізніше з Екрана 2 */
@@ -4168,12 +4185,20 @@ firebase.initializeApp(firebaseConfig);
         }
       })
       .catch(function () {
+        if (startedAt !== formVersion) { cancelled = true; return; }
         showToast('Не вдалось звернутись до Gemini — прогін без Top Tasks', false);
       })
       .finally(function () {
-        submitBtn.disabled = false;
         confirmRunBtn.disabled = false;
         confirmRunBtn.textContent = originalConfirmText;
+        if (cancelled) {
+          /* форма вже інша (скорше за все порожня) — стан кнопки рахуємо
+             з неї, а не вмикаємо примусово */
+          updateSubmitState();
+          showToast('Виведення задач скасовано: форму змінено', false);
+          return;
+        }
+        submitBtn.disabled = false;
         showConfirm(state);
       });
   }
@@ -4833,6 +4858,7 @@ firebase.initializeApp(firebaseConfig);
   }
 
   function clearForm() {
+    formVersion++;
     /* бриф не чиститься: він один на проєкт і лишається для всіх його
        сторінок (так і сказано в підказці під полем). Новий прогін — нова
        сторінка, тож чиститься опис сторінки й усе, що з нього виведено */
@@ -5060,6 +5086,13 @@ firebase.initializeApp(firebaseConfig);
     parseInProgress = true;
     parseBtn.textContent = 'Розбираємо…';
     updateParseState();
+    /* див. formVersion: відповідь на вже замінену форму не кладеться.
+       Застарілість вирішується в момент відповіді й запам'ятовується в
+       cancelled — finally не порівнює версію сам: успішний розбір через
+       applyFormState() теж її збільшує, і finally прийняв би власний
+       результат за «форму змінили» */
+    var startedAt = formVersion;
+    var cancelled = false;
 
     fetch('/api/parse', {
       method: 'POST',
@@ -5074,15 +5107,22 @@ firebase.initializeApp(firebaseConfig);
          той уже встиг би заповнити поля, а повідомлення неправдиво сказало б
          «не вдалось» (той самий урок, що з generateVariants()) */
       .then(function (data) {
+        if (startedAt !== formVersion) { cancelled = true; return; }
         applyParseResult(data);
         showToast('Поля заповнено з документів — перевір і виправ', false);
       }, function () {
+        if (startedAt !== formVersion) { cancelled = true; return; }
         showToast('Не вдалось розібрати документи — спробуй ще раз', false);
       })
       .finally(function () {
         parseInProgress = false;
         parseBtn.textContent = 'Розібрати';
         updateParseState();
+        /* форму замінили цілком, поки йшов розбір («Новий прогін», «Зразок»,
+           …) — відповідь відкинута. Мовчки це виглядало б як зависання */
+        if (cancelled) {
+          showToast('Розбір скасовано: форму змінено під час розбору', false);
+        }
       });
   }
 
