@@ -76,12 +76,60 @@ function normalizeCount(raw) {
   return { value: '', fix: 'нечислове ' + JSON.stringify(raw) + ' → порожнє' };
 }
 
+// Джерело значення: 'page' — стоїть в описі сторінки дослівно, 'brief' —
+// у брифі дослівно, 'agent' — усе інше (складене, переформульоване,
+// виведене). 'designer' ставить лише клієнт, коли дизайнер править поле, —
+// від моделі воно не приймається.
+const MODEL_SOURCES = ['page', 'brief', 'agent'];
+
+// Дослівність — обчислення, не судження, тож її перевіряє код: регістр,
+// пробіли й типографські лапки/апострофи вирівнюються, крайова пунктуація
+// відкидається, і значення шукається в документі цілими словами.
+function normalizeForMatch(text) {
+  return String(text || '')
+    .toLowerCase()
+    .replace(/[’ʼ`']/g, "'")
+    .replace(/[«»“”„"]/g, '"')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/^[.,;:!?"'()—–\-\s]+|[.,;:!?"'()—–\-\s]+$/g, '');
+}
+
+// Цілими словами, не підрядком. Підрядок робив перевірку залежною від
+// відмінка: «показник» проходив як дослівний, бо сидить усередині
+// «показників», а «картка» при «картки» — ні. Тепер обидва — не дослівно.
+function containsAsWords(haystack, needle) {
+  if (haystack === '' || needle === '') { return false; }
+  const escaped = needle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return new RegExp('(^|[^\\p{L}\\p{N}])' + escaped + '(?=$|[^\\p{L}\\p{N}])', 'u').test(haystack);
+}
+
+// Джерело для порожнього значення — null: позначати нічого. Невідоме
+// джерело → 'agent' (походження, яке не можна перевірити, взятим з
+// документа не вважається). verbatim — чи перевіряти дослівність: для
+// count ні, бо «три» в тексті стає "3".
+function normalizeSource(rawSource, value, label, docs, verbatim, fixes) {
+  if (value === '') { return null; }
+  if (MODEL_SOURCES.indexOf(rawSource) === -1) {
+    fixes.push('джерело ' + label + ' ' + JSON.stringify(rawSource) + ' → "agent"');
+    return 'agent';
+  }
+  if (verbatim && rawSource !== 'agent') {
+    if (!containsAsWords(normalizeForMatch(docs[rawSource]), normalizeForMatch(value))) {
+      fixes.push('джерело ' + label + ' "' + rawSource + '", але дослівно в документі немає → "agent"');
+      return 'agent';
+    }
+  }
+  return rawSource;
+}
+
 // Нормалізація після моделі: усе, що можна порахувати, тримає код, а не
 // промпт. "Рівно одна головна" — обчислення, не судження: тип ставиться
 // за позицією, а порядок пріоритету лишається прочитаним моделлю. Кожне
 // виправлення — окремий console.warn: це дані про те, як часто модель
-// порушує правила промпту, не шум.
-function normalizeParsed(parsed) {
+// порушує правила промпту, не шум. docs — { page, brief }, тексти двох
+// документів для перевірки дослівності джерел.
+function normalizeParsed(parsed, docs) {
   const fixes = [];
 
   const audiences = [];
@@ -100,7 +148,8 @@ function normalizeParsed(parsed) {
       if (modelType !== type) {
         fixes.push('audiences[' + audiences.length + '] тип ' + JSON.stringify(modelType) + ' → ' + JSON.stringify(type));
       }
-      audiences.push({ value: value, type: type });
+      const source = normalizeSource(isObject ? a.source : undefined, value, 'audiences[' + audiences.length + ']', docs, true, fixes);
+      audiences.push({ value: value, type: type, source: source });
     } else {
       fixes.push('audiences: ' + JSON.stringify(value) + ' понад ' + MAX_AUDIENCES + ' → droppedAudiences');
       droppedAudiences.push({ value: value });
@@ -122,9 +171,20 @@ function normalizeParsed(parsed) {
   if (!Array.isArray(parsed.tasks)) {
     fixes.push('tasks не масив → []');
   }
+  // Top Tasks виводяться з ролей блоків — їх у документах дослівно немає
+  // за визначенням, тож джерело завжди 'agent'; інша заява моделі — у лог
   const tasks = rawTasks
-    .map(function (t) { return { value: asString(t !== null && typeof t === 'object' ? t.value : t) }; })
-    .filter(function (t) { return t.value !== ''; });
+    .map(function (t) {
+      const isObject = t !== null && typeof t === 'object';
+      return { value: asString(isObject ? t.value : t), rawSource: isObject ? t.source : undefined };
+    })
+    .filter(function (t) { return t.value !== ''; })
+    .map(function (t, index) {
+      if (t.rawSource !== 'agent') {
+        fixes.push('джерело tasks[' + index + '] ' + JSON.stringify(t.rawSource) + ' → "agent"');
+      }
+      return { value: t.value, source: 'agent' };
+    });
   // не виправлення — до трьох не добиваємо, — але порушення правила 6,
   // тож у той самий лог
   if (tasks.length !== 3) {
@@ -147,25 +207,46 @@ function normalizeParsed(parsed) {
     if (typeof rawCountable !== 'boolean') {
       fixes.push('blocks[' + index + '] ' + JSON.stringify(name) + ' countable ' + JSON.stringify(rawCountable) + ' → false');
     }
+    const unit = asString(isObject ? b.unit : '');
+    const rawSources = isObject && b.sources !== null && typeof b.sources === 'object' ? b.sources : {};
+    const label = 'blocks[' + index + '] ' + JSON.stringify(name);
     blocks.push({
       name: name,
-      unit: asString(isObject ? b.unit : ''),
+      unit: unit,
       count: count.value,
       // true лише коли модель сказала саме true — те саме значення за
       // замовчуванням, що в міграції app.html
-      countable: rawCountable === true
+      countable: rawCountable === true,
+      // countable — завжди судження моделі, дослівно в описі його не буває:
+      // джерело 'agent' без питання до моделі
+      sources: {
+        name: normalizeSource(rawSources.name, name, label + '.name', docs, true, fixes),
+        unit: normalizeSource(rawSources.unit, unit, label + '.unit', docs, true, fixes),
+        count: normalizeSource(rawSources.count, count.value, label + '.count', docs, false, fixes),
+        countable: 'agent'
+      }
     });
   });
 
+  const rawTopSources = parsed.sources !== null && typeof parsed.sources === 'object' ? parsed.sources : {};
+  const category = asString(parsed.category);
+  const support = asString(parsed.support);
+  const goal = asString(parsed.goal);
+
   return {
     result: {
-      category: asString(parsed.category),
-      support: asString(parsed.support),
+      category: category,
+      support: support,
       audiences: audiences,
       droppedAudiences: droppedAudiences,
-      goal: asString(parsed.goal),
+      goal: goal,
       tasks: tasks,
-      blocks: blocks
+      blocks: blocks,
+      sources: {
+        category: normalizeSource(rawTopSources.category, category, 'category', docs, true, fixes),
+        support: normalizeSource(rawTopSources.support, support, 'support', docs, true, fixes),
+        goal: normalizeSource(rawTopSources.goal, goal, 'goal', docs, true, fixes)
+      }
     },
     fixes: fixes
   };
@@ -224,6 +305,7 @@ ${pageDescription.trim()}
 - goal — бізнес-ціль: що має статися після візиту
 - tasks — Top Tasks
 - blocks — блоки сторінки; для кожного: name — назва, unit — одиниця, count — кількість одиниць, countable — чи одиницю читають поштучно
+- sources, source — джерело кожного значення (правило 11): sources для category/support/goal, source у кожної аудиторії й задачі, sources для name/unit/count кожного блоку
 
 Правила:
 
@@ -248,8 +330,10 @@ ${pageDescription.trim()}
 
 10. count — рядок із цифр. Числівник словом — теж число: «три» → "3".
 
+11. Джерело кожного значення — чесно. "page" — значення стоїть в описі сторінки дослівно. "brief" — стоїть у брифі дослівно. "agent" — усе інше: складене з обох документів, переформульоване, узагальнене чи виведене. Top Tasks — завжди "agent". Кількість, названа в тексті числом чи словом, або верхня межа названого діапазону — джерело той документ, де вона названа. Для порожнього значення джерело — "". Якщо сумніваєшся — "agent".
+
 Поверни ТІЛЬКИ JSON, без пояснень і без markdown-огорожі, у форматі:
-{"category": "", "support": "", "audiences": [{"value": "", "type": "головна"}], "droppedAudiences": [{"value": ""}], "goal": "", "tasks": [{"value": ""}], "blocks": [{"name": "", "unit": "", "count": "", "countable": true}]}`;
+{"category": "", "support": "", "goal": "", "sources": {"category": "page|brief|agent", "support": "page|brief|agent", "goal": "page|brief|agent"}, "audiences": [{"value": "", "type": "головна", "source": "page|brief|agent"}], "droppedAudiences": [{"value": ""}], "tasks": [{"value": "", "source": "agent"}], "blocks": [{"name": "", "unit": "", "count": "", "countable": true, "sources": {"name": "page|brief|agent", "unit": "page|brief|agent", "count": "page|brief|agent"}}]}`;
 
   // ТИМЧАСОВО gemini-3.1-flash-lite: денна квота free tier на 3.8-flash
   // вичерпана (13.09.2026), а правку категорії треба було перевірити
@@ -326,7 +410,7 @@ ${pageDescription.trim()}
       return;
     }
 
-    const normalized = normalizeParsed(parsed);
+    const normalized = normalizeParsed(parsed, { page: pageDescription, brief: briefText });
     normalized.fixes.forEach(function (fix) {
       console.warn('[parse] нормалізація:', fix);
     });
