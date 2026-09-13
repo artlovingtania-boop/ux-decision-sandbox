@@ -123,6 +123,125 @@ function normalizeSource(rawSource, value, label, docs, verbatim, fixes) {
   return rawSource;
 }
 
+// Прив'язки блок ↔ задача ↔ аудиторія. Модель не знає id, тож повертає
+// пари текстом, а код зіставляє текст із щойно нормалізованими tasks і
+// audiences. Точний збіг рядка тут не годиться: модель переказує своїми
+// словами (на джерелах — 10 разів з 10). Тому — перетин основ слів
+// (Жаккар): основа — перші STEM_LENGTH літер, щоб «спонсори»/«спонсорів»
+// збігались без справжнього стемера; службові слова й слова до двох літер
+// відкидаються, щоб спільне «для» не зшивало дві різні задачі. Кандидатів
+// мало (рівно три задачі, до двох аудиторій), тож замість порогу у
+// відсотках — найкращий із них, аби бал був більший за нуль.
+const STEM_LENGTH = 5;
+const LINK_STOPWORDS = ['та', 'для', 'від', 'про', 'або', 'під', 'над', 'при', 'без', 'через', 'що', 'як', 'усі', 'всі', 'це'];
+
+function linkStems(text) {
+  const stems = new Set();
+  normalizeForMatch(text).split(/[^\p{L}\p{N}']+/u).forEach(function (word) {
+    if (word.length <= 2 || LINK_STOPWORDS.indexOf(word) !== -1) { return; }
+    stems.add(word.slice(0, STEM_LENGTH));
+  });
+  return stems;
+}
+
+function jaccard(a, b) {
+  let intersection = 0;
+  a.forEach(function (stem) { if (b.has(stem)) { intersection++; } });
+  const union = a.size + b.size - intersection;
+  return union === 0 ? 0 : intersection / union;
+}
+
+// Найкращий кандидат для тексту: { index, tied } або null, якщо жоден не
+// має спільної основи. Точний збіг (після нормалізації) виграє одразу.
+// tied — чи ділить найкращий бал ще хтось: що з нічиєю робити, вирішує
+// виклик (задачі й аудиторії поводяться по-різному, див. resolveLinks).
+function bestMatch(text, candidateValues) {
+  const normalized = normalizeForMatch(text);
+  const exact = candidateValues.findIndex(function (v) { return normalizeForMatch(v) === normalized; });
+  if (exact !== -1) { return { index: exact, tied: false }; }
+  const stems = linkStems(text);
+  const scores = candidateValues.map(function (v) { return jaccard(stems, linkStems(v)); });
+  const best = Math.max.apply(null, scores.concat(0));
+  if (best === 0) { return null; }
+  const top = scores.reduce(function (acc, s, i) { if (s === best) { acc.push(i); } return acc; }, []);
+  return { index: top[0], tied: top.length > 1 };
+}
+
+// Сирі пари блоку → пари з канонічними текстами (рівно ті, що в tasks і
+// audiences відповіді; клієнт перетворює їх на id точним збігом).
+//   не масив / немає → null (модель не відповіла — видно в «Не вистачає»)
+//   []               → [] (модель сказала «блок не обслуговує задач»)
+//   пари, частина відкинута → решта
+//   пари, відкинуто всі     → null, не []: інакше збій зіставлення виглядав
+//     би як свідомо «не обслуговує задач» і сховався б
+// Задача при нічиї — перша з рівних із warn: задач три, з одного домену,
+// нічия там імовірна, а відкинута пара дала б блок без задачі — прогалину,
+// яку не видно (блок без задачі не блокує). Хибну прив'язку дизайнер
+// побачить у картці й виправить. Аудиторія при нічиї — відкидається:
+// аудиторій дві, і нічия між ними — справді «незрозуміло, кому».
+// Аудиторія, що найкраще збігається з droppedAudiences, — теж відкидається:
+// її у формі немає, а приписати її сусідній аудиторії — хибна пара.
+function resolveLinks(rawLinks, label, tasks, audiences, droppedAudiences, fixes) {
+  if (!Array.isArray(rawLinks)) {
+    fixes.push(label + ' links ' + JSON.stringify(rawLinks) + ' не масив → null');
+    return null;
+  }
+  if (rawLinks.length === 0) { return []; }
+
+  const taskValues = tasks.map(function (t) { return t.value; });
+  const audienceValues = audiences.map(function (a) { return a.value; });
+  const droppedValues = droppedAudiences.map(function (a) { return a.value; });
+  const resolved = [];
+
+  rawLinks.forEach(function (link, i) {
+    const pairLabel = label + ' links[' + i + ']';
+    const isObject = link !== null && typeof link === 'object';
+    const taskText = asString(isObject ? link.task : undefined);
+    const audienceText = asString(isObject ? link.audience : undefined);
+    if (taskText === '' || audienceText === '') {
+      fixes.push('прив\'язка ' + pairLabel + ' ' + JSON.stringify(link) + ' без задачі чи аудиторії → відкинуто');
+      return;
+    }
+
+    const task = bestMatch(taskText, taskValues);
+    if (task === null) {
+      fixes.push('прив\'язка ' + pairLabel + ' задача ' + JSON.stringify(taskText) + ' не зіставилась → відкинуто');
+      return;
+    }
+    if (task.tied) {
+      fixes.push('нічия при зіставленні ' + pairLabel + ' задача ' + JSON.stringify(taskText) + ' → перша з рівних ' + JSON.stringify(taskValues[task.index]));
+    }
+
+    const audience = bestMatch(audienceText, audienceValues.concat(droppedValues));
+    if (audience === null) {
+      fixes.push('прив\'язка ' + pairLabel + ' аудиторія ' + JSON.stringify(audienceText) + ' не зіставилась → відкинуто');
+      return;
+    }
+    if (audience.tied) {
+      fixes.push('прив\'язка ' + pairLabel + ' аудиторія ' + JSON.stringify(audienceText) + ' — нічия між аудиторіями → відкинуто');
+      return;
+    }
+    if (audience.index >= audienceValues.length) {
+      fixes.push('прив\'язка ' + pairLabel + ' аудиторія ' + JSON.stringify(audienceText) + ' — з droppedAudiences, у формі її немає → відкинуто');
+      return;
+    }
+
+    const pair = { task: taskValues[task.index], audience: audienceValues[audience.index] };
+    const duplicate = resolved.some(function (p) { return p.task === pair.task && p.audience === pair.audience; });
+    if (duplicate) {
+      fixes.push('прив\'язка ' + pairLabel + ' дубль пари → відкинуто');
+      return;
+    }
+    resolved.push(pair);
+  });
+
+  if (resolved.length === 0) {
+    fixes.push(label + ' links: усі ' + rawLinks.length + ' пар відкинуто → null');
+    return null;
+  }
+  return resolved;
+}
+
 // Нормалізація після моделі: усе, що можна порахувати, тримає код, а не
 // промпт. "Рівно одна головна" — обчислення, не судження: тип ставиться
 // за позицією, а порядок пріоритету лишається прочитаним моделлю. Кожне
@@ -223,10 +342,24 @@ function normalizeParsed(parsed, docs) {
         name: normalizeSource(rawSources.name, name, label + '.name', docs, true, fixes),
         unit: normalizeSource(rawSources.unit, unit, label + '.unit', docs, true, fixes),
         count: normalizeSource(rawSources.count, count.value, label + '.count', docs, false, fixes),
-        countable: 'agent'
-      }
+        countable: 'agent',
+        // прив'язки — виведення, не цитата, тож завжди 'agent', як countable.
+        // Клієнту це потрібно, щоб [] від розбору лишався питанням, поки
+        // дизайнер його не підтвердить (isLinksPending в app.html)
+        links: 'agent'
+      },
+      links: resolveLinks(isObject ? b.links : undefined, label, tasks, audiences, droppedAudiences, fixes)
     });
   });
+
+  // Жодної пари на жодному блоці при наявних задачах — не структура без
+  // прив'язок, а збій моделі. [] тут означало б «свідомо не обслуговує» й
+  // сховало б збій — тож усі блоки стають null і видні в «Не вистачає»
+  const anyPair = blocks.some(function (b) { return Array.isArray(b.links) && b.links.length > 0; });
+  if (blocks.length > 0 && tasks.length > 0 && !anyPair) {
+    fixes.push('links: жоден з ' + blocks.length + ' блоків не має прив\'язок — збій, не структура → усі null');
+    blocks.forEach(function (b) { b.links = null; });
+  }
 
   const rawTopSources = parsed.sources !== null && typeof parsed.sources === 'object' ? parsed.sources : {};
   const category = asString(parsed.category);
@@ -304,7 +437,7 @@ ${pageDescription.trim()}
 - droppedAudiences — аудиторії, що не ввійшли в audiences
 - goal — бізнес-ціль: що має статися після візиту
 - tasks — Top Tasks
-- blocks — блоки сторінки; для кожного: name — назва, unit — одиниця, count — кількість одиниць, countable — чи одиницю читають поштучно
+- blocks — блоки сторінки; для кожного: name — назва, unit — одиниця, count — кількість одиниць, countable — чи одиницю читають поштучно, links — які задачі й для яких аудиторій блок обслуговує (правило 12)
 - sources, source — джерело кожного значення (правило 11): sources для category/support/goal, source у кожної аудиторії й задачі, sources для name/unit/count кожного блоку
 
 Правила:
@@ -332,8 +465,10 @@ ${pageDescription.trim()}
 
 11. Джерело кожного значення — чесно. "page" — значення стоїть в описі сторінки дослівно. "brief" — стоїть у брифі дослівно. "agent" — усе інше: складене з обох документів, переформульоване, узагальнене чи виведене. Top Tasks — завжди "agent". Кількість, названа в тексті числом чи словом, або верхня межа названого діапазону — джерело той документ, де вона названа. Для порожнього значення джерело — "". Якщо сумніваєшся — "agent".
 
+12. links — для кожного блоку масив пар {task, audience}. task — рівно текст однієї із задач у tasks, audience — рівно текст однієї з аудиторій у audiences; не перефразовуй. Аудиторії з droppedAudiences у пари не став. Блок може обслуговувати кілька задач і кілька аудиторій — тоді кілька пар, по одній на кожну комбінацію, де блок справді дає відповідь. Блок може не обслуговувати жодної задачі — тоді links: [] (порожній масив — правильна відповідь, а не недогляд): типово шапка, футер, смуга партнерів, перше представлення. Прив'язка ставиться там, де блок дає відповідь на задачу, а не там, де тема згадана поруч.
+
 Поверни ТІЛЬКИ JSON, без пояснень і без markdown-огорожі, у форматі:
-{"category": "", "support": "", "goal": "", "sources": {"category": "page|brief|agent", "support": "page|brief|agent", "goal": "page|brief|agent"}, "audiences": [{"value": "", "type": "головна", "source": "page|brief|agent"}], "droppedAudiences": [{"value": ""}], "tasks": [{"value": "", "source": "agent"}], "blocks": [{"name": "", "unit": "", "count": "", "countable": true, "sources": {"name": "page|brief|agent", "unit": "page|brief|agent", "count": "page|brief|agent"}}]}`;
+{"category": "", "support": "", "goal": "", "sources": {"category": "page|brief|agent", "support": "page|brief|agent", "goal": "page|brief|agent"}, "audiences": [{"value": "", "type": "головна", "source": "page|brief|agent"}], "droppedAudiences": [{"value": ""}], "tasks": [{"value": "", "source": "agent"}], "blocks": [{"name": "", "unit": "", "count": "", "countable": true, "sources": {"name": "page|brief|agent", "unit": "page|brief|agent", "count": "page|brief|agent"}, "links": [{"task": "", "audience": ""}]}]}`;
 
   // ТИМЧАСОВО gemini-3.1-flash-lite: денна квота free tier на 3.8-flash
   // вичерпана (13.09.2026), а правку категорії треба було перевірити

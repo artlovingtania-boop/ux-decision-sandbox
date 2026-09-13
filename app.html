@@ -2398,7 +2398,7 @@ firebase.initializeApp(firebaseConfig);
     /* прив'язки Екрана 2 — null, поки дизайнер їх не торкався там */
     item.dataset.links = JSON.stringify(links === undefined ? null : links);
     /* джерела підполів блоку; новий блок, доданий кнопкою, — дизайнерів */
-    item.dataset.sources = JSON.stringify(sources || { name: 'designer', unit: 'designer', count: 'designer', countable: 'designer' });
+    item.dataset.sources = JSON.stringify(sources || { name: 'designer', unit: 'designer', count: 'designer', countable: 'designer', links: 'designer' });
 
     item.innerHTML =
       '<div class="block-row">' +
@@ -4200,7 +4200,30 @@ firebase.initializeApp(firebaseConfig);
   function updateBlockProblemMark(item) {
     var name = item.querySelector('.block-name').value.trim();
     var links = JSON.parse(item.dataset.links || 'null');
-    item.classList.toggle('block-item--unlinked', !!name && links === null);
+    item.classList.toggle('block-item--unlinked', !!name && (links === null || isLinksPending(item)));
+  }
+
+  /* [] від розбору — питання, не відповідь: «блок не обслуговує задач»
+     сказав агент, і так проскакували справжні пропуски («Музиканти» в
+     замірі на «Ватрі», PROGRESS.md). Поки дизайнер не підтвердить, блок
+     лишається в «Не вистачає» окремим рядком — «перевір», на відміну від
+     підтвердженого «вирішено». Хто поставив прив'язки — sources.links;
+     його відсутність (старі прогони, ручний блок) — дизайнер */
+  function isLinksPending(item) {
+    var links = JSON.parse(item.dataset.links || 'null');
+    var sources = JSON.parse(item.dataset.sources || 'null') || {};
+    return Array.isArray(links) && links.length === 0 && sources.links === 'agent';
+  }
+
+  /* будь-яка дія дизайнера з прив'язками блоку (прапорець, вибір задачі
+     чи аудиторії, додавання чи видалення пари) — його рішення. Ставиться
+     прямо в обробниках, а не через markDesignerSource(): renderBlockLinks()
+     перебудовує рядки ще до того, як подія дійде до форми, і target там
+     уже поза карткою */
+  function setLinksSource(blockItem, source) {
+    var sources = JSON.parse(blockItem.dataset.sources || 'null') || {};
+    sources.links = source;
+    blockItem.dataset.sources = JSON.stringify(sources);
   }
 
   /* Дві блокуючі перевірки — порожні обов'язкові поля («ти не дозаповнив»)
@@ -4208,7 +4231,7 @@ firebase.initializeApp(firebaseConfig);
      одна пара вже є — на порожньому старті це очевидність, не недогляд).
      Порядок фіксований: спершу поля, потім покриття — вони читаються
      по-різному. Блок без задачі в цей список НЕ входить і кнопку не
-     блокує (updateBlockProblemMark вище) — до 2026-09-XX перевірка була
+     блокує (updateBlockProblemMark вище) — до 2026-09-13 перевірка була
      симетричною й суперечила ядру: задача без блоку — знахідка, вища за
      будь-яке порушення порогу (зміст, який нема куди переставити), блок
      без задачі — ні (PROGRESS.md, зміна поведінки). Рядок про нього все
@@ -4254,8 +4277,11 @@ firebase.initializeApp(firebaseConfig);
     var advisoryRows = [];
     blockItems.forEach(function (item) {
       var links = JSON.parse(item.dataset.links || 'null');
+      var name = item.querySelector('.block-name').value.trim();
       if (links === null) {
-        advisoryRows.push('Блок «' + item.querySelector('.block-name').value.trim() + '» ще не має задачі.');
+        advisoryRows.push('Блок «' + name + '» ще не має задачі.');
+      } else if (isLinksPending(item)) {
+        advisoryRows.push('Блок «' + name + '»: за розбором задач не обслуговує — перевір і підтверди прапорцем або прив\'яжи задачу.');
       }
     });
 
@@ -4396,6 +4422,9 @@ firebase.initializeApp(firebaseConfig);
 
     var links = JSON.parse(blockItem.dataset.links || 'null');
     var hasLinks = Array.isArray(links) && links.length > 0;
+    /* [] від агента, ще не підтверджений: прапорець не стоїть і кнопка
+       прив'язки видна — рішення за дизайнером, не прийняте за нього */
+    var pending = isLinksPending(blockItem);
 
     if (hasLinks) {
       links.forEach(function (link, index) {
@@ -4406,7 +4435,7 @@ firebase.initializeApp(firebaseConfig);
     /* "+ прив'язати задачу", поки рядків нема; "+ ще одна прив'язка",
        коли вже є хоч один; нема опції взагалі — нема самих задач,
        прив'язувати нічого */
-    if (taskItems.length > 0 && (links === null || hasLinks)) {
+    if (taskItems.length > 0 && (links === null || hasLinks || pending)) {
       var addBtn = document.createElement('button');
       addBtn.type = 'button';
       addBtn.className = 'confirm-add-link';
@@ -4417,7 +4446,7 @@ firebase.initializeApp(firebaseConfig);
     var checkbox = document.createElement('sl-checkbox');
     checkbox.className = 'confirm-no-links-checkbox';
     checkbox.textContent = 'блок не обслуговує задач';
-    if (Array.isArray(links) && links.length === 0) {
+    if (Array.isArray(links) && links.length === 0 && !pending) {
       checkbox.setAttribute('checked', '');
     }
     container.appendChild(checkbox);
@@ -4469,6 +4498,7 @@ firebase.initializeApp(firebaseConfig);
         if (!Array.isArray(draftLinks)) { draftLinks = []; }
         draftLinks.push({ taskId: target.value, audienceId: newAudienceId });
         linkRow.blockItemRef.dataset.links = JSON.stringify(draftLinks);
+        setLinksSource(linkRow.blockItemRef, 'designer');
         saveState();
         renderBlockLinks(linkRow.blockItemRef);
         updateMissingSection();
@@ -4479,6 +4509,7 @@ firebase.initializeApp(firebaseConfig);
       if (!Array.isArray(links)) { return; }
       links[linkRow.linkIndex].taskId = target.value;
       linkRow.blockItemRef.dataset.links = JSON.stringify(links);
+      setLinksSource(linkRow.blockItemRef, 'designer');
       saveState();
       updateMissingSection();
       return;
@@ -4500,6 +4531,7 @@ firebase.initializeApp(firebaseConfig);
       if (!Array.isArray(links2)) { return; }
       links2[linkRow2.linkIndex].audienceId = target.value;
       linkRow2.blockItemRef.dataset.links = JSON.stringify(links2);
+      setLinksSource(linkRow2.blockItemRef, 'designer');
       saveState();
       updateMissingSection();
       return;
@@ -4509,8 +4541,10 @@ firebase.initializeApp(firebaseConfig);
       var blockItem = target.closest('.block-item');
       if (!blockItem) { return; }
       /* позначено → [] (свідомо без задачі), рядки ховаються; знято →
-         null (не обрано, знову блокує), а не назад у порожній масив */
+         null (не обрано), а не назад у порожній масив. Позначка дизайнером
+         і є підтвердженням [] від розбору: «перевір» стає «вирішено» */
       blockItem.dataset.links = JSON.stringify(target.checked ? [] : null);
+      setLinksSource(blockItem, 'designer');
       saveState();
       renderBlockLinks(blockItem);
       updateMissingSection();
@@ -4558,6 +4592,7 @@ firebase.initializeApp(firebaseConfig);
       /* останній рядок прибрано вручну (не чекбоксом) — назад у null,
          той самий принцип, що й у pruneBlockLinks() */
       linkRow.blockItemRef.dataset.links = JSON.stringify(links2.length ? links2 : null);
+      setLinksSource(linkRow.blockItemRef, 'designer');
       saveState();
       renderBlockLinks(linkRow.blockItemRef);
       updateMissingSection();
@@ -4893,8 +4928,37 @@ firebase.initializeApp(firebaseConfig);
     state.tasks = (data.tasks || []).map(function (t) {
       return { id: genId(), value: t.value, source: 'agent' };
     });
+    /* Прив'язки від розбору. Сервер уже зіставив переказ моделі з задачами
+       й аудиторіями відповіді й повертає рівно їхні тексти — тут лише
+       текст → id точним збігом (id з'являються тільки тут, у genId()).
+       null (модель не відповіла або всі пари відкинуто) лишається null —
+       блок видно в «Не вистачає»; [] — «не обслуговує задач». Джерела в
+       прив'язки немає: це завжди виведення агента, як countable */
+    var taskIdByValue = Object.create(null);
+    state.tasks.forEach(function (t) {
+      if (!(t.value in taskIdByValue)) { taskIdByValue[t.value] = t.id; }
+    });
+    var audienceIdByValue = Object.create(null);
+    state.audiences.forEach(function (a) {
+      if (!(a.value in audienceIdByValue)) { audienceIdByValue[a.value] = a.id; }
+    });
+    function linksToIds(links, blockName) {
+      if (!Array.isArray(links)) { return null; }
+      var pairs = [];
+      links.forEach(function (link) {
+        var taskId = taskIdByValue[link.task];
+        var audienceId = audienceIdByValue[link.audience];
+        if (!taskId || !audienceId) {
+          console.warn('[parse] прив\'язка блоку «' + blockName + '» без відповідника у формі → відкинуто', link);
+          return;
+        }
+        pairs.push({ taskId: taskId, audienceId: audienceId });
+      });
+      /* та сама межа, що на сервері: відкинуті всі — не «не обслуговує» */
+      return links.length > 0 && pairs.length === 0 ? null : pairs;
+    }
     state.structureBlocks = (data.blocks || []).map(function (b) {
-      return { name: b.name, unit: b.unit, count: b.count, links: null, countable: b.countable === true, sources: b.sources };
+      return { name: b.name, unit: b.unit, count: b.count, links: linksToIds(b.links, b.name), countable: b.countable === true, sources: b.sources };
     });
     state.droppedAudiences = (data.droppedAudiences || []).map(function (a) {
       return { value: a.value };
