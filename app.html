@@ -1348,6 +1348,73 @@ textarea.field-input {
   border-left: 3px solid var(--border-medium);
 }
 
+/* ---------- Екран «Структури» (етап 6) ---------- */
+/* пряма дитина .container — той самий вертикальний ритм, що .app-form,
+   хоч це не форма: заголовок, підказка, базова картка, додані структури,
+   ряд кнопок */
+#structures-screen .container {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-24);
+}
+
+.structure-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-12);
+}
+
+.structure-section__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-12);
+}
+
+.structure-block-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-8);
+}
+
+/* та сама поверхня, що .block-item — блок лишається впізнаваним тим самим
+   об'єктом і тут, і на Узгодженні */
+.structure-block {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-8);
+  padding: var(--spacing-12) var(--spacing-16);
+  background: var(--surface-card);
+  border: 1px solid var(--border-card);
+  border-radius: var(--radius-md);
+  cursor: grab;
+  user-select: none;
+}
+
+/* базова структура — читання, не дія: інший курсор сигналізує це саме,
+   не тільки відсутність обробника */
+.structure-block--static {
+  cursor: default;
+}
+
+.structure-block--dragging {
+  cursor: grabbing;
+  opacity: 0.6;
+}
+
+.structure-block__index {
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+
+.structure-block__name {
+  flex: 1;
+}
+
+.structure-block__cta {
+  flex-shrink: 0;
+}
+
 /* один рядок-прив'язка: задача ▾ "для" аудиторія ▾ ✕ — усі елементи
    в один потік, без переносу (фіксована ширина сторінки, місця
    вистачає навіть із чотирма елементами в рядку) */
@@ -1694,7 +1761,7 @@ sl-button[variant="text"]::part(label):hover {
     </section>
 
     <div class="form-actions">
-      <button type="button" id="generate-btn" class="button button--primary" disabled>Згенерувати</button>
+      <button type="button" id="generate-btn" class="button button--primary" disabled>До структур →</button>
       <button type="button" id="form-reset-btn" class="button button--secondary">Новий прогін</button>
       <p class="field-hint" id="generate-progress-hint" hidden>Це може зайняти до хвилини: три запити йдуть послідовно.</p>
     </div>
@@ -1710,6 +1777,30 @@ sl-button[variant="text"]::part(label):hover {
       <button type="button" id="revert-btn" class="button button--text">Скасувати зміни</button>
     </span>
   </sl-alert>
+</div>
+</div>
+
+<div id="structures-screen" hidden>
+<div class="container">
+  <header class="app-head">
+    <button type="button" id="structures-back-btn" class="button button--text">← Назад до узгодження</button>
+    <h1 class="app-head__title">Структури</h1>
+  </header>
+  <p class="field-hint">Склад блоків один на всі структури — це те, що робить метрики зіставними. Різниця тільки в порядку.</p>
+
+  <section class="structure-section" id="structure-baseline">
+    <div class="structure-section__head">
+      <h2 class="result-section__title">Базова структура</h2>
+      <p class="field-caption">порядок з опису сторінки · не перетягується</p>
+    </div>
+    <div class="structure-block-list" id="structure-baseline-list"></div>
+  </section>
+
+  <div id="structures-list"></div>
+
+  <div class="form-actions">
+    <button type="button" id="add-structure-btn" class="button button--secondary">+ Додати структуру</button>
+  </div>
 </div>
 </div>
 
@@ -1986,6 +2077,12 @@ firebase.initializeApp(firebaseConfig);
   var pageDescBtn = document.getElementById('page-desc-btn');
   var logoBtn = document.getElementById('logo-btn');
 
+  var structuresScreen = document.getElementById('structures-screen');
+  var structuresBackBtn = document.getElementById('structures-back-btn');
+  var structureBaselineList = document.getElementById('structure-baseline-list');
+  var structuresList = document.getElementById('structures-list');
+  var addStructureBtn = document.getElementById('add-structure-btn');
+
   var confirmScreen = document.getElementById('confirm-screen');
   var confirmBackBtn = document.getElementById('confirm-back-btn');
   var missingAlert = document.getElementById('missing-alert');
@@ -2115,7 +2212,17 @@ firebase.initializeApp(firebaseConfig);
       droppedAudiences: JSON.parse(form.dataset.droppedAudiences || '[]'),
       /* джерела трьох полів-рядків { category, support, goal } — один
          об'єкт у dataset форми; джерела рядків списків — на самих рядках */
-      sources: JSON.parse(form.dataset.sources || 'null')
+      sources: JSON.parse(form.dataset.sources || 'null'),
+      /* Чернетка Екрана «Структури» (етап 6): масив {id, order} — order
+         це імена блоків, той самий спосіб посилатись на блок, що вже
+         скрізь у файлі (variant.flow, buildBlocksPayload). Блоки не мають
+         стабільних id, тож рядок і є ідентичністю; pruneStructuresDraft()
+         лагодить її при перейменуванні/видаленні/додаванні блоку. Останнім
+         ключем — контракт порядку вище. Зберігається (не ефемерна, на
+         відміну від selectedMetricsAudienceId): перетягування — реальний
+         час дизайнера, і втратити його через перезавантаження гірше, ніж
+         мати ще один ключ у стані */
+      structuresDraft: JSON.parse(form.dataset.structuresDraft || '[]')
     };
   }
 
@@ -2297,6 +2404,12 @@ firebase.initializeApp(firebaseConfig);
       state.sources = defaultScalarSources();
     }
 
+    /* Чернетка структур (етап 6) — у кінець, як усе вище; стан до цього
+       кроку її не мав. Форма реальних імен блоків тут іще недоступна
+       (applyFormState() рендерить blockList пізніше) — pruneStructuresDraft()
+       після нього прибере посилання на неіснуючі назви */
+    if (!Array.isArray(state.structuresDraft)) { state.structuresDraft = []; }
+
     return state;
   }
 
@@ -2350,6 +2463,7 @@ firebase.initializeApp(firebaseConfig);
     document.getElementById('support').value = state.support || '';
     document.getElementById('goal').value = state.goal || '';
     form.dataset.sources = JSON.stringify(state.sources || defaultScalarSources());
+    form.dataset.structuresDraft = JSON.stringify(Array.isArray(state.structuresDraft) ? state.structuresDraft : []);
 
     audienceList.innerHTML = '';
     /* у сховищі може лежати більше двох аудиторій, збережених до введення обмеження */
@@ -2371,6 +2485,8 @@ firebase.initializeApp(firebaseConfig);
       ? state.structureBlocks
       : [{ name: '', unit: '', count: '', links: null, countable: false }];
     blocks.forEach(function (b) { addBlockRow(b.name, b.unit, b.count, b.countable, b.links, b.sources); });
+    /* блоки щойно з'явились у DOM — тепер можна звірити з ними чернетку структур */
+    pruneStructuresDraft();
 
     refreshFieldUi();
     autoGrowAll();
@@ -3739,6 +3855,7 @@ firebase.initializeApp(firebaseConfig);
     renderPersonaSwitcher();
     formScreen.hidden = true;
     confirmScreen.hidden = true;
+    structuresScreen.hidden = true;
     runsScreen.hidden = true;
     loginScreen.hidden = true;
     resultScreen.hidden = false;
@@ -4022,13 +4139,16 @@ firebase.initializeApp(firebaseConfig);
     });
   }
 
-  /* Одна дія на «Згенерувати» (низ Узгодження) і «Запустити заново» (банер
+  /* Одна дія на «До структур →» (низ Узгодження) і «Запустити заново» (банер
      «Опис змінено») — обидві кнопки роблять те саме: перевірити задачі,
-     за потреби вивести моделлю, згенерувати. Дедуп на однаковому вході
-     свідомо не додається: генерація недетермінована (три виклики
-     /api/generate під ту саму комбінацію осей можуть дати інший порядок),
-     повторний запуск на тому самому вході — легітимна дія, не дубль
-     (те саме рішення, що вже було на generateBtn до етапу 3а — PROGRESS.md) */
+     за потреби вивести моделлю, відкрити Структури. Раніше (до етапу 6)
+     тут одразу викликався finishRun() — генерація трьома викликами з осями.
+     Той шлях лишається в коді, недоторканим і невикликаним (finishRun(),
+     generateVariants(), /api/generate, осі — PROGRESS.md, «не чіпати»):
+     Узгодження тепер веде до структур від дизайнера, не до автоматичних
+     варіантів. Дедуп на однаковому вході тому вже не питання цієї функції —
+     чернетка структур узагалі не прогін, доки не натиснута «Прогнати
+     аудит» (сам той крок — окремий, ще не реалізований). */
   function startGeneration() {
     /* новий прогін закриває режим редагування — попередження більше не про що */
     editingRun = null;
@@ -4038,7 +4158,7 @@ firebase.initializeApp(firebaseConfig);
     var hasTasks = state.tasks.some(function (t) { return t.value.trim() !== ''; });
 
     if (hasTasks) {
-      finishRun(state);
+      showStructures();
       return;
     }
 
@@ -4105,7 +4225,7 @@ firebase.initializeApp(firebaseConfig);
           return;
         }
         rerunBtn.disabled = false;
-        finishRun(state);
+        showStructures();
       });
   }
 
@@ -4121,6 +4241,7 @@ firebase.initializeApp(firebaseConfig);
     if (!isLoggedIn) { showLogin(); return; }
     formScreen.hidden = true;
     confirmScreen.hidden = true;
+    structuresScreen.hidden = true;
     resultScreen.hidden = true;
     loginScreen.hidden = true;
     runsScreen.hidden = false;
@@ -4166,6 +4287,7 @@ firebase.initializeApp(firebaseConfig);
   function showLogin() {
     formScreen.hidden = true;
     confirmScreen.hidden = true;
+    structuresScreen.hidden = true;
     resultScreen.hidden = true;
     runsScreen.hidden = true;
     loginScreen.hidden = false;
@@ -4178,6 +4300,7 @@ firebase.initializeApp(firebaseConfig);
   function showForm() {
     if (!isLoggedIn) { showLogin(); return; }
     confirmScreen.hidden = true;
+    structuresScreen.hidden = true;
     resultScreen.hidden = true;
     runsScreen.hidden = true;
     loginScreen.hidden = true;
@@ -4539,11 +4662,15 @@ firebase.initializeApp(firebaseConfig);
   /* Виклик після будь-якої зміни аудиторії/задачі/блоку деінде на екрані:
      видаляє висячі посилання, перебудовує рядки прив'язок у всіх картках
      (дропдауни могли змінитись) і перераховує «Не вистачає». Дешево на
-     10 блоках, рахується на кожну зміну, не лише при вході на екран. */
+     10 блоках, рахується на кожну зміну, не лише при вході на екран.
+     pruneStructuresDraft() тут-таки: перейменування/видалення/додавання
+     блоку — той самий клас зміни, що збиває links, збиває і чернетку
+     структур (BUGS.md, той самий принцип). */
   function refreshAgreementLinks() {
     pruneConfirmRefs();
     renderAllBlockLinks();
     updateMissingSection();
+    pruneStructuresDraft();
   }
 
   /* Один делегований sl-change на #block-list — для селектів усередині
@@ -4697,6 +4824,7 @@ firebase.initializeApp(firebaseConfig);
   function showAgreement() {
     if (!isLoggedIn) { showLogin(); return; }
     formScreen.hidden = true;
+    structuresScreen.hidden = true;
     runsScreen.hidden = true;
     resultScreen.hidden = true;
     loginScreen.hidden = true;
@@ -4713,6 +4841,227 @@ firebase.initializeApp(firebaseConfig);
   }
 
   confirmBackBtn.addEventListener('click', showForm);
+
+  /* ---------- Екран «Структури» (етап 6) ---------- */
+
+  /* Блоки не мають стабільних id — і в links, і тут ідентичність тримає
+     ім'я (той самий підхід, що variant.flow, buildBlocksPayload). Читати
+     й писати чернетку — завжди через ці дві функції, ніде напряму
+     dataset.structuresDraft, щоб формат лишався один. */
+  function getStructuresDraft() {
+    return JSON.parse(form.dataset.structuresDraft || '[]');
+  }
+
+  function setStructuresDraft(list) {
+    form.dataset.structuresDraft = JSON.stringify(list);
+  }
+
+  /* Чернетка звіряється з живим переліком блоків після будь-якої зміни
+     назви/складу (refreshAgreementLinks()) і при заповненні форми
+     (applyFormState(), одразу як blockList наповнений). Той самий принцип,
+     що pruneBlockLinks() для прив'язок: блоки, яких більше нема, — геть;
+     блоки, що з'явились і яких ще нема в чиїйсь структурі, — у кінець
+     цієї структури (порядок для нового блоку не задати краще, ніж
+     "у кінець" — дизайнер перетягне сам). Ідентичність по імені означає,
+     що перейменування блоку виглядає як "старий зник, новий з'явився в
+     кінці" — та сама межа, що вже є в links (blockByName-пошук усюди
+     в файлі), тут просто вперше видима дизайнеру. */
+  function pruneStructuresDraft() {
+    var validNames = Array.from(blockList.querySelectorAll('.block-name'))
+      .map(function (input) { return input.value.trim(); })
+      .filter(function (name) { return name !== ''; });
+
+    var draft = getStructuresDraft();
+    var changed = false;
+    draft.forEach(function (structure) {
+      var kept = structure.order.filter(function (name) { return validNames.indexOf(name) !== -1; });
+      var missing = validNames.filter(function (name) { return kept.indexOf(name) === -1; });
+      var next = kept.concat(missing);
+      if (JSON.stringify(next) !== JSON.stringify(structure.order)) { changed = true; }
+      structure.order = next;
+    });
+    /* saveState() тут-таки, не покладаючись на виклик, що привів сюди:
+       той самий принцип, що pruneConfirmRefs(). Без цього виправлення
+       лишалось тільки в dataset, а найближче наступне saveState() з
+       іншого місця (яке пишé весь collectState(), включно зі старим
+       dataset.structuresDraft, прочитаним ДО цього виправлення) стирало
+       його — BUGS.md, знайдено живою перевіркою під час цього ж етапу */
+    if (changed) { setStructuresDraft(draft); saveState(); }
+  }
+
+  /* Кнопка дії на блоці в конкретному порядку — властивість самого блоку
+     (links[].cta), не структури: структура — лише порядок імен. Тому
+     "чи ця позиція — точка дії" рахується наживо з поточних links, а не
+     зберігається на структурі. Правило 13 (api/parse.js) і форма
+     редагування прив'язок (Узгодження) — єдине джерело цього прапорця. */
+  function blockHasCta(state, name) {
+    var block = (state.structureBlocks || []).filter(function (b) { return b.name === name; })[0];
+    return !!(block && Array.isArray(block.links) && block.links.some(function (l) { return l.cta === true; }));
+  }
+
+  function structureBlockRow(name, cta, draggableRow) {
+    var row = el('div', 'structure-block' + (draggableRow ? '' : ' structure-block--static'));
+    row.dataset.name = name;
+    row.appendChild(el('span', 'structure-block__index'));
+    row.appendChild(el('span', 'structure-block__name', name));
+    if (cta) { row.appendChild(el('span', 'tag tag--muted structure-block__cta', 'кнопка')); }
+    return row;
+  }
+
+  function renumberStructureBlocks(container) {
+    Array.from(container.querySelectorAll('.structure-block')).forEach(function (row, index) {
+      row.querySelector('.structure-block__index').textContent = (index + 1) + ' ·';
+    });
+  }
+
+  /* draggableRow: false для базової структури — вона точка відліку,
+     перетягуванню не підлягає (тільки читання). order фільтрується проти
+     живих імен блоків про всяк випадок: базовий рядок рахується напряму
+     з state, тож завжди актуальний; для доданих структур pruneStructuresDraft()
+     уже прибрала неактуальні імена до виклику цієї функції. */
+  function renderStructureList(container, order, state, draggableRow, structureId) {
+    container.innerHTML = '';
+    var validNames = (state.structureBlocks || []).map(function (b) { return b.name; });
+    order.filter(function (name) { return validNames.indexOf(name) !== -1; }).forEach(function (name) {
+      var row = structureBlockRow(name, blockHasCta(state, name), draggableRow);
+      if (draggableRow) { wireStructureDrag(row, structureId); }
+      container.appendChild(row);
+    });
+    renumberStructureBlocks(container);
+  }
+
+  /* Перетягування — миша, не нативний Drag and Drop API: той дає гнучкість,
+     якої тут не треба (перенесення між вікнами, кастомний прев'ю), і додає
+     крихкість (dataTransfer, preventDefault на кожному кроці), яку важче
+     перевірити виміром. Порядок під час руху перераховується одразу —
+     і в DOM (insertBefore за серединою сусіда), і в номерах (renumberStructureBlocks
+     на кожен рух, не тільки по відпусканню). Фіксація в dataset.structuresDraft —
+     по відпусканню, за фактичним порядком DOM. */
+  var structureDrag = null;
+
+  function wireStructureDrag(row, structureId) {
+    row.addEventListener('mousedown', function (event) {
+      if (event.button !== 0) { return; }
+      event.preventDefault();
+      structureDrag = { structureId: structureId, el: row };
+      row.classList.add('structure-block--dragging');
+      document.addEventListener('mousemove', onStructureDragMove);
+      document.addEventListener('mouseup', onStructureDragEnd);
+    });
+  }
+
+  function onStructureDragMove(event) {
+    if (!structureDrag) { return; }
+    var container = structureDrag.el.parentNode;
+    var siblings = Array.from(container.querySelectorAll('.structure-block')).filter(function (node) {
+      return node !== structureDrag.el;
+    });
+    var after = siblings.filter(function (node) {
+      var rect = node.getBoundingClientRect();
+      return event.clientY < rect.top + rect.height / 2;
+    })[0];
+    if (after) { container.insertBefore(structureDrag.el, after); }
+    else { container.appendChild(structureDrag.el); }
+    renumberStructureBlocks(container);
+  }
+
+  function onStructureDragEnd() {
+    if (!structureDrag) { return; }
+    var container = structureDrag.el.parentNode;
+    var structureId = structureDrag.structureId;
+    structureDrag.el.classList.remove('structure-block--dragging');
+    document.removeEventListener('mousemove', onStructureDragMove);
+    document.removeEventListener('mouseup', onStructureDragEnd);
+    structureDrag = null;
+
+    var newOrder = Array.from(container.querySelectorAll('.structure-block')).map(function (node) {
+      return node.dataset.name;
+    });
+    var draft = getStructuresDraft();
+    var structure = draft.filter(function (s) { return s.id === structureId; })[0];
+    if (!structure) { return; }
+    structure.order = newOrder;
+    setStructuresDraft(draft);
+    saveState();
+  }
+
+  /* Номер структури — за поточною позицією в переліку, не збережений
+     рядок: після видалення "Структура 2" решта мали б розрив у нумерації
+     ("1, 3, 4"), якби номер зберігався при створенні. id (genId()) —
+     стабільна ідентичність для персони й видалення; номер — тільки
+     показ, рахується щоразу заново. */
+  function renderStructuresList(draft, state) {
+    structuresList.innerHTML = '';
+    draft.forEach(function (structure, index) {
+      var section = el('section', 'structure-section');
+      section.dataset.structureId = structure.id;
+
+      var head = el('div', 'structure-section__head');
+      head.appendChild(el('h2', 'result-section__title', 'Структура ' + (index + 1)));
+      var removeBtn = el('button', 'button button--text structure-remove', '✕ Видалити структуру');
+      removeBtn.type = 'button';
+      head.appendChild(removeBtn);
+      section.appendChild(head);
+
+      var list = el('div', 'structure-block-list');
+      section.appendChild(list);
+      renderStructureList(list, structure.order, state, true, structure.id);
+
+      structuresList.appendChild(section);
+    });
+  }
+
+  /* Немає власного стану, який треба заморожувати на вході: базовий
+     порядок і links читаються наживо з collectState() щоразу, той самий
+     принцип, що showAgreement()/refreshAgreementLinks(). Draft переживає
+     перезавантаження (form.dataset.structuresDraft, контракт порядку
+     ключів вище) — сюди можна повертатись, не втрачаючи перетягнуте. */
+  function showStructures() {
+    if (!isLoggedIn) { showLogin(); return; }
+    pruneStructuresDraft();
+    var state = collectState();
+
+    var baselineOrder = (state.structureBlocks || [])
+      .filter(function (b) { return b.name.trim() !== ''; })
+      .map(function (b) { return b.name; });
+    renderStructureList(structureBaselineList, baselineOrder, state, false, 'baseline');
+    renderStructuresList(getStructuresDraft(), state);
+
+    formScreen.hidden = true;
+    confirmScreen.hidden = true;
+    resultScreen.hidden = true;
+    runsScreen.hidden = true;
+    loginScreen.hidden = true;
+    structuresScreen.hidden = false;
+    window.scrollTo(0, 0);
+  }
+
+  structuresBackBtn.addEventListener('click', showAgreement);
+
+  addStructureBtn.addEventListener('click', function () {
+    var state = collectState();
+    var baselineOrder = (state.structureBlocks || [])
+      .filter(function (b) { return b.name.trim() !== ''; })
+      .map(function (b) { return b.name; });
+    var draft = getStructuresDraft();
+    draft.push({ id: genId(), order: baselineOrder.slice() });
+    setStructuresDraft(draft);
+    saveState();
+    renderStructuresList(draft, state);
+  });
+
+  /* видалення чернетки структури — не та сама вага дії, що видалення
+     збереженого прогону: нічого остаточного ще не сталось (аудит не
+     прогнаний), тож без озброєної кнопки-підтвердження */
+  structuresList.addEventListener('click', function (event) {
+    var removeBtn = event.target.closest('.structure-remove');
+    if (!removeBtn) { return; }
+    var structureId = removeBtn.closest('.structure-section').dataset.structureId;
+    var draft = getStructuresDraft().filter(function (s) { return s.id !== structureId; });
+    setStructuresDraft(draft);
+    saveState();
+    renderStructuresList(draft, collectState());
+  });
 
   generateBtn.addEventListener('click', startGeneration);
 
@@ -4846,6 +5195,8 @@ firebase.initializeApp(firebaseConfig);
     document.getElementById('support').value = '';
     document.getElementById('goal').value = '';
     form.dataset.sources = JSON.stringify(defaultScalarSources());
+    /* новий прогін — нові структури; стара чернетка більше ні до чого */
+    form.dataset.structuresDraft = '[]';
 
     audienceList.innerHTML = '';
     addAudienceRow('', 'головна');
