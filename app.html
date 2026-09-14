@@ -813,7 +813,33 @@ textarea.field-input {
 /* ---------- звіт унизу екрана ---------- */
 .report-actions {
   display: flex;
+  align-items: center;
   gap: var(--spacing-12);
+}
+
+/* контур, не рамка: .button має border: none навмисно (.button--secondary,
+   вище) — справжня рамка зробила б цю кнопку на 2px вищою за сусідню
+   без border у тому самому ряду. box-shadow висоти не займає, дає той
+   самий вигляд контуру. Приглушений текст — тут, не новий .button-
+   модифікатор (CLAUDE.md: без зайвих модифікаторів .button), правило
+   локальне для цього ряду. */
+.report-actions .button--text {
+  box-shadow: inset 0 0 0 1px var(--border-card);
+  color: var(--text-secondary);
+}
+
+/* «Новий прогін» — та сама кнопка, звичайний колір тексту: вихід із
+   прогону, не читання звіту про нього. Специфічність — три класи, не
+   один: .report-actions .button--text (два класи) інакше переважає
+   порядком байдуже, це специфічність, не порядок у файлі */
+.report-actions .button--text.report-actions__primary {
+  color: var(--text-primary);
+}
+
+.report-actions__divider {
+  width: 1px;
+  height: var(--spacing-24);
+  background: var(--border-card);
 }
 
 
@@ -1418,12 +1444,49 @@ textarea.field-input {
   margin-top: var(--spacing-48);
 }
 
-/* кнопки звіту (копіювати/завантажити/додати структуру) — прямий
-   нащадок #result-body, на відміну від другого .report-actions
-   («Видалити прогін»), що стоїть поза ним і вже дістає свої 48 від
-   .result gap; без >, правило зачепило б і його, подвоївши відступ */
-#result-body > .report-actions {
+/* смуга вибору структур — остання в #result-body, той самий великий
+   зазор, що між рештою секцій екрана; ряд кнопок звіту тепер увесь
+   поза #result-body (нижче) — і копіювати/завантажити, коли їх
+   ховають для старого формату, і видалити з новим прогоном, коли ні —
+   дістає свої 48 від .result gap сам, без окремого правила тут.
+   Рамка/фон/заокруглення — ті самі, що в карток структур і блоків
+   розходження, смуга того самого сімейства секцій. */
+.carry-strip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-16);
   margin-top: var(--spacing-48);
+  padding: var(--spacing-24);
+  background: var(--surface-page);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-ml);
+}
+
+.carry-strip__pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-8);
+}
+
+/* пігулка — та сама поверхня, що .tag--muted, тримає sl-checkbox і,
+   для базової, підпис «завжди» (.field-caption — той самий, що скрізь
+   для короткої мітки на два-три слова) */
+.carry-pill {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-8);
+  padding: var(--spacing-8) var(--spacing-16);
+  background: var(--surface-card);
+  border: 1px solid var(--border-card);
+  border-radius: var(--radius-pill);
+}
+
+/* підпис під смугою — той самий .field-hint, що скрізь, тільки з
+   меншим зазором: пов'язаний зі смугою вище, не окрема секція */
+.carry-strip__note {
+  margin-top: var(--spacing-12);
 }
 
 /* ---------- таблиця розходжень ---------- */
@@ -2053,6 +2116,10 @@ sl-button[variant="text"]::part(label):hover {
       <h1 class="app-head__title">Результат</h1>
     </header>
 
+    <!-- прогін виник з "До структур →" на смузі вибору — result.refinedFrom
+         (runAudit()); текст будує refinedNoticeText(), той самий у звіті -->
+    <sl-alert variant="neutral" id="refined-notice" hidden></sl-alert>
+
     <sl-alert variant="warning" id="save-notice">Прогін не збережено: сховище браузера недоступне або переповнене.</sl-alert>
 
     <details class="advanced" id="input-summary">
@@ -2098,16 +2165,26 @@ sl-button[variant="text"]::part(label):hover {
         <p class="field-hint">🔶 Межа реалізації: зіставлення «бачить код / бачить персона» йде на рівні структури, не окремої знахідки — зауваження персони не прив'язані до місця в структурі. Чи код і персона кажуть про те саме місце, вирішує дизайнер. 🔶 Самі правила трактування виведені з розбору, не з прогонів.</p>
       </div>
 
-      <div class="report-actions">
-        <button type="button" id="copy-report-btn" class="button button--secondary">Скопіювати звіт</button>
-        <button type="button" id="save-report-btn" class="button button--secondary">Завантажити звіт</button>
-        <button type="button" id="add-structure-cta-btn" class="button button--secondary">+ Додати структуру й порівняти</button>
+      <!-- вибір структур для наступного прогону — renderCarryStrip() -->
+      <div class="carry-strip" id="carry-strip">
+        <div class="carry-strip__pills" id="carry-strip-pills"></div>
+        <button type="button" id="refine-btn" class="button button--primary">До структур →</button>
       </div>
+      <p class="field-hint carry-strip__note">Невибрані лишаться в цьому прогоні. Базова йде в наступний завжди.</p>
 
     </div>
 
+    <!-- поза #result-body навмисно: лишається доступним і для прогонів
+         старого формату (#result-body тоді прихований цілком). Копіювати/
+         завантажити прибираються для них окремо, в renderCurrentRun() —
+         вони залежать від result.structures, якого там нема; видалити й
+         новий прогін лишаються завжди. -->
     <div class="report-actions">
+      <button type="button" id="copy-report-btn" class="button button--text">Скопіювати звіт</button>
+      <button type="button" id="save-report-btn" class="button button--text">Завантажити звіт</button>
       <button type="button" id="delete-run-btn" class="button button--text">Видалити прогін</button>
+      <span class="report-actions__divider" aria-hidden="true"></span>
+      <button type="button" id="result-reset-btn" class="button button--text report-actions__primary">Новий прогін</button>
     </div>
 
   </div>
@@ -2304,8 +2381,9 @@ firebase.initializeApp(firebaseConfig);
   var formScreen = document.getElementById('form-screen');
   var resultScreen = document.getElementById('result-screen');
   var editBtn = document.getElementById('edit-btn');
-  /* кнопок скидання дві — у блоці «Вхідний опис» і на екрані форми */
-  var resetButtons = [document.getElementById('reset-btn'), document.getElementById('form-reset-btn')];
+  /* кнопок скидання три — у блоці «Вхідний опис», на екрані форми й
+     у нижньому ряду «Результату» */
+  var resetButtons = [document.getElementById('reset-btn'), document.getElementById('form-reset-btn'), document.getElementById('result-reset-btn')];
   var copyReportBtn = document.getElementById('copy-report-btn');
   var saveReportBtn = document.getElementById('save-report-btn');
   var deleteRunBtn = document.getElementById('delete-run-btn');
@@ -2320,13 +2398,15 @@ firebase.initializeApp(firebaseConfig);
      просто без виклику й без DOM, у який їм тепер писати */
   var personaSwitcher = document.getElementById('persona-switcher');
   var saveNotice = document.getElementById('save-notice');
+  var refinedNotice = document.getElementById('refined-notice');
   var resultLegacyNotice = document.getElementById('result-legacy-notice');
   var resultBody = document.getElementById('result-body');
   var singleStructureNotice = document.getElementById('single-structure-notice');
   var structuresGrid = document.getElementById('structures-grid');
   var divergenceGrid = document.getElementById('divergence-grid');
   var divergenceLede = document.getElementById('divergence-lede');
-  var addStructureCtaBtn = document.getElementById('add-structure-cta-btn');
+  var carryStripPills = document.getElementById('carry-strip-pills');
+  var refineBtn = document.getElementById('refine-btn');
 
   var runsScreen = document.getElementById('runs-screen');
   var runsBody = document.getElementById('runs-body');
@@ -3739,7 +3819,13 @@ firebase.initializeApp(firebaseConfig);
     var allMetrics = structures.map(function (s) { return computeStructureMetrics(s.order, state); });
     var findingsById = computeStructureFindings(structures, allMetrics, state);
 
+    /* .hidden сам по собі не показує sl-alert — Shoelace рендерить вміст
+       лише за .open (свій внутрішній стан, не той самий атрибут); без
+       нього рядок був порожнім на екрані, хоч .hidden = false, знайдено
+       живим виміром — той самий принцип, що .open на save-notice нижче
+       (BUGS.md) */
     singleStructureNotice.hidden = structures.length >= 2;
+    singleStructureNotice.open = structures.length < 2;
 
     structuresGrid.innerHTML = '';
     divergenceGrid.innerHTML = '';
@@ -3747,6 +3833,43 @@ firebase.initializeApp(firebaseConfig);
       var personaResult = getPersonaResultFor(structure.id);
       structuresGrid.appendChild(renderStructureCard(structure, index, state, allMetrics[index], personaResult));
       divergenceGrid.appendChild(renderDivergenceBlock(structure, index, findingsById[structure.id] || [], personaResult, structures.length));
+    });
+  }
+
+  /* Текст — спільний для екрана й звіту (refinedNoticeText), щоб вони не
+     розійшлись, той самий принцип, що buildDivergenceView(). N — розмір
+     прогону, з якого уточнювали (result.refinedFrom, записаний у мить
+     кліку «До структур →» на смузі); M — розмір поточного, рахується
+     наживо, не зберігається окремо. */
+  function refinedNoticeText(refinedFrom, structureCount) {
+    return 'Структури уточнені з попереднього прогону. Персона бачила їх у складі ' + refinedFrom +
+      ', тепер бачить у складі ' + structureCount +
+      ' — зауваження на тих самих порядках можуть відрізнятись. Числа рахуються однаково.';
+  }
+
+  /* Смуга вибору структур для наступного прогону — під трьома абзацами.
+     Базова — пігулка з прапорцем, завжди позначеним і незнімним («завжди»
+     поруч): сіра пігулка без прапорця виглядала б вимкненою опцією, хоч
+     насправді найпевніша — вона йде в кожен прогін. Кнопка активна
+     завжди, навіть з нуля відмічених: усі додані можуть виявитись
+     гіршими за базову, і перехід із самою базовою — реальний випадок,
+     не порожній стан. */
+  function renderCarryStrip() {
+    var structures = currentRun.result.structures || [];
+    carryStripPills.innerHTML = '';
+    structures.forEach(function (structure, index) {
+      var pill = el('div', 'carry-pill');
+      var checkbox = document.createElement('sl-checkbox');
+      checkbox.className = 'carry-pill__checkbox';
+      checkbox.textContent = structure.isBaseline ? 'Базова структура' : 'Структура ' + index;
+      checkbox.dataset.structureId = structure.id;
+      pill.appendChild(checkbox);
+      if (structure.isBaseline) {
+        checkbox.checked = true;
+        checkbox.disabled = true;
+        pill.appendChild(el('span', 'field-caption', 'завжди'));
+      }
+      carryStripPills.appendChild(pill);
     });
   }
 
@@ -4141,6 +4264,10 @@ firebase.initializeApp(firebaseConfig);
     var lines = [];
 
     lines.push('UX SANDBOX · ' + state.category);
+    if (currentRun.result.refinedFrom) {
+      lines.push('');
+      lines.push(refinedNoticeText(currentRun.result.refinedFrom, (currentRun.result.structures || []).length));
+    }
     lines.push('');
     lines.push('ВХІДНИЙ ОПИС');
     var sources = state.sources || {};
@@ -4585,12 +4712,17 @@ firebase.initializeApp(firebaseConfig);
     disarmReset();
     disarmEdit();
     disarmDeleteRun();
-    disarmAddStructureCta();
+    disarmRefine();
     renderSummary();
 
     var isNewFormat = !!(currentRun.result && Array.isArray(currentRun.result.structures));
     resultLegacyNotice.hidden = isNewFormat;
     resultBody.hidden = !isNewFormat;
+    /* копіювати/завантажити залежать від result.structures — нема сенсу
+       для старого формату; видалити й новий прогін (поза #result-body)
+       лишаються доступними в обох випадках */
+    copyReportBtn.hidden = !isNewFormat;
+    saveReportBtn.hidden = !isNewFormat;
     if (isNewFormat) {
       resetPersonaSelection();
       /* до рендеру карток — щоб 'loading' устиг проставитись синхронно
@@ -4599,6 +4731,16 @@ firebase.initializeApp(firebaseConfig);
       ensurePersonaAudit(currentRun, selectedPersonaKey);
       renderPersonaSwitcher();
       renderStructuresResult();
+      renderCarryStrip();
+    }
+
+    var refinedFrom = currentRun.result && currentRun.result.refinedFrom;
+    /* .open поруч із .hidden — sl-alert без нього не рендерить вміст,
+       навіть коли .hidden = false (BUGS.md, знайдено на single-structure-notice) */
+    refinedNotice.hidden = !refinedFrom;
+    refinedNotice.open = !!refinedFrom;
+    if (refinedFrom) {
+      refinedNotice.textContent = refinedNoticeText(refinedFrom, currentRun.result.structures.length);
     }
 
     formScreen.hidden = true;
@@ -5856,13 +5998,21 @@ firebase.initializeApp(firebaseConfig);
     updateEditNotice();
 
     var state = collectState();
-    var baselineOrder = (state.structureBlocks || [])
-      .filter(function (b) { return b.name.trim() !== ''; })
-      .map(function (b) { return b.name; });
     var draft = getStructuresDraft();
 
-    var structures = [{ id: 'baseline', isBaseline: true, order: baselineOrder }]
+    var structures = [{ id: 'baseline', isBaseline: true, order: baselineStructureOrder(state) }]
       .concat(draft.map(function (s) { return { id: s.id, isBaseline: false, order: s.order.slice() }; }));
+
+    /* result.refinedFrom — одноразова позначка: «До структур →» смуги
+       вибору лишає розмір прогону, з якого уточнювали, у form.dataset
+       (той самий носій, що чернетка структур), тут читається й одразу
+       чиститься — застосовується лише до наступного прогону, не до
+       всіх майбутніх у цій сесії форми */
+    var result = { structures: structures, personaAudit: {} };
+    if (form.dataset.refinedFromCount) {
+      result.refinedFrom = Number(form.dataset.refinedFromCount);
+      delete form.dataset.refinedFromCount;
+    }
 
     currentRun = {
       id: genId(),
@@ -5871,7 +6021,7 @@ firebase.initializeApp(firebaseConfig);
       seq: nextSeq(state.category),
       title: '',
       input: state,
-      result: { structures: structures, personaAudit: {} }
+      result: result
     };
     runs.unshift(currentRun);
 
@@ -5911,9 +6061,9 @@ firebase.initializeApp(firebaseConfig);
     loadExampleBtn.textContent = 'Зразок · «Ватра»';
   }
 
-  function disarmAddStructureCta() {
-    addStructureCtaBtn.dataset.armed = '';
-    addStructureCtaBtn.textContent = '+ Додати структуру й порівняти';
+  function disarmRefine() {
+    refineBtn.dataset.armed = '';
+    refineBtn.textContent = 'До структур →';
   }
 
   function isDraftEmpty() {
@@ -6698,25 +6848,45 @@ firebase.initializeApp(firebaseConfig);
     showToast('Файл збережено', false);
   });
 
-  /* «Додати структуру й порівняти» — той самий шлях, що «Змінити опис»
+  /* «До структур →» смуги вибору — той самий шлях, що «Змінити опис»
      (editDescription): чернетку форми мовчки не затираємо, перший клік
-     перепитує. runInput.structuresDraft — ті самі додані структури, що
-     стали result.structures цього прогону (runAudit() будує друге з
-     першого), тож applyFormState() відновлює їх сама, без окремого кроку */
-  addStructureCtaBtn.addEventListener('click', function () {
+     перепитує. На відміну від колишньої «Додати структуру й порівняти»,
+     чернетка для Структур — не весь runInput.structuresDraft, а тільки
+     відмічені пігулки: невідмічені лишаються в цьому прогоні, запис
+     того, що було, заднім числом не переписується (базова в чернетку
+     не йде — вона завжди читається наживо з блоків). refinedFromCount
+     записую в те саме сховище, що чернетку (form.dataset) — одноразово,
+     runAudit() читає його на наступному прогоні й одразу чистить. */
+  refineBtn.addEventListener('click', function () {
     if (!currentRun) { return; }
     var runInput = currentRun.input;
     var differs = JSON.stringify(collectState()) !== JSON.stringify(runInput);
 
-    if (differs && !isDraftEmpty() && addStructureCtaBtn.dataset.armed !== 'yes') {
-      addStructureCtaBtn.dataset.armed = 'yes';
-      addStructureCtaBtn.textContent = 'Замінити поля прогоном?';
+    if (differs && !isDraftEmpty() && refineBtn.dataset.armed !== 'yes') {
+      refineBtn.dataset.armed = 'yes';
+      refineBtn.textContent = 'Замінити поля прогоном?';
       return;
     }
 
-    disarmAddStructureCta();
+    disarmRefine();
+
+    var checkedIds = Array.from(carryStripPills.querySelectorAll('.carry-pill__checkbox'))
+      .filter(function (cb) { return cb.checked && !cb.disabled; })
+      .map(function (cb) { return cb.dataset.structureId; });
+    var selectedDraft = (currentRun.result.structures || [])
+      .filter(function (s) { return !s.isBaseline && checkedIds.indexOf(s.id) !== -1; })
+      .map(function (s) { return { id: s.id, order: s.order.slice() }; });
+
+    form.dataset.refinedFromCount = String((currentRun.result.structures || []).length);
+
+    var nextInput = {};
+    for (var key in runInput) {
+      if (Object.prototype.hasOwnProperty.call(runInput, key)) { nextInput[key] = runInput[key]; }
+    }
+    nextInput.structuresDraft = selectedDraft;
+
     editingRun = currentRun;
-    applyFormState(runInput).then(function () {
+    applyFormState(nextInput).then(function () {
       saveState();
       updateEditNotice();
       showStructures();
