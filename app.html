@@ -381,9 +381,11 @@ textarea.field-input {
   min-width: 0;
 }
 
-.audience-row .audience-select {
-  width: 160px;
+/* напис пріоритету в рядку чернетки картки — за позицією, не вибір */
+.audience-row .edit-audience-type {
+  width: 96px;
   flex-shrink: 0;
+  align-self: center;
 }
 
 /* ---------- top tasks ---------- */
@@ -547,18 +549,6 @@ textarea.field-input {
   flex-direction: column;
   gap: var(--spacing-40);
   padding-bottom: var(--spacing-40);
-}
-
-/* заголовок над "Додатково" на Екрані 1: та сама типографіка, що
-   .advanced__summary, але без cursor:pointer і justify-content —
-   тут немає ні кліку, ні іконок, це статичний підпис, не акордеон */
-.advanced__title {
-  padding-block: var(--spacing-24);
-  font-weight: 700;
-  font-size: 20px;
-  line-height: 1.15;
-  letter-spacing: -0.44px;
-  color: var(--text-primary);
 }
 
 .form-actions {
@@ -861,11 +851,14 @@ textarea.field-input {
 }
 
 /* padding рядків нижче дає власний відступ — спільний .summary-rows
-   gap (12px) тут дублював би його. */
-#summary-body {
+   gap (12px) тут дублював би його. Картка «Що я зрозуміла» на Узгодженні —
+   та сама розкладка, що «Вхідний опис» на Екрані 3 */
+#summary-body,
+#input-card-body {
   gap: 0;
 }
 
+#input-card-body .summary-row,
 #summary-body .summary-row {
   display: grid;
   grid-template-columns: 200px 1fr;
@@ -875,6 +868,7 @@ textarea.field-input {
   border-bottom: 1px solid var(--border-card);
 }
 
+#input-card-body .summary-row:last-child,
 #summary-body .summary-row:last-child {
   border-bottom: none;
 }
@@ -896,6 +890,36 @@ textarea.field-input {
   display: flex;
   flex-direction: column;
   gap: var(--spacing-4);
+}
+
+/* ---------- Узгодження: картка вхідних даних і форма її редагування ---------- */
+/* той самий вигляд картки, що .block-item, — поверхня, рамка, радіус */
+.input-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-16);
+  padding: var(--spacing-16);
+  background: var(--surface-card);
+  border: 1px solid var(--border-card);
+  border-radius: var(--radius-md);
+}
+
+.input-card__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-12);
+}
+
+.input-edit__audience-actions {
+  display: flex;
+  gap: var(--spacing-12);
+}
+
+/* задачі відділені рискою: виведені з аудиторії й цілі, тому поруч, але окремо */
+.input-edit__tasks {
+  border-top: 1px solid var(--border-card);
+  padding-top: var(--spacing-16);
 }
 
 /* "Перелік блоків" у "Вхідному описі" — той самий патерн, що .advanced
@@ -1585,40 +1609,73 @@ sl-button[variant="text"]::part(label):hover {
 
   <form id="app-form" class="app-form" novalidate>
 
-    <div class="form-group">
-      <label class="field-label" for="category">Категорія продукту</label>
-      <p class="field-caption" data-source-for="category" hidden></p>
-      <div class="field field-wrap">
-        <input class="field-input" type="text" id="category" data-limit="80" placeholder="тип сторінки або продукту одним рядком">
-        <button type="button" class="field-clear" aria-label="Очистити поле">✕</button>
+    <!-- Картка вхідних даних: дизайнер її переважно читає, редагування —
+         окрема дія. Форма редагування — чернетка: пише в приховане сховище
+         нижче лише на «Зберегти», тож «Скасувати» нічого не відкочує -->
+    <section class="input-card" id="input-card">
+      <div class="input-card__head">
+        <h2 class="result-section__title">Що я зрозуміла</h2>
+        <button type="button" id="input-edit-btn" class="button button--secondary">Редагувати</button>
       </div>
-    </div>
-
-    <div class="form-group">
-      <label class="field-label" for="support">Чим підкріплюється діяльність</label>
-      <p class="field-caption" data-source-for="support" hidden></p>
-      <div class="field field-wrap">
-        <textarea class="field-input" id="support" rows="3" data-limit="600" placeholder="що організація робить і чим це доводиться: події, публікації, партнери, люди, документи, показники"></textarea>
-        <button type="button" class="field-clear" aria-label="Очистити поле">✕</button>
-      </div>
-      <span class="field-counter"></span>
-      <p class="field-hint">Без цього поля система виведе шаблонний список секцій — професійний на вигляд, але без блоків, що несуть задачі.</p>
-    </div>
-
-    <div class="form-group">
-      <label class="field-label">Цільова аудиторія</label>
-      <div id="audience-list" class="audience-list"></div>
-      <button type="button" id="add-audience" class="field-add-btn">+ Додати другу аудиторію</button>
+      <div class="summary-rows" id="input-card-body"></div>
       <p class="field-hint" id="dropped-audiences" hidden></p>
-    </div>
+    </section>
 
-    <div class="form-group">
-      <label class="field-label" for="goal">Бізнес-ціль</label>
-      <p class="field-caption" data-source-for="goal" hidden></p>
-      <div class="field field-wrap">
-        <input class="field-input" type="text" id="goal" data-limit="120" placeholder="що має статися після візиту">
-        <button type="button" class="field-clear" aria-label="Очистити поле">✕</button>
+    <section class="input-card" id="input-edit" hidden>
+      <div class="form-group">
+        <label class="field-label" for="edit-category">Категорія продукту</label>
+        <div class="field field-wrap">
+          <input class="field-input" type="text" id="edit-category" placeholder="тип сторінки або продукту одним рядком">
+        </div>
       </div>
+
+      <div class="form-group">
+        <label class="field-label" for="edit-support">Чим підкріплюється діяльність</label>
+        <div class="field field-wrap">
+          <textarea class="field-input" id="edit-support" rows="3" placeholder="що організація робить і чим це доводиться: події, публікації, партнери, люди, документи, показники"></textarea>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="field-label">Цільова аудиторія</label>
+        <div id="edit-audience-list" class="audience-list"></div>
+        <div class="input-edit__audience-actions">
+          <button type="button" id="edit-swap-audiences" class="field-add-btn">⇅ Поміняти пріоритет місцями</button>
+          <button type="button" id="edit-add-audience" class="field-add-btn">+ Додати другу аудиторію</button>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="field-label" for="edit-goal">Бізнес-ціль</label>
+        <div class="field field-wrap">
+          <input class="field-input" type="text" id="edit-goal" placeholder="що має статися після візиту">
+        </div>
+      </div>
+
+      <div class="form-group input-edit__tasks">
+        <label class="field-label">Задачі читача</label>
+        <p class="field-hint">Виведені з аудиторії й бізнес-цілі, тому правляться поруч з ними. Формат: дієслово + об'єкт. Якщо видалити всі — система виведе їх заново при генерації.</p>
+        <div id="edit-task-list" class="task-list"></div>
+        <button type="button" id="edit-add-task" class="field-add-btn">+ Додати задачу</button>
+      </div>
+
+      <div class="form-actions">
+        <button type="button" id="edit-save-btn" class="button button--primary">Зберегти</button>
+        <button type="button" id="edit-cancel-btn" class="button button--text">Скасувати</button>
+      </div>
+    </section>
+
+    <p class="confirm__text" id="input-consequences" hidden></p>
+
+    <!-- Сховище п'яти полів картки — джерело стану для collectState(),
+         прив'язок і «Не вистачає». Дизайнер його не бачить: пишуть у нього
+         лише «Зберегти» форми редагування, розбір і відкриття прогону -->
+    <div id="input-store" hidden>
+      <input type="text" id="category">
+      <textarea id="support"></textarea>
+      <div id="audience-list"></div>
+      <input type="text" id="goal">
+      <div id="task-list"></div>
     </div>
 
     <div class="form-group">
@@ -1626,20 +1683,6 @@ sl-button[variant="text"]::part(label):hover {
       <div id="block-list" class="block-list"></div>
       <button type="button" id="add-block" class="field-add-btn">+ Додати блок</button>
       <p class="field-hint">Одиниця — те, що повторюється в блоці: іменник в однині, коротко.</p>
-    </div>
-
-    <div class="advanced">
-      <p class="advanced__title">Додатково · необов'язково</p>
-      <div class="advanced__body">
-
-        <div class="form-group">
-          <label class="field-label">Top Tasks</label>
-          <div id="task-list" class="task-list"></div>
-          <button type="button" id="add-task" class="field-add-btn">+ Додати задачу</button>
-          <p class="field-hint">Якщо не заповните — система виведе сама з аудиторії й бізнес-цілі. Формат: дієслово + об'єкт.</p>
-        </div>
-
-      </div>
     </div>
 
     <section class="result-section">
@@ -1885,8 +1928,21 @@ firebase.initializeApp(firebaseConfig);
   var audienceList = document.getElementById('audience-list');
   var taskList = document.getElementById('task-list');
   var blockList = document.getElementById('block-list');
-  var addAudienceBtn = document.getElementById('add-audience');
-  var addTaskBtn = document.getElementById('add-task');
+  var inputCard = document.getElementById('input-card');
+  var inputCardBody = document.getElementById('input-card-body');
+  var inputEditBtn = document.getElementById('input-edit-btn');
+  var inputEdit = document.getElementById('input-edit');
+  var editAudienceList = document.getElementById('edit-audience-list');
+  var editTaskList = document.getElementById('edit-task-list');
+  var editSwapAudiencesBtn = document.getElementById('edit-swap-audiences');
+  var editAddAudienceBtn = document.getElementById('edit-add-audience');
+  var editAddTaskBtn = document.getElementById('edit-add-task');
+  var editSaveBtn = document.getElementById('edit-save-btn');
+  var editCancelBtn = document.getElementById('edit-cancel-btn');
+  var inputConsequences = document.getElementById('input-consequences');
+  /* true, поки відкрита форма редагування картки: генерація брала б
+     збережений стан без незбереженої правки — «Не вистачає» блокує */
+  var inputEditOpen = false;
   var addBlockBtn = document.getElementById('add-block');
   var loadExampleBtn = document.getElementById('load-example-btn');
   var toAgreementBtn = document.getElementById('to-agreement-btn');
@@ -2025,9 +2081,9 @@ firebase.initializeApp(firebaseConfig);
         return {
           id: item.dataset.id,
           value: item.querySelector('.audience-input').value,
-          /* порожнє значення селекта буває лише до його ініціалізації
-             (порожньої опції немає) — тоді тип, з яким рядок створено */
-          type: item.querySelector('.audience-select').value || item.dataset.type,
+          /* тип живе на рядку (позиція: перша — «головна»), не в sl-select —
+             синхронно, без гонок ініціалізації компонента */
+          type: item.dataset.type,
           source: item.dataset.source || 'designer'
         };
       }),
@@ -2086,6 +2142,19 @@ firebase.initializeApp(firebaseConfig);
         if (!a.id) { a.id = genId(); }
         /* стан до позначок джерела — аудиторії вводив дизайнер */
         if (!('source' in a)) { a.source = 'designer'; }
+      });
+      /* Пріоритет — позицією: головна перша, тип за місцем (так само, як
+         нормалізує розбір). Старі стани могли мати головну другою чи обидві
+         «другорядна» (форма колись це дозволяла) або зовсім без type (гонка
+         sl-select, BUGS.md). Головну — вперед: зміст пріоритету зберігається;
+         решті — тип за позицією. Без головної — перша стає головною: так її
+         вже й трактував Екран 3 (resetMetricsAudience бере першу). Об'єкт
+         перебудовано в порядку ключів collectState(), щоб відсутній type не
+         ліг у кінець і не розвів чернетку з прогоном у порівнянні JSON */
+      var mainIndex = state.audiences.findIndex(function (a) { return a.type === 'головна'; });
+      if (mainIndex > 0) { state.audiences.unshift(state.audiences.splice(mainIndex, 1)[0]); }
+      state.audiences = state.audiences.map(function (a, index) {
+        return { id: a.id, value: a.value, type: index === 0 ? 'головна' : 'другорядна', source: a.source };
       });
     }
 
@@ -2287,7 +2356,11 @@ firebase.initializeApp(firebaseConfig);
     var audiences = (state.audiences && state.audiences.length)
       ? state.audiences.slice(0, MAX_AUDIENCES)
       : [{ value: '', type: 'головна' }];
-    var audienceTypesReady = audiences.map(function (a) { return addAudienceRow(a.value, a.type, a.id, a.source); });
+    /* тип — з позиції: пріоритет задається порядком (migrateState() ставить
+       головну першою), тож «обидві другорядні» неможливі за будовою */
+    audiences.forEach(function (a, index) {
+      addAudienceRow(a.value, index === 0 ? 'головна' : 'другорядна', a.id, a.source);
+    });
 
     taskList.innerHTML = '';
     (state.tasks || []).forEach(function (t) { addTaskRow(t.value, t.id, t.source); });
@@ -2303,12 +2376,14 @@ firebase.initializeApp(firebaseConfig);
     autoGrowAll();
     updateParseState();
     renderSourceMarks();
-    /* Тип аудиторії в sl-select встановлюється асинхронно (setSlSelectValue).
-       collectState(), викликаний одразу після applyFormState(), бачить ще
-       порожній тип — і saveState() записав би "", який після перезавантаження
-       став би «головна» в обох аудиторій. Хто зберігає стан одразу після
-       заповнення форми — має дочекатись цього промісу (BUGS.md, 2026-09-13) */
-    return Promise.all(audienceTypesReady);
+    /* інший стан — відкрита правка картки й рядок про наслідки вже не про нього */
+    closeInputEdit();
+    inputConsequences.hidden = true;
+    renderInputCard();
+    /* Раніше тут чекали, поки тип аудиторії встане в sl-select (BUGS.md,
+       2026-09-13). Селекта типу більше немає — тип живе на рядку, тож
+       проміс резолвиться одразу; лишається, щоб виклики з .then() не міняти */
+    return Promise.resolve();
   }
 
   /* ---------- динамічні рядки ---------- */
@@ -2332,55 +2407,23 @@ firebase.initializeApp(firebaseConfig);
       });
   }
 
+  /* Рядки аудиторій і задач — у прихованому сховищі (#input-store): дизайнер
+     бачить картку «Що я зрозуміла» й править через її форму. Керувань тут
+     немає. Тип аудиторії — з позиції й живе на рядку, а не в sl-select:
+     селект типу був джерелом трьох гонок за день (BUGS.md, правило вгорі) —
+     без нього тип синхронний. Пріоритет міняють місцями у формі картки */
   function addAudienceRow(value, type, id, source) {
     var item = document.createElement('div');
     item.className = 'audience-item';
     item.dataset.id = id || genId();
-    /* новий рядок, доданий кнопкою, — дизайнерів */
     item.dataset.source = source || 'designer';
-    /* тип, з яким рядок створено: collectState() бере його, поки sl-select
-       ще не має значення (не зареєстрований або setSlSelectValue() не
-       встиг). Без цього будь-яке раннє saveState() писало аудиторії без
-       type, і після перезавантаження обидві ставали «головна» (BUGS.md) */
     item.dataset.type = type || 'головна';
-    item.innerHTML =
-      '<div class="audience-row">' +
-      '<div class="field field-wrap">' +
-      '<input class="field-input audience-input" type="text" data-limit="120" placeholder="хто читає сторінку і в якому стані приходить">' +
-      '<button type="button" class="field-clear" aria-label="Очистити поле">✕</button>' +
-      '</div>' +
-      '<sl-select class="audience-select">' +
-      '<sl-option value="головна">головна</sl-option>' +
-      '<sl-option value="другорядна">другорядна</sl-option>' +
-      '</sl-select>' +
-      '<button type="button" class="audience-remove" aria-label="Видалити аудиторію">✕</button>' +
-      '</div>' +
-      '<p class="field-caption" data-source-mark hidden></p>';
-    item.querySelector('.audience-input').value = value || '';
-    item.querySelector('.audience-remove').addEventListener('click', function () {
-      item.remove();
-      updateAudienceControls();
-      saveState();
-      refreshAgreementLinks();
-      updateEditNotice();
-    });
+    var input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'audience-input';
+    input.value = value || '';
+    item.appendChild(input);
     audienceList.appendChild(item);
-    /* тип стає справжнім значенням селекта лише після цього промісу;
-       хто зберігає стан одразу після рядка — має його дочекатись */
-    var typeReady = setSlSelectValue(item.querySelector('.audience-select'), type || 'головна');
-    updateAudienceControls();
-    refreshFieldUi();
-    return typeReady;
-  }
-
-  /* єдине місце, де вирішується видимість керувань блоку аудиторій:
-     аудиторій максимум дві, у першої немає кнопки видалення */
-  function updateAudienceControls() {
-    var rows = Array.from(audienceList.querySelectorAll('.audience-row'));
-    rows.forEach(function (row, index) {
-      row.querySelector('.audience-remove').classList.toggle('audience-remove--hidden', index === 0);
-    });
-    addAudienceBtn.hidden = rows.length >= MAX_AUDIENCES;
   }
 
   function addTaskRow(value, id, source) {
@@ -2388,24 +2431,12 @@ firebase.initializeApp(firebaseConfig);
     item.className = 'task-item';
     item.dataset.id = id || genId();
     item.dataset.source = source || 'designer';
-    item.innerHTML =
-      '<div class="task-row">' +
-      '<div class="field field-wrap">' +
-      '<input class="field-input task-input" type="text" data-limit="60">' +
-      '<button type="button" class="field-clear" aria-label="Очистити поле">✕</button>' +
-      '</div>' +
-      '<button type="button" class="task-remove" aria-label="Видалити задачу">✕</button>' +
-      '</div>' +
-      '<p class="field-caption" data-source-mark hidden></p>';
-    item.querySelector('.task-input').value = value || '';
-    item.querySelector('.task-remove').addEventListener('click', function () {
-      item.remove();
-      saveState();
-      refreshAgreementLinks();
-      updateEditNotice();
-    });
+    var input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'task-input';
+    input.value = value || '';
+    item.appendChild(input);
     taskList.appendChild(item);
-    refreshFieldUi();
   }
 
   /* "опис" необов'язковий на рівні блоку: якщо одиниця й кількість
@@ -4054,6 +4085,7 @@ firebase.initializeApp(firebaseConfig);
           /* виведені з аудиторії й цілі — у документах дослівно їх немає */
           data.tasks.forEach(function (t) { addTaskRow(t, genId(), 'agent'); });
           saveState();
+          renderInputCard();
           state = collectState();
           showToast('Top Tasks виведено моделлю', false);
         } else {
@@ -4292,6 +4324,9 @@ firebase.initializeApp(firebaseConfig);
     });
 
     var blockingRows = [];
+    /* генерація бере збережений стан — незбережена правка картки в неї не
+       потрапила б, а дизайнер міг би думати, що потрапить */
+    if (inputEditOpen) { blockingRows.push('Збережи або скасуй правку в картці «Що я зрозуміла».'); }
     if (!category) { blockingRows.push('Категорія продукту не заповнена.'); }
     if (!support) { blockingRows.push('Чим підкріплюється діяльність не заповнено.'); }
     if (!audience) { blockingRows.push('Цільова аудиторія не заповнена.'); }
@@ -4821,6 +4856,9 @@ firebase.initializeApp(firebaseConfig);
     refreshFieldUi();
     autoGrowAll();
     renderSourceMarks();
+    closeInputEdit();
+    inputConsequences.hidden = true;
+    renderInputCard();
     saveState();
     updateParseState();
     /* порівнювати вже нема з чим */
@@ -4841,6 +4879,232 @@ firebase.initializeApp(firebaseConfig);
       : '';
   }
 
+  /* ---------- картка «Що я зрозуміла» і форма її редагування ---------- */
+
+  function isFilled(item) { return String(item.value || '').trim() !== ''; }
+
+  /* П'ять полів, прочитаних з документів, — для читання, з позначкою
+     джерела біля кожного значення. Джерело істини — сховище (collectState),
+     картка лише показує. Порожнє — «—»: чого бракує, називає «Не вистачає» */
+  function renderInputCard() {
+    var s = collectState();
+    var sources = s.sources || {};
+    inputCardBody.innerHTML = '';
+    function scalarRow(label, value, field) {
+      var v = String(value || '').trim();
+      inputCardBody.appendChild(summaryRow(label, v || '—', v ? SOURCE_LABELS[sources[field]] : ''));
+    }
+    function listRow(label, lines) {
+      var row = el('div', 'summary-row');
+      row.appendChild(el('span', 'field-caption', label));
+      var values = el('div', 'summary-list');
+      if (!lines.length) { values.appendChild(valueWithSource('—')); }
+      lines.forEach(function (line) { values.appendChild(valueWithSource(line.text, line.source)); });
+      row.appendChild(values);
+      inputCardBody.appendChild(row);
+    }
+    scalarRow('Категорія продукту', s.category, 'category');
+    scalarRow('Чим підкріплюється діяльність', s.support, 'support');
+    listRow('Цільова аудиторія', s.audiences.filter(isFilled).map(function (a) {
+      return { text: a.value.trim() + ' · ' + a.type, source: SOURCE_LABELS[a.source] };
+    }));
+    scalarRow('Бізнес-ціль', s.goal, 'goal');
+    listRow('Задачі читача', s.tasks.filter(isFilled).map(function (t, index) {
+      return { text: (index + 1) + '. ' + t.value.trim(), source: SOURCE_LABELS[t.source] };
+    }));
+  }
+
+  /* Рядки чернетки: id і джерело — з рядка сховища, original — значення на
+     момент відкриття (правка перетворює джерело на «задано дизайнером») */
+  function addEditAudienceRow(audience) {
+    var item = el('div', 'edit-audience-item');
+    item.dataset.id = audience.id || genId();
+    item.dataset.source = audience.source || 'designer';
+    item.dataset.original = audience.value || '';
+    var row = el('div', 'audience-row');
+    var wrap = el('div', 'field field-wrap');
+    var input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'field-input edit-audience-input';
+    input.placeholder = 'хто читає сторінку і в якому стані приходить';
+    input.value = audience.value || '';
+    wrap.appendChild(input);
+    row.appendChild(wrap);
+    row.appendChild(el('span', 'field-caption edit-audience-type'));
+    var remove = el('button', 'audience-remove', '✕');
+    remove.type = 'button';
+    remove.setAttribute('aria-label', 'Видалити аудиторію');
+    row.appendChild(remove);
+    item.appendChild(row);
+    editAudienceList.appendChild(item);
+  }
+
+  /* Пріоритет — позицією: напис «головна»/«другорядна» за місцем, ✕ лише в
+     другої, «поміняти місцями» — коли їх дві, «+ Додати другу аудиторію» —
+     лише коли одна (третьої не обіцяємо: MAX_AUDIENCES) */
+  function updateEditAudienceControls() {
+    var items = Array.from(editAudienceList.querySelectorAll('.edit-audience-item'));
+    items.forEach(function (item, index) {
+      item.querySelector('.edit-audience-type').textContent = index === 0 ? 'головна' : 'другорядна';
+      item.querySelector('.audience-remove').classList.toggle('audience-remove--hidden', index === 0);
+    });
+    editSwapAudiencesBtn.hidden = items.length < 2;
+    editAddAudienceBtn.hidden = items.length >= MAX_AUDIENCES;
+  }
+
+  function addEditTaskRow(task) {
+    var item = el('div', 'edit-task-item');
+    item.dataset.id = task.id || genId();
+    item.dataset.source = task.source || 'designer';
+    item.dataset.original = task.value || '';
+    var row = el('div', 'task-row');
+    var wrap = el('div', 'field field-wrap');
+    var input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'field-input edit-task-input';
+    input.placeholder = "дієслово + об'єкт";
+    input.value = task.value || '';
+    wrap.appendChild(input);
+    row.appendChild(wrap);
+    var remove = el('button', 'task-remove', '✕');
+    remove.type = 'button';
+    remove.setAttribute('aria-label', 'Видалити задачу');
+    row.appendChild(remove);
+    item.appendChild(row);
+    editTaskList.appendChild(item);
+  }
+
+  function openInputEdit() {
+    var s = collectState();
+    document.getElementById('edit-category').value = s.category || '';
+    document.getElementById('edit-support').value = s.support || '';
+    document.getElementById('edit-goal').value = s.goal || '';
+    editAudienceList.innerHTML = '';
+    s.audiences.forEach(addEditAudienceRow);
+    updateEditAudienceControls();
+    editTaskList.innerHTML = '';
+    s.tasks.filter(isFilled).forEach(addEditTaskRow);
+    inputCard.hidden = true;
+    inputConsequences.hidden = true;
+    inputEdit.hidden = false;
+    inputEditOpen = true;
+    autoGrow(document.getElementById('edit-support'));
+    updateMissingSection();
+  }
+
+  /* «Скасувати» — лише закрити: чернетка в сховище не писалась, тож
+     відкочувати нічого, і стан не зберігався */
+  function closeInputEdit() {
+    inputEditOpen = false;
+    inputEdit.hidden = true;
+    inputCard.hidden = false;
+    updateMissingSection();
+  }
+
+  /* Рядки чернетки → значення для сховища. Порожні відкидаються, але
+     аудиторія лишається хоч одна (порожня) — як у clearForm(). Джерело:
+     незмінене значення зберігає своє, змінене й нове — «задано дизайнером» */
+  function readEditRows(list, inputSelector) {
+    return Array.from(list.children).map(function (item) {
+      var value = item.querySelector(inputSelector).value.trim();
+      return {
+        id: item.dataset.id,
+        value: value,
+        source: value === item.dataset.original.trim() ? item.dataset.source : 'designer'
+      };
+    }).filter(isFilled);
+  }
+
+  function saveInputEdit() {
+    var before = collectState();
+    var scalarSources = JSON.parse(JSON.stringify(before.sources || defaultScalarSources()));
+    ['category', 'support', 'goal'].forEach(function (field) {
+      var value = document.getElementById('edit-' + field).value.trim();
+      if (value !== String(before[field] || '').trim()) { scalarSources[field] = 'designer'; }
+      document.getElementById(field).value = value;
+    });
+    form.dataset.sources = JSON.stringify(scalarSources);
+
+    var audiences = readEditRows(editAudienceList, '.edit-audience-input');
+    if (!audiences.length) { audiences = [{ id: genId(), value: '', source: 'designer' }]; }
+    audienceList.innerHTML = '';
+    audiences.forEach(function (a, index) {
+      addAudienceRow(a.value, index === 0 ? 'головна' : 'другорядна', a.id, a.source);
+    });
+    taskList.innerHTML = '';
+    readEditRows(editTaskList, '.edit-task-input').forEach(function (t) { addTaskRow(t.value, t.id, t.source); });
+
+    closeInputEdit();
+    /* прив'язки на видалені задачі й аудиторії прибирає pruneConfirmRefs() */
+    refreshAgreementLinks();
+    renderInputCard();
+    saveState();
+    updateEditNotice();
+    showInputConsequences(before, collectState());
+  }
+
+  /* Рядок про наслідки під карткою — лише коли правка зачепила задачі чи
+     аудиторії: категорія, підкріплення й ціль далі нікуди не йдуть (ціль
+     брала участь у виведенні задач один раз). Блоків за формою не видно,
+     тож наслідок називається словами. Без втрат — теж рядок: мовчання
+     після правки читалося б як «не перевірило» */
+  function showInputConsequences(before, after) {
+    function signature(list) {
+      return JSON.stringify(list.filter(isFilled).map(function (x) { return [x.id, x.value.trim(), x.type || '']; }));
+    }
+    var touched = signature(before.audiences) !== signature(after.audiences) ||
+      signature(before.tasks) !== signature(after.tasks);
+    if (!touched) { inputConsequences.hidden = true; return; }
+
+    function covers(state, taskId) {
+      return state.structureBlocks.some(function (b) {
+        return Array.isArray(b.links) && b.links.some(function (l) { return l.taskId === taskId; });
+      });
+    }
+    var parts = [];
+
+    /* блоки не міняються при правці картки — порівняння за індексом;
+       перехід пар «усі аудиторії» на єдину лишену аудиторію — не втрата */
+    var lost = [];
+    after.structureBlocks.forEach(function (b, index) {
+      var was = before.structureBlocks[index];
+      var countBefore = was && Array.isArray(was.links) ? was.links.length : 0;
+      var countAfter = Array.isArray(b.links) ? b.links.length : 0;
+      if (countAfter < countBefore && b.name.trim() !== '') { lost.push('«' + b.name.trim() + '»'); }
+    });
+    if (lost.length) { parts.push('прив\'язки втратили блоки (' + lost.length + '): ' + lost.join(', ') + '.'); }
+
+    /* без блоку — ті, що втратили покриття, і нові; задача, яка й до
+       правки не мала блоку, — не наслідок правки */
+    var idsBefore = before.tasks.map(function (t) { return t.id; });
+    var orphans = after.tasks.filter(isFilled).filter(function (t) {
+      return !covers(after, t.id) && (idsBefore.indexOf(t.id) === -1 || covers(before, t.id));
+    });
+    if (orphans.length) {
+      parts.push('без блоку лишились задачі: ' + orphans.map(function (t) { return '«' + t.value.trim() + '»'; }).join(', ') + '.');
+    }
+
+    /* змінений текст задачі: id той самий, прив'язки йдуть за ним. Система
+       не розрізнить уточнення від підміни — називаємо блоки, вирішує дизайнер */
+    before.tasks.filter(isFilled).forEach(function (t0) {
+      var t1 = after.tasks.filter(function (t) { return t.id === t0.id; })[0];
+      if (!t1 || t1.value.trim() === t0.value.trim()) { return; }
+      var linked = after.structureBlocks.filter(function (b) {
+        return Array.isArray(b.links) && b.links.some(function (l) { return l.taskId === t1.id; });
+      }).map(function (b) { return '«' + b.name.trim() + '»'; });
+      if (linked.length) {
+        parts.push('задачу «' + t1.value.trim() + '» змінено — прив\'язки до неї лишились, перевір блоки: ' + linked.join(', ') + '.');
+      }
+    });
+
+    /* перше речення йде після двокрапки з малої, наступні — з великої */
+    var text = parts.map(function (part, index) {
+      return index === 0 ? part : part.charAt(0).toUpperCase() + part.slice(1);
+    }).join(' ');
+    inputConsequences.textContent = 'Після правки: ' + (text || 'прив\'язки блоків не зачеплено.');
+    inputConsequences.hidden = false;
+  }
+
   /* ---------- позначки джерела ---------- */
 
   /* Чотири джерела на формі: тут дизайнер вирішує, чому вірити.
@@ -4852,26 +5116,15 @@ firebase.initializeApp(firebaseConfig);
     designer: 'задано дизайнером'
   };
 
-  /* поля-рядки, чиє джерело лежить у form.dataset.sources */
-  var SCALAR_SOURCE_FIELDS = ['category', 'support', 'goal'];
-
   function defaultScalarSources() {
     return { category: 'designer', support: 'designer', goal: 'designer' };
   }
 
   /* Правка дизайнера перетворює джерело на 'designer' без сліду: що було
-     до правки, не зберігається — виправлене дизайнером вигаданим уже не є */
+     до правки, не зберігається — виправлене дизайнером вигаданим уже не є.
+     Тут — лише підполя блоку; джерела п'яти полів картки ставить
+     saveInputEdit() за збереженням, а не на кожне натискання */
   function markDesignerSource(target) {
-    if (SCALAR_SOURCE_FIELDS.indexOf(target.id) !== -1) {
-      var scalarSources = JSON.parse(form.dataset.sources || 'null') || defaultScalarSources();
-      scalarSources[target.id] = 'designer';
-      form.dataset.sources = JSON.stringify(scalarSources);
-      return;
-    }
-    var audienceItem = target.closest('.audience-item');
-    if (audienceItem) { audienceItem.dataset.source = 'designer'; return; }
-    var taskItem = target.closest('.task-item');
-    if (taskItem) { taskItem.dataset.source = 'designer'; return; }
     var blockItem = target.closest('.block-item');
     if (!blockItem) { return; }
     var part = target.classList.contains('block-name') ? 'name'
@@ -4931,24 +5184,10 @@ firebase.initializeApp(firebaseConfig);
     mark.textContent = text || '';
   }
 
-  /* Підписи джерела на формі: поля-рядки — .field-caption з
-     data-source-for="<id поля>"; рядки списків — .field-caption з
-     data-source-mark усередині рядка. Порожнє значення позначки не має */
+  /* Підписи джерела на картках блоків — .field-caption з data-source-mark
+     усередині картки. Джерела п'яти полів показує картка «Що я зрозуміла»
+     (renderInputCard). Порожнє значення позначки не має */
   function renderSourceMarks() {
-    var scalarSources = JSON.parse(form.dataset.sources || 'null') || {};
-    Array.from(form.querySelectorAll('[data-source-for]')).forEach(function (mark) {
-      var field = mark.dataset.sourceFor;
-      var value = document.getElementById(field).value.trim();
-      setSourceMark(mark, value === '' ? '' : SOURCE_LABELS[scalarSources[field]]);
-    });
-    Array.from(audienceList.querySelectorAll('.audience-item')).forEach(function (item) {
-      var value = item.querySelector('.audience-input').value.trim();
-      setSourceMark(item.querySelector('[data-source-mark]'), value === '' ? '' : SOURCE_LABELS[item.dataset.source]);
-    });
-    Array.from(taskList.querySelectorAll('.task-item')).forEach(function (item) {
-      var value = item.querySelector('.task-input').value.trim();
-      setSourceMark(item.querySelector('[data-source-mark]'), value === '' ? '' : SOURCE_LABELS[item.dataset.source]);
-    });
     Array.from(blockList.querySelectorAll('.block-item')).forEach(function (item) {
       setSourceMark(item.querySelector('[data-source-mark]'), blockSourceText({
         name: item.querySelector('.block-name').value,
@@ -5281,20 +5520,45 @@ firebase.initializeApp(firebaseConfig);
     showToast('Файл збережено', false);
   });
 
-  addAudienceBtn.addEventListener('click', function () {
-    if (audienceList.querySelectorAll('.audience-row').length >= MAX_AUDIENCES) { return; }
-    addAudienceRow('', 'головна');
-    saveState();
-    refreshAgreementLinks();
-    updateEditNotice();
+  inputEditBtn.addEventListener('click', openInputEdit);
+  editCancelBtn.addEventListener('click', closeInputEdit);
+  editSaveBtn.addEventListener('click', saveInputEdit);
+
+  editSwapAudiencesBtn.addEventListener('click', function () {
+    var items = editAudienceList.querySelectorAll('.edit-audience-item');
+    if (items.length === 2) { editAudienceList.insertBefore(items[1], items[0]); }
+    updateEditAudienceControls();
   });
 
-  addTaskBtn.addEventListener('click', function () {
-    addTaskRow('');
-    saveState();
-    refreshAgreementLinks();
-    updateEditNotice();
+  editAddAudienceBtn.addEventListener('click', function () {
+    if (editAudienceList.querySelectorAll('.edit-audience-item').length >= MAX_AUDIENCES) { return; }
+    addEditAudienceRow({ value: '', source: 'designer' });
+    updateEditAudienceControls();
   });
+
+  editAddTaskBtn.addEventListener('click', function () {
+    addEditTaskRow({ value: '', source: 'designer' });
+  });
+
+  /* ✕ у чернетці прибирає лише рядок чернетки — сховище не чіпається */
+  inputEdit.addEventListener('click', function (event) {
+    var removeAudience = event.target.closest('.audience-remove');
+    if (removeAudience) {
+      removeAudience.closest('.edit-audience-item').remove();
+      updateEditAudienceControls();
+      return;
+    }
+    var removeTask = event.target.closest('.task-remove');
+    if (removeTask) { removeTask.closest('.edit-task-item').remove(); }
+  });
+
+  /* ввід у чернетці не має доходити до обробників #app-form: ті зберігають
+     стан і перебудовують прив'язки на кожне натискання */
+  inputEdit.addEventListener('input', function (event) {
+    if (event.target.tagName === 'TEXTAREA') { autoGrow(event.target); }
+    event.stopPropagation();
+  });
+  inputEdit.addEventListener('change', function (event) { event.stopPropagation(); });
 
   addBlockBtn.addEventListener('click', function () {
     addBlockRow('', '', '', false);
@@ -5346,8 +5610,9 @@ firebase.initializeApp(firebaseConfig);
     updateEditNotice();
   });
 
-  /* sl-change приходить лише від дій користувача (тип аудиторії, прапорець
-     «читають поштучно»), не від програмного встановлення значення */
+  /* sl-change приходить лише від дій користувача (прапорець «читають
+     поштучно», селекти й прапорці прив'язок), не від програмного
+     встановлення значення */
   form.addEventListener('sl-change', function (event) {
     markDesignerSource(event.target);
     renderSourceMarks();
