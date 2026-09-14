@@ -1719,61 +1719,64 @@ textarea.field-input {
   flex-shrink: 0;
 }
 
-/* один рядок-прив'язка: задача ▾ "для" аудиторія ▾ ✕ — усі елементи
-   в один потік, без переносу (фіксована ширина сторінки, місця
-   вистачає навіть із чотирма елементами в рядку) */
-.confirm-link-row {
-  display: flex;
+/* Матриця «задача × аудиторія» — замінила рядки з двома sl-select
+   (BUGS.md, той самий контейнер .confirm-links, лише інший вміст).
+   Рамка й радіус — ті самі, що в полів (--radius-md, --sl-input-
+   border-radius-medium теж на нього посилається), заливки нема —
+   фон картки просвічує. Колонок стільки, скільки аудиторій: 1fr для
+   назв задач, по auto на кожну аудиторію — рахується й проставляється
+   в JS (audienceItems.length), тут лише правило, значення різне для
+   кожної картки. */
+/* пласка сітка: кожна клітинка — прямий елемент .link-matrix, рядки —
+   природне перенесення після заданої кількості колонок (grid-template-
+   columns, рахує JS), без обгортки на рядок і без subgrid — той
+   механізм тут не потрібен, вирівнювання все одно в одному контейнері */
+.link-matrix {
+  display: grid;
   align-items: center;
-  gap: var(--spacing-8);
   width: 100%;
+  border: 1px solid var(--border-card);
+  border-radius: var(--radius-md);
+  padding: var(--spacing-12) var(--spacing-16);
+  row-gap: var(--spacing-8);
+  column-gap: var(--spacing-12);
 }
 
-.confirm-link-row sl-select {
-  flex: 1 1 0;
+/* одна колонка (одна аудиторія) — шапки й лінії нема, підписувати
+   нема чого: рендер вирішує renderLinkMatrix(), не тут */
+.link-matrix__col-head {
+  justify-self: center;
+}
+
+/* одна лінія на всю ширину матриці, не по лінії під кожним рядком —
+   спокійніша в щільній картці, колонку тримають самі позначки */
+.link-matrix__divider {
+  grid-column: 1 / -1;
+  height: 1px;
+  background: var(--border-card);
+}
+
+.link-matrix__label {
   min-width: 0;
 }
 
-/* прапорець «кнопка» — четверта колонка рядка, своєї ширини: стискаються
-   селекти, картка не росте */
-.confirm-link-cta {
-  flex-shrink: 0;
-}
-
-.confirm-link-remove {
-  flex-shrink: 0;
-  background: none;
-  border: none;
-  padding: var(--spacing-4);
-  font-family: 'DM Sans', sans-serif;
-  font-size: 18px;
-  line-height: 1;
-  color: var(--text-secondary);
-  cursor: pointer;
-}
-
-/* "усі аудиторії" — пунктирна рамка на самому селекті: сигналізує
-   "динамічно обчислюється", а не застиглий конкретний вибір */
-.confirm-audience-select--all::part(combobox) {
-  border-style: dashed;
-}
-
-/* "+ прив'язати задачу" / "+ ще одна прив'язка" — легша дія, ніж
-   .field-add-btn (та бордер-кнопка для "додати новий рядок форми" на
-   Екрані 1); тут це повторювана дрібна дія всередині вже існуючої
-   картки, тому просто підкреслений текст. Кольори й розмір — наявні
-   токени, border-bottom:dashed своя, іншого способу підкреслити
-   пунктиром у проєкті нема */
-.confirm-add-link {
-  align-self: flex-start;
-  background: none;
-  border: none;
-  border-bottom: 1px dashed var(--border-medium);
+/* кругла позначка-перемикач: контур у спокої, заливка акцентним при
+   виборі — той самий --accent-yellow, що на головних кнопках, не
+   новий колір. 20px — var(--spacing-20), не вигадане число. */
+.link-matrix__cell {
+  width: var(--spacing-20);
+  height: var(--spacing-20);
+  justify-self: center;
   padding: 0;
-  font-family: 'DM Sans', sans-serif;
-  font-size: 14px;
-  color: var(--text-secondary);
+  background: transparent;
+  border: 1px solid var(--border-card);
+  border-radius: var(--radius-pill);
   cursor: pointer;
+}
+
+.link-matrix__cell[aria-pressed="true"] {
+  background: var(--accent-yellow);
+  border-color: var(--accent-yellow);
 }
 
 </style>
@@ -2847,7 +2850,12 @@ firebase.initializeApp(firebaseConfig);
      і Promise.all з undefined миттєво "резолвиться", нічого не чекаючи;
      (2) навіть після реєстрації класів — sl-select дізнається про свої
      sl-option лише після updateComplete кожного з них. Тому чекаємо
-     обидва рівні по черзі, а не покладаємось на сам факт appendChild. */
+     обидва рівні по черзі, а не покладаємось на сам факт appendChild.
+     Наразі без викликів — єдиний споживач (рядки прив'язок) прибрано на
+     користь матриці (BUGS.md); лишена навмисно, не забуто прибрати: та
+     сама гонка чекає кожен новий sl-select зі значенням, поставленим із
+     коду, і переоткривати її вдруге дорожче, ніж тримати непотрібний
+     виклик кілька тижнів. */
   function setSlSelectValue(select, value) {
     return Promise.all([customElements.whenDefined('sl-select'), customElements.whenDefined('sl-option')])
       .then(function () {
@@ -5215,15 +5223,6 @@ firebase.initializeApp(firebaseConfig);
 
   /* ---------- екран 2: підтвердження перед генерацією ---------- */
 
-
-  /* текст задачі/аудиторії — від дизайнера, тому textContent, не innerHTML-конкатенація */
-  function makeOption(value, label) {
-    var opt = document.createElement('sl-option');
-    opt.value = value;
-    opt.textContent = label;
-    return opt;
-  }
-
   /* Був непорожнім масивом пар, після виключення невалідних taskId/
      audienceId спорожнів → null (не []): звужений вибір, що втратив усі
      свої посилання, не застигає порожнім, а знімається — та сама логіка,
@@ -5394,109 +5393,138 @@ firebase.initializeApp(firebaseConfig);
     blockItems.forEach(function (item) { updateBlockProblemMark(item); });
   }
 
-  /* Один рядок-прив'язка: "задача ▾ для аудиторія ▾ ✕". Аудиторія й
-     "для" не рендеряться, якщо аудиторія у формі одна — audienceId
-     тоді вже примусово проставлений в pruneConfirmRefs(). */
-  function buildLinkRow(blockItem, links, index, taskItems, audienceItems, showAudienceSelect) {
-    var link = links[index];
-    var linkRow = el('div', 'confirm-link-row');
-    linkRow.blockItemRef = blockItem;
-    linkRow.linkIndex = index;
-
-    var taskSelect = document.createElement('sl-select');
-    taskSelect.className = 'confirm-link-task-select';
-    taskItems.forEach(function (taskItem) {
-      taskSelect.appendChild(makeOption(taskItem.dataset.id, taskItem.querySelector('.task-input').value));
+  /* Чи покриває блок пару задача↔аудиторія — конкретна пара або пара
+     "усі аудиторії" (той самий підрахунок, що в computeVariantMetrics).
+     Матриця сама більше ніколи не пише AUDIENCE_ALL_VALUE — лише читає
+     її: стара пара "усі аудиторії" (з розбору чи попередньої сесії)
+     показує обидві клітинки позначеними. */
+  function linkCovers(links, taskId, audienceId) {
+    if (!Array.isArray(links)) { return false; }
+    return links.some(function (l) {
+      return l.taskId === taskId && (l.audienceId === audienceId || l.audienceId === AUDIENCE_ALL_VALUE);
     });
-    linkRow.appendChild(taskSelect);
-    setSlSelectValue(taskSelect, link.taskId);
+  }
 
-    if (showAudienceSelect) {
-      linkRow.appendChild(el('span', 'field-hint', 'для'));
+  /* Клік по клітинці матриці — створює або знімає конкретну пару
+     {taskId, audienceId}. Зняття клітинки, яку покриває пара "усі
+     аудиторії" (не конкретна), спершу розкладає її на конкретні пари
+     для решти аудиторій (cta зберігається), і лише тоді знімає
+     позначену — без цього кроку зняття не мало б ефекту: жодна
+     конкретна пара з таким audienceId не існує, щоб її прибрати
+     (неочевидний випадок, BUGS.md). Порожньо після зняття — null, не
+     []: та сама межа, що при видаленні останнього рядка раніше й у
+     pruneBlockLinks() — звужений вибір, що втратив усі пари, не
+     застигає порожнім, а знімається. */
+  function toggleLinkPair(blockItem, taskId, audienceId, allAudienceIds) {
+    var links = JSON.parse(blockItem.dataset.links || 'null');
+    if (!Array.isArray(links)) { links = []; }
 
-      var audienceSelect = document.createElement('sl-select');
-      audienceSelect.className = 'confirm-link-audience-select';
-      if (link.audienceId === AUDIENCE_ALL_VALUE) {
-        audienceSelect.classList.add('confirm-audience-select--all');
+    var exactIndex = -1;
+    for (var i = 0; i < links.length; i++) {
+      if (links[i].taskId === taskId && links[i].audienceId === audienceId) { exactIndex = i; break; }
+    }
+
+    if (exactIndex !== -1) {
+      links.splice(exactIndex, 1);
+    } else {
+      var allIndex = -1;
+      for (var j = 0; j < links.length; j++) {
+        if (links[j].taskId === taskId && links[j].audienceId === AUDIENCE_ALL_VALUE) { allIndex = j; break; }
       }
-      /* "усі аудиторії" першою, відділена розділювачем від конкретних —
-         не multiple, тож жодної логіки взаємовиключності тут не треба:
-         вибір будь-якої опції просто замінює попередній */
-      audienceSelect.appendChild(makeOption(AUDIENCE_ALL_VALUE, 'усі аудиторії'));
-      audienceSelect.appendChild(document.createElement('sl-divider'));
-      audienceItems.forEach(function (audienceItem) {
-        audienceSelect.appendChild(makeOption(audienceItem.dataset.id, audienceItem.querySelector('.audience-input').value));
-      });
-      linkRow.appendChild(audienceSelect);
-      setSlSelectValue(audienceSelect, link.audienceId);
+      if (allIndex !== -1) {
+        var allPair = links[allIndex];
+        links.splice(allIndex, 1);
+        allAudienceIds.forEach(function (aid) {
+          if (aid !== audienceId) { links.push({ taskId: taskId, audienceId: aid, cta: allPair.cta }); }
+        });
+      } else {
+        links.push({ taskId: taskId, audienceId: audienceId, cta: false });
+      }
     }
 
-    /* Кнопка дії — прапорець на парі, а не окреме поле: її аудиторія —
-       аудиторія задачі, яку блок закриває, а текст кнопки на метрику не
-       впливає (рахується позиція й доказова база до неї). Кілька
-       прапорців у блоці — одна позиція (номер блоку), кілька дій. Блок
-       без пар кнопки мати не може: кандидат виникає з покриття задачі */
-    var ctaCheckbox = document.createElement('sl-checkbox');
-    ctaCheckbox.className = 'confirm-link-cta';
-    ctaCheckbox.textContent = 'кнопка';
-    if (link.cta === true) { ctaCheckbox.setAttribute('checked', ''); }
-    linkRow.appendChild(ctaCheckbox);
-
-    var removeBtn = document.createElement('button');
-    removeBtn.type = 'button';
-    removeBtn.className = 'confirm-link-remove';
-    removeBtn.setAttribute('aria-label', "Прибрати прив'язку");
-    removeBtn.textContent = '✕';
-    linkRow.appendChild(removeBtn);
-
-    return linkRow;
+    blockItem.dataset.links = JSON.stringify(links.length ? links : null);
+    setLinksSource(blockItem, 'designer');
+    saveState();
+    renderBlockLinks(blockItem);
+    updateMissingSection();
   }
 
-  /* Порожній рядок-чернетка: живе тільки в DOM, у links не пишеться.
-     Без linkIndex — це і є ознака "чернетка" для обробників нижче.
-     Задача — обов'язковий плейсхолдер; аудиторія (якщо є) теж порожня,
-     а не "усі аудиторії" за замовчуванням — дизайнер ще нічого не обрав. */
-  function buildDraftLinkRow(blockItem, taskItems, audienceItems, showAudienceSelect) {
-    var linkRow = el('div', 'confirm-link-row');
-    linkRow.blockItemRef = blockItem;
+  /* Стан агрегованого прапорця «кнопка»: усі пари блоку true → checked,
+     усі false → unchecked, розходяться (так приходить із розбору —
+     різні аудиторії, різні кнопки, «Долучайся» на «Ватрі») →
+     indeterminate. null — пар нема, прапорець не рендериться. */
+  function ctaAggregateState(links) {
+    if (!Array.isArray(links) || links.length === 0) { return null; }
+    var allTrue = links.every(function (l) { return l.cta === true; });
+    if (allTrue) { return 'checked'; }
+    var allFalse = links.every(function (l) { return l.cta !== true; });
+    if (allFalse) { return 'unchecked'; }
+    return 'mixed';
+  }
 
-    var taskSelect = document.createElement('sl-select');
-    taskSelect.className = 'confirm-link-task-select';
-    taskSelect.setAttribute('placeholder', 'оберіть задачу');
-    taskItems.forEach(function (taskItem) {
-      taskSelect.appendChild(makeOption(taskItem.dataset.id, taskItem.querySelector('.task-input').value));
+  /* Прапорець «кнопка» — на блок, пише в усі поточні пари одразу: він
+     про блок ("чи є в цьому блоці кнопка"), а не про конкретний
+     перетин, хоч cta й лишається властивістю пари (етап 4, PROGRESS.md
+     — її аудиторія це аудиторія задачі, яку блок закриває; на «Ватрі»
+     блок «Долучайся» мав різні кнопки для різних аудиторій, тож
+     сплощення в окреме поле на блок загубило б реальну відмінність).
+     indeterminate → клік ставить true всім, не false: розбіжність, що
+     її дав розбір, дизайнер розв'язує в бік "є", не мовчки стирає. */
+  function setAllCta(blockItem, value) {
+    var links = JSON.parse(blockItem.dataset.links || 'null');
+    if (!Array.isArray(links) || !links.length) { return; }
+    links.forEach(function (l) { l.cta = value; });
+    blockItem.dataset.links = JSON.stringify(links);
+    setLinksSource(blockItem, 'designer');
+    saveState();
+  }
+
+  /* Матриця «задача × аудиторія»: рядки — усі задачі прогону, колонки —
+     аудиторії. Одна аудиторія — колонка одна, без шапки й без лінії під
+     нею: підписувати нема чого. Клітинки — прямі діти .link-matrix
+     (grid-template-columns рахує й проставляє тут же), рядки — природне
+     перенесення сітки, без subgrid: усе в одному контейнері. */
+  function renderLinkMatrix(links, taskItems, audienceItems) {
+    var showHeader = audienceItems.length > 1;
+    var matrix = el('div', 'link-matrix');
+    matrix.style.gridTemplateColumns = '1fr repeat(' + audienceItems.length + ', auto)';
+
+    if (showHeader) {
+      matrix.appendChild(el('span', 'link-matrix__label'));
+      audienceItems.forEach(function (a) {
+        matrix.appendChild(el('span', 'link-matrix__col-head field-caption', a.querySelector('.audience-input').value.trim()));
+      });
+      matrix.appendChild(el('div', 'link-matrix__divider'));
+    }
+
+    taskItems.forEach(function (t) {
+      var taskLabel = t.querySelector('.task-input').value.trim();
+      matrix.appendChild(el('span', 'link-matrix__label', taskLabel));
+      audienceItems.forEach(function (a) {
+        var audienceLabel = a.querySelector('.audience-input').value.trim();
+        var on = linkCovers(links, t.dataset.id, a.dataset.id);
+        var cell = document.createElement('button');
+        cell.type = 'button';
+        cell.className = 'link-matrix__cell';
+        cell.setAttribute('aria-pressed', String(on));
+        cell.setAttribute('aria-label', taskLabel + ' — ' + audienceLabel);
+        cell.dataset.taskId = t.dataset.id;
+        cell.dataset.audienceId = a.dataset.id;
+        matrix.appendChild(cell);
+      });
     });
-    linkRow.appendChild(taskSelect);
 
-    if (showAudienceSelect) {
-      linkRow.appendChild(el('span', 'field-hint', 'для'));
-
-      var audienceSelect = document.createElement('sl-select');
-      audienceSelect.className = 'confirm-link-audience-select';
-      audienceSelect.setAttribute('placeholder', 'оберіть аудиторію');
-      audienceSelect.appendChild(makeOption(AUDIENCE_ALL_VALUE, 'усі аудиторії'));
-      audienceSelect.appendChild(document.createElement('sl-divider'));
-      audienceItems.forEach(function (audienceItem) {
-        audienceSelect.appendChild(makeOption(audienceItem.dataset.id, audienceItem.querySelector('.audience-input').value));
-      });
-      linkRow.appendChild(audienceSelect);
-    }
-
-    var removeBtn = document.createElement('button');
-    removeBtn.type = 'button';
-    removeBtn.className = 'confirm-link-remove';
-    removeBtn.setAttribute('aria-label', "Прибрати рядок");
-    removeBtn.textContent = '✕';
-    linkRow.appendChild(removeBtn);
-
-    return linkRow;
+    return matrix;
   }
 
-  /* Прив'язки задача↔аудиторія — рядки всередині картки блоку, нижче
+  /* Прив'язки задача↔аудиторія — матриця всередині картки блоку, нижче
      одиниці й кількості (етап 3а: об'єднання з колишнім Екраном 2, одне
      джерело істини — .block-item, не дві розмітки того самого блоку).
-     Оновлює лише .confirm-links цієї картки, поля name/unit/count/countable
-     не чіпаються — фокус і курсор під час друку не губляться. */
+     Замінила рядки з двома sl-select (BUGS.md) — десять блоків більше
+     не відкривають ті самі три задачі в закритому полі по десять разів,
+     вибране видно одразу. Оновлює лише .confirm-links цієї картки, поля
+     name/unit/count/countable не чіпаються — фокус і курсор під час
+     друку не губляться. */
   function renderBlockLinks(blockItem) {
     var container = blockItem.querySelector('.confirm-links');
     var name = blockItem.querySelector('.block-name').value.trim();
@@ -5509,29 +5537,27 @@ firebase.initializeApp(firebaseConfig);
     var audienceItems = Array.from(audienceList.querySelectorAll('.audience-item')).filter(function (item) {
       return item.querySelector('.audience-input').value.trim() !== '';
     });
-    var showAudienceSelect = audienceItems.length > 1;
 
     var links = JSON.parse(blockItem.dataset.links || 'null');
     var hasLinks = Array.isArray(links) && links.length > 0;
-    /* [] від агента, ще не підтверджений: прапорець не стоїть і кнопка
-       прив'язки видна — рішення за дизайнером, не прийняте за нього */
+    /* [] від агента, ще не підтверджений: матриця видна, рішення за
+       дизайнером, не прийняте за нього */
     var pending = isLinksPending(blockItem);
+    var showMatrix = taskItems.length > 0 && audienceItems.length > 0 && (links === null || hasLinks || pending);
 
-    if (hasLinks) {
-      links.forEach(function (link, index) {
-        container.appendChild(buildLinkRow(blockItem, links, index, taskItems, audienceItems, showAudienceSelect));
-      });
-    }
+    if (showMatrix) {
+      container.appendChild(el('p', 'field-hint', 'Кому яку задачу закриває'));
+      container.appendChild(renderLinkMatrix(links, taskItems, audienceItems));
 
-    /* "+ прив'язати задачу", поки рядків нема; "+ ще одна прив'язка",
-       коли вже є хоч один; нема опції взагалі — нема самих задач,
-       прив'язувати нічого */
-    if (taskItems.length > 0 && (links === null || hasLinks || pending)) {
-      var addBtn = document.createElement('button');
-      addBtn.type = 'button';
-      addBtn.className = 'confirm-add-link';
-      addBtn.textContent = hasLinks ? "+ ще одна прив'язка" : "+ прив'язати задачу";
-      container.appendChild(addBtn);
+      var ctaState = ctaAggregateState(links);
+      if (ctaState !== null) {
+        var ctaCheckbox = document.createElement('sl-checkbox');
+        ctaCheckbox.className = 'confirm-link-cta';
+        ctaCheckbox.textContent = 'кнопка';
+        if (ctaState === 'checked') { ctaCheckbox.setAttribute('checked', ''); }
+        else if (ctaState === 'mixed') { ctaCheckbox.setAttribute('indeterminate', ''); }
+        container.appendChild(ctaCheckbox);
+      }
     }
 
     var checkbox = document.createElement('sl-checkbox');
@@ -5563,92 +5589,27 @@ firebase.initializeApp(firebaseConfig);
     pruneStructuresDraft();
   }
 
-  /* Один делегований sl-change на #block-list — для селектів усередині
-     рядків-прив'язок і для чекбокса «блок не обслуговує задач». Кожна
+  /* Один делегований sl-change на #block-list — для агрегованого
+     прапорця «кнопка» і для чекбокса «блок не обслуговує задач». Кожна
      зміна оновлює лише .confirm-links свого блоку (renderBlockLinks), не
      всі картки — на відміну від колишнього renderConfirmBlocks(). */
   blockList.addEventListener('sl-change', function (event) {
     var target = event.target;
 
-    if (target.classList.contains('confirm-link-task-select')) {
-      var linkRow = target.closest('.confirm-link-row');
-      if (!linkRow) { return; }
-
-      if (linkRow.linkIndex === undefined) {
-        /* чернетка: вибір задачі перетворює рядок на реальну пару.
-           Аудиторія — та, що вже обрана в цьому ж рядку (select.value
-           сам це пам'ятає, навіть якщо в links ще нічого не писали),
-           інакше той самий дефолт, що раніше ставив клік "+" */
-        var draftAudienceSelect = linkRow.querySelector('.confirm-link-audience-select');
-        var chosenAudienceId = draftAudienceSelect && draftAudienceSelect.value ? draftAudienceSelect.value : null;
-
-        var liveAudienceItemsForDraft = Array.from(audienceList.querySelectorAll('.audience-item')).filter(function (item) {
-          return item.querySelector('.audience-input').value.trim() !== '';
-        });
-        if (!chosenAudienceId && !liveAudienceItemsForDraft.length) { return; }
-        var newAudienceId = chosenAudienceId
-          || (liveAudienceItemsForDraft.length > 1 ? AUDIENCE_ALL_VALUE : liveAudienceItemsForDraft[0].dataset.id);
-
-        var draftLinks = JSON.parse(linkRow.blockItemRef.dataset.links || 'null');
-        if (!Array.isArray(draftLinks)) { draftLinks = []; }
-        draftLinks.push({ taskId: target.value, audienceId: newAudienceId, cta: false });
-        linkRow.blockItemRef.dataset.links = JSON.stringify(draftLinks);
-        setLinksSource(linkRow.blockItemRef, 'designer');
-        saveState();
-        renderBlockLinks(linkRow.blockItemRef);
-        updateMissingSection();
-        return;
-      }
-
-      var links = JSON.parse(linkRow.blockItemRef.dataset.links || 'null');
-      if (!Array.isArray(links)) { return; }
-      links[linkRow.linkIndex].taskId = target.value;
-      linkRow.blockItemRef.dataset.links = JSON.stringify(links);
-      setLinksSource(linkRow.blockItemRef, 'designer');
-      saveState();
-      updateMissingSection();
-      return;
-    }
-
-    if (target.classList.contains('confirm-link-audience-select')) {
-      var linkRow2 = target.closest('.confirm-link-row');
-      if (!linkRow2) { return; }
-
-      target.classList.toggle('confirm-audience-select--all', target.value === AUDIENCE_ALL_VALUE);
-
-      if (linkRow2.linkIndex === undefined) {
-        /* чернетка без задачі: значення вже "запам'яталось" у самому
-           select.value — writing в links тільки коли обрано задачу */
-        return;
-      }
-
-      var links2 = JSON.parse(linkRow2.blockItemRef.dataset.links || 'null');
-      if (!Array.isArray(links2)) { return; }
-      links2[linkRow2.linkIndex].audienceId = target.value;
-      linkRow2.blockItemRef.dataset.links = JSON.stringify(links2);
-      setLinksSource(linkRow2.blockItemRef, 'designer');
-      saveState();
-      updateMissingSection();
-      return;
-    }
-
     if (target.classList.contains('confirm-link-cta')) {
-      var ctaRow = target.closest('.confirm-link-row');
-      /* у чернетки прапорця немає — він з'являється, коли рядок стає парою */
-      if (!ctaRow || ctaRow.linkIndex === undefined) { return; }
-      var ctaLinks = JSON.parse(ctaRow.blockItemRef.dataset.links || 'null');
-      if (!Array.isArray(ctaLinks) || !ctaLinks[ctaRow.linkIndex]) { return; }
-      ctaLinks[ctaRow.linkIndex].cta = target.checked;
-      ctaRow.blockItemRef.dataset.links = JSON.stringify(ctaLinks);
-      setLinksSource(ctaRow.blockItemRef, 'designer');
-      saveState();
+      var ctaBlockItem = target.closest('.block-item');
+      if (!ctaBlockItem) { return; }
+      var ctaLinks = JSON.parse(ctaBlockItem.dataset.links || 'null');
+      var wasChecked = ctaAggregateState(ctaLinks) === 'checked';
+      setAllCta(ctaBlockItem, !wasChecked);
+      renderBlockLinks(ctaBlockItem);
       return;
     }
 
     if (target.classList.contains('confirm-no-links-checkbox')) {
       var blockItem = target.closest('.block-item');
       if (!blockItem) { return; }
-      /* позначено → [] (свідомо без задачі), рядки ховаються; знято →
+      /* позначено → [] (свідомо без задачі), матриця ховається; знято →
          null (не обрано), а не назад у порожній масив. Позначка дизайнером
          і є підтвердженням [] від розбору: «перевір» стає «вирішено» */
       blockItem.dataset.links = JSON.stringify(target.checked ? [] : null);
@@ -5659,52 +5620,19 @@ firebase.initializeApp(firebaseConfig);
     }
   });
 
-  /* click, не sl-change: "+ прив'язати"/"+ ще одна" і "✕" — звичайні
-     кнопки, не Shoelace-компоненти */
+  /* click, не sl-change: клітинки матриці — звичайні кнопки, не
+     Shoelace-компоненти */
   blockList.addEventListener('click', function (event) {
-    var addBtn = event.target.closest('.confirm-add-link');
-    if (addBtn) {
-      var blockItem = addBtn.closest('.block-item');
-      if (!blockItem) { return; }
+    var cell = event.target.closest('.link-matrix__cell');
+    if (!cell) { return; }
+    var blockItem = cell.closest('.block-item');
+    if (!blockItem) { return; }
 
-      var liveTaskItems = Array.from(taskList.querySelectorAll('.task-item')).filter(function (item) {
-        return item.querySelector('.task-input').value.trim() !== '';
-      });
-      var liveAudienceItems = Array.from(audienceList.querySelectorAll('.audience-item')).filter(function (item) {
-        return item.querySelector('.audience-input').value.trim() !== '';
-      });
-      if (!liveTaskItems.length) { return; }
+    var liveAudienceIds = Array.from(audienceList.querySelectorAll('.audience-item'))
+      .filter(function (item) { return item.querySelector('.audience-input').value.trim() !== ''; })
+      .map(function (item) { return item.dataset.id; });
 
-      /* нічого не пишемо в links — тільки порожній рядок у DOM, з
-         плейсхолдером "оберіть задачу". Пара з'явиться, коли дизайнер
-         справді щось обере (sl-change на .confirm-link-task-select) */
-      var draftRow = buildDraftLinkRow(blockItem, liveTaskItems, liveAudienceItems, liveAudienceItems.length > 1);
-      addBtn.parentNode.insertBefore(draftRow, addBtn);
-      return;
-    }
-
-    var removeBtn = event.target.closest('.confirm-link-remove');
-    if (removeBtn) {
-      var linkRow = removeBtn.closest('.confirm-link-row');
-      if (!linkRow || !linkRow.blockItemRef) { return; }
-
-      if (linkRow.linkIndex === undefined) {
-        /* чернетка ще не в links — просто прибрати з DOM */
-        linkRow.remove();
-        return;
-      }
-
-      var links2 = JSON.parse(linkRow.blockItemRef.dataset.links || 'null');
-      if (!Array.isArray(links2)) { return; }
-      links2.splice(linkRow.linkIndex, 1);
-      /* останній рядок прибрано вручну (не чекбоксом) — назад у null,
-         той самий принцип, що й у pruneBlockLinks() */
-      linkRow.blockItemRef.dataset.links = JSON.stringify(links2.length ? links2 : null);
-      setLinksSource(linkRow.blockItemRef, 'designer');
-      saveState();
-      renderBlockLinks(linkRow.blockItemRef);
-      updateMissingSection();
-    }
+    toggleLinkPair(blockItem, cell.dataset.taskId, cell.dataset.audienceId, liveAudienceIds);
   });
 
   /* Вхід на Узгодження (перейменований колишній Екран 2, «Підтвердження
