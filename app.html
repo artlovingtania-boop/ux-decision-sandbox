@@ -1110,8 +1110,7 @@ textarea.field-input {
    всі три варіанти мають бути видимі одразу */
 .flow {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
+  flex-direction: column;
   gap: var(--spacing-8);
 }
 
@@ -1138,8 +1137,7 @@ textarea.field-input {
   color: var(--text-secondary);
 }
 
-/* точка дії — факт структури, а не висновок, тому нейтрально:
-   рамка без заливки. Зелений лишився тільки бейджу «без критичних зауважень» */
+/* точка дії — факт структури, а не висновок, тому нейтрально: рамка без заливки */
 .flow__item--action {
   background: transparent;
   border-color: var(--border-focus);
@@ -1821,7 +1819,7 @@ sl-button[variant="text"]::part(label):hover {
   <section class="structure-section" id="structure-baseline">
     <div class="structure-section__head">
       <h2 class="result-section__title">Базова структура</h2>
-      <p class="field-caption">порядок з опису сторінки · не перетягується</p>
+      <p class="field-hint">порядок з опису сторінки · не перетягується</p>
     </div>
     <div class="structure-block-list" id="structure-baseline-list"></div>
   </section>
@@ -3207,7 +3205,7 @@ firebase.initializeApp(firebaseConfig);
       item.appendChild(el('span', 'flow__index', String(index + 1) + ' ·'));
       item.appendChild(el('span', null, block.name));
       if (block.action) {
-        item.appendChild(el('span', 'flow__note', '· точка дії'));
+        item.appendChild(el('span', 'flow__note', '· кнопка'));
       }
       flow.appendChild(item);
     });
@@ -3445,7 +3443,7 @@ firebase.initializeApp(firebaseConfig);
   function renderStructureCard(structure, index, state, structureMetrics, findings, personaResult) {
     var card = el('article', 'variant-card');
 
-    var badge = el('span', 'tag tag--green-soft', 'без критичних зауважень');
+    var badge = el('span', 'tag tag--muted', 'без критичних зауважень');
     if (!hasCleanPersonaAudit(personaResult)) { badge.classList.add('variant-card__badge--empty'); }
     card.appendChild(badge);
 
@@ -4286,7 +4284,7 @@ firebase.initializeApp(firebaseConfig);
     });
     personaSwitcher.appendChild(row);
 
-    personaSwitcher.appendChild(el('p', 'field-caption', IS_KOLO_AUDIENCE
+    personaSwitcher.appendChild(el('p', 'field-hint', IS_KOLO_AUDIENCE
       ? 'Персона калібрована на конкретному класі читача — вибір визначає, з чиєї позиції оцінюється структура'
       : 'Каліброваної персони для цієї аудиторії немає — персонний аудит не виконується'));
   }
