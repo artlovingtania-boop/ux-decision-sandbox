@@ -1724,9 +1724,12 @@ textarea.field-input {
    Рамка й радіус — ті самі, що в полів (--radius-md, --sl-input-
    border-radius-medium теж на нього посилається), заливки нема —
    фон картки просвічує. Колонок стільки, скільки аудиторій: 1fr для
-   назв задач, по auto на кожну аудиторію — рахується й проставляється
-   в JS (audienceItems.length), тут лише правило, значення різне для
-   кожної картки. */
+   назв задач, по var(--spacing-80) на кожну аудиторію (з макета) —
+   рахується й проставляється в JS (audienceItems.length), тут лише
+   правило, значення різне для кожної картки. Фіксована ширина, не
+   auto: auto тягнувся б до повної назви аудиторії в шапці й ламав
+   сітку (колонки різної ширини, підписи не над своєю колонкою,
+   кружечки пливуть по висоті — усе це той самий корінь). */
 /* пласка сітка: кожна клітинка — прямий елемент .link-matrix, рядки —
    природне перенесення після заданої кількості колонок (grid-template-
    columns, рахує JS), без обгортки на рядок і без subgrid — той
@@ -1743,9 +1746,29 @@ textarea.field-input {
 }
 
 /* одна колонка (одна аудиторія) — шапки й лінії нема, підписувати
-   нема чого: рендер вирішує renderLinkMatrix(), не тут */
+   нема чого: рендер вирішує renderLinkMatrix(), не тут.
+   Звичайний приглушений текст (.field-hint), не моноширинний капс —
+   той самий перегляд, що вже пройшли інші екрани цього дня.
+   min-width: 0 дає колонці (80px, вище) справді обрізати текст замість
+   того, щоб тягнутись під нього; overflow/ellipsis — сам обрізок,
+   повна назва — в title (JS), не губиться, просто не на екрані. */
 .link-matrix__col-head {
-  justify-self: center;
+  /* justify-self: stretch (за замовчуванням, не center) — інакше елемент
+     стискається до розміру власного тексту й overflow/ellipsis нема
+     до чого застосувати: колонка лишається 80px, а текст вилазить за
+     неї й перекриває сусідню (знайдено виміром: без stretch ширина
+     заголовка була 289px у 80px колонці). text-align центрує вже
+     обрізаний текст усередині реальної ширини колонки. */
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  text-align: center;
+  font-family: 'DM Sans', sans-serif;
+  font-weight: 400;
+  font-size: 14px;
+  line-height: 1.4;
+  color: var(--text-secondary);
 }
 
 /* одна лінія на всю ширину матриці, не по лінії під кожним рядком —
@@ -1762,10 +1785,15 @@ textarea.field-input {
 
 /* кругла позначка-перемикач: контур у спокої, заливка акцентним при
    виборі — той самий --accent-yellow, що на головних кнопках, не
-   новий колір. 20px — var(--spacing-20), не вигадане число. */
+   новий колір. 18px — з макета (не токен: найближчий, 20, з макетом
+   не збігається — тут точне значення важливіше за токен). center у
+   рядку різної висоти (назва задачі переноситься) дає align-items:
+   center на .link-matrix вище — він працює по-рядково, не по всій
+   сітці одразу, доки колонки не ламають розкладку самі (тому й
+   фіксована ширина, не auto). */
 .link-matrix__cell {
-  width: var(--spacing-20);
-  height: var(--spacing-20);
+  width: 18px;
+  height: 18px;
   justify-self: center;
   padding: 0;
   background: transparent;
@@ -5487,12 +5515,17 @@ firebase.initializeApp(firebaseConfig);
   function renderLinkMatrix(links, taskItems, audienceItems) {
     var showHeader = audienceItems.length > 1;
     var matrix = el('div', 'link-matrix');
-    matrix.style.gridTemplateColumns = '1fr repeat(' + audienceItems.length + ', auto)';
+    matrix.style.gridTemplateColumns = '1fr repeat(' + audienceItems.length + ', var(--spacing-80))';
 
     if (showHeader) {
       matrix.appendChild(el('span', 'link-matrix__label'));
       audienceItems.forEach(function (a) {
-        matrix.appendChild(el('span', 'link-matrix__col-head field-caption', a.querySelector('.audience-input').value.trim()));
+        var audienceLabel = a.querySelector('.audience-input').value.trim();
+        var colHead = el('span', 'link-matrix__col-head', audienceLabel);
+        /* обрізає сам CSS (ellipsis, колонка 80px) — повна назва тут,
+           не губиться, просто не на екрані */
+        colHead.title = audienceLabel;
+        matrix.appendChild(colHead);
       });
       matrix.appendChild(el('div', 'link-matrix__divider'));
     }
