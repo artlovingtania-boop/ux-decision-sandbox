@@ -1476,7 +1476,7 @@ textarea.field-input {
 .carry-pill {
   display: flex;
   align-items: center;
-  gap: var(--spacing-8);
+  gap: var(--spacing-12);
   padding: var(--spacing-8) var(--spacing-16);
   background: var(--surface-card);
   border: 1px solid var(--border-card);
@@ -1808,10 +1808,14 @@ textarea.field-input {
 }
 
 /* рядок-розкриття матриці, коли пар іще нема — легша дія, не картка,
-   повторюється в кожному блоці без прив'язок. Кольори й розмір — наявні
-   токени, border-bottom:dashed своя, іншого способу підкреслити
-   пунктиром у проєкті нема (той самий клас, що в "+ ще одна прив'язка"
-   до переходу на матрицю — повернула під нову роль, не вигадала заново) */
+   повторюється в кожному блоці без прив'язок. Звичайний колір тексту
+   (--text-primary), не приглушений: поруч недоступний прапорець
+   «кнопка» тим самим сірим, і три бліді рядки підряд не давали
+   зрозуміти, що з них клікається — контраст між ними й має це
+   показувати. Розмір — наявний токен, border-bottom:dashed своя,
+   іншого способу підкреслити пунктиром у проєкті нема (той самий клас,
+   що в "+ ще одна прив'язка" до переходу на матрицю — повернула під
+   нову роль, не вигадала заново) */
 .confirm-add-link {
   align-self: flex-start;
   background: none;
@@ -1820,7 +1824,7 @@ textarea.field-input {
   padding: 0;
   font-family: 'DM Sans', sans-serif;
   font-size: 14px;
-  color: var(--text-secondary);
+  color: var(--text-primary);
   cursor: pointer;
 }
 
@@ -2108,7 +2112,7 @@ sl-button[variant="text"]::part(label):hover {
       <h2 class="result-section__title">Не вистачає</h2>
       <sl-alert variant="warning" open id="missing-alert">
         <div class="summary-list" id="missing-list"></div>
-        <p id="missing-summary" hidden>Усі блоки готові — можна генерувати.</p>
+        <p id="missing-summary" hidden>Усі блоки готові — можна переходити до структур.</p>
       </sl-alert>
     </section>
 
@@ -5408,7 +5412,11 @@ firebase.initializeApp(firebaseConfig);
 
     missingAlert.variant = generateErrorText ? 'danger' : (ready ? 'neutral' : 'warning');
     missingList.hidden = rows.length === 0;
-    missingSummary.hidden = !(ready && !generateErrorText);
+    /* "Усі блоки готові" — лише коли список справді порожній, не лише
+       коли немає блокуючих рядків: дорадчі (advisoryRows) не блокують
+       кнопку, але лишаються в rows, і без rows.length === 0 тут обидва
+       показувались одночасно */
+    missingSummary.hidden = rows.length !== 0;
     /* generationInProgress тримає кнопки заблокованими, навіть якщо
        checklist саме зараз став готовим (дизайнер щось поправив, поки
        йде запит) — інакше можна запустити другу генерацію поверх першої.
