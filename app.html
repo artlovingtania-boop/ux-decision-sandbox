@@ -1498,44 +1498,96 @@ textarea.field-input {
 }
 
 /* ---------- Екран «Структури» (етап 6) ---------- */
+/* container--wide (1280, не 760 форми) — у розмітці на самому екрані:
+   з трьома картками поруч 760 замало, 1fr-колонки стають нерівними
+   (мінімальний контент однієї підпирає її ширшою за інші, решта
+   стискається) — знайдено виміром, не на око. Той самий 1280, що
+   на «Результаті» з тієї самої причини. */
 /* пряма дитина .container — той самий вертикальний ритм, що .app-form,
-   хоч це не форма: заголовок, підказка, базова картка, додані структури,
-   ряд кнопок */
+   хоч це не форма: заголовок, підказка, сітка карток, ряд кнопок */
 #structures-screen .container {
   display: flex;
   flex-direction: column;
   gap: var(--spacing-24);
 }
 
-.structure-section {
+/* ті самі колонки й відступ, що .variants-grid на «Результаті» (3,
+   var(--spacing-24)) — значення ті самі, клас окремий: .variants-grid
+   несе grid-template-rows на subgrid-вирівнювання однойменних секцій
+   між картками (потрібне Результату, тут немає кількох секцій, які
+   вирівнювати). Без явних рядків — зайві картки самі йдуть на новий
+   рядок при трьох і більше структурах; звуження колонок означало б
+   нечитабельні картки без межі, а сенс сітки саме в однаковій ширині. */
+.structure-picker {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--spacing-24);
+}
+
+/* та сама рамка/фон/заокруглення, що .variant-card на «Результаті» —
+   не сам клас: той display:grid із subgrid, тут воно нема до чого
+   прив'язати (картка тут — заголовок і список, без секцій-сусідів) */
+.structure-card {
   display: flex;
   flex-direction: column;
   gap: var(--spacing-12);
+  padding: var(--spacing-24);
+  background: var(--surface-page);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-ml);
 }
 
-.structure-section__head {
+/* колонка вужча за колишній повноширинний рядок — заголовок і другий
+   елемент (підпис базової / кнопка видалення доданої) при потребі
+   переносяться на свій рядок, а не тиснуться в один, кожен своїм
+   переносом слів */
+.structure-card__head {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: var(--spacing-12);
 }
 
+/* картка "+ Додати структуру" — останній елемент сітки, тому сама займає
+   наступну вільну комірку; пунктир — той самий border-card, що вже
+   в .field-add-btn, заокруглення — .radius-ml карток, не .radius-md
+   кнопки: розміром вона ближча до картки, не до інлайн-кнопки.
+   Висота — stretch за замовчуванням (grid item без align-self), тому
+   дорівнює висоті рядка, тобто найвищій картці поруч */
+.structure-add-cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--spacing-24);
+  background: transparent;
+  border: 1px dashed var(--border-card);
+  border-radius: var(--radius-ml);
+  font-family: 'DM Sans', sans-serif;
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+/* компактніше за звичайний .block-item — дві колонки мають уміщатись
+   на екрані без гортання, а блоків у структурі стільки ж, скільки
+   на Узгодженні (склад один на всі структури) */
 .structure-block-list {
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-8);
+  gap: var(--spacing-4);
 }
 
-/* та сама поверхня, що .block-item — блок лишається впізнаваним тим самим
-   об'єктом і тут, і на Узгодженні */
 .structure-block {
   display: flex;
   align-items: center;
   gap: var(--spacing-8);
-  padding: var(--spacing-12) var(--spacing-16);
+  padding: var(--spacing-8) var(--spacing-12);
   background: var(--surface-card);
   border: 1px solid var(--border-card);
   border-radius: var(--radius-md);
+  font-size: 14px;
   cursor: grab;
   user-select: none;
 }
@@ -1930,26 +1982,16 @@ sl-button[variant="text"]::part(label):hover {
 </div>
 
 <div id="structures-screen" hidden>
-<div class="container">
+<div class="container container--wide">
   <header class="app-head">
     <button type="button" id="structures-back-btn" class="button button--text">← Назад до узгодження</button>
     <h1 class="app-head__title">Структури</h1>
   </header>
   <p class="field-hint">Склад блоків один на всі структури — це те, що робить метрики зіставними. Різниця тільки в порядку.</p>
 
-  <section class="structure-section" id="structure-baseline">
-    <div class="structure-section__head">
-      <h2 class="result-section__title">Базова структура</h2>
-      <p class="field-hint">порядок з опису сторінки · не перетягується</p>
-    </div>
-    <div class="structure-block-list" id="structure-baseline-list"></div>
-  </section>
-
-  <div id="structures-list"></div>
-
-  <div class="form-actions">
-    <button type="button" id="add-structure-btn" class="button button--secondary">+ Додати структуру</button>
-  </div>
+  <!-- базова й додані структури, і "+ Додати структуру" останньою —
+       усі прямі діти одної сітки, рендерить renderStructuresPicker() -->
+  <div class="structure-picker" id="structures-picker"></div>
 
   <div class="form-actions">
     <button type="button" id="run-audit-btn" class="button button--primary">Прогнати аудит</button>
@@ -2254,9 +2296,7 @@ firebase.initializeApp(firebaseConfig);
 
   var structuresScreen = document.getElementById('structures-screen');
   var structuresBackBtn = document.getElementById('structures-back-btn');
-  var structureBaselineList = document.getElementById('structure-baseline-list');
-  var structuresList = document.getElementById('structures-list');
-  var addStructureBtn = document.getElementById('add-structure-btn');
+  var structuresPicker = document.getElementById('structures-picker');
   var runAuditBtn = document.getElementById('run-audit-btn');
 
   var confirmScreen = document.getElementById('confirm-screen');
@@ -5572,7 +5612,7 @@ firebase.initializeApp(firebaseConfig);
     row.dataset.name = name;
     row.appendChild(el('span', 'structure-block__index'));
     row.appendChild(el('span', 'structure-block__name', name));
-    if (cta) { row.appendChild(el('span', 'tag tag--muted structure-block__cta', 'кнопка')); }
+    if (cta) { row.appendChild(el('span', 'tag tag--muted tag--tiny structure-block__cta', 'кнопка')); }
     return row;
   }
 
@@ -5653,30 +5693,63 @@ firebase.initializeApp(firebaseConfig);
     saveState();
   }
 
-  /* Номер структури — за поточною позицією в переліку, не збережений
-     рядок: після видалення "Структура 2" решта мали б розрив у нумерації
-     ("1, 3, 4"), якби номер зберігався при створенні. id (genId()) —
-     стабільна ідентичність для персони й видалення; номер — тільки
-     показ, рахується щоразу заново. */
-  function renderStructuresList(draft, state) {
-    structuresList.innerHTML = '';
-    draft.forEach(function (structure, index) {
-      var section = el('section', 'structure-section');
-      section.dataset.structureId = structure.id;
+  function baselineStructureOrder(state) {
+    return (state.structureBlocks || [])
+      .filter(function (b) { return b.name.trim() !== ''; })
+      .map(function (b) { return b.name; });
+  }
 
-      var head = el('div', 'structure-section__head');
+  /* Базова й додані структури — одна сітка, один рендер: раніше базова
+     була статичною розміткою (окрема секція, свій список), додані —
+     JS-рендером в #structures-list; тепер обидві мають однаковий вигляд
+     картки в одній сітці, тож і код той самий, різниця тільки в
+     draggableRow/наявності кнопки видалення. "+ Додати структуру" —
+     останньою карткою: сама займає наступну вільну комірку сітки, без
+     окремої позиційної логіки.
+     Номер структури — за поточною позицією в переліку, не збережений
+     рядок: після видалення "Структура 2" решта мали б розрив у
+     нумерації ("1, 3, 4"), якби номер зберігався при створенні. id
+     (genId()) — стабільна ідентичність для персони й видалення; номер —
+     тільки показ, рахується щоразу заново. */
+  function renderStructuresPicker() {
+    var state = collectState();
+    var draft = getStructuresDraft();
+    structuresPicker.innerHTML = '';
+
+    var baselineCard = el('section', 'structure-card');
+    baselineCard.dataset.structureId = 'baseline';
+    var baselineHead = el('div', 'structure-card__head');
+    baselineHead.appendChild(el('h2', 'result-section__title', 'Базова структура'));
+    baselineHead.appendChild(el('p', 'field-hint', 'порядок з опису сторінки · не перетягується'));
+    baselineCard.appendChild(baselineHead);
+    var baselineList = el('div', 'structure-block-list');
+    baselineCard.appendChild(baselineList);
+    structuresPicker.appendChild(baselineCard);
+    renderStructureList(baselineList, baselineStructureOrder(state), state, false, 'baseline');
+
+    draft.forEach(function (structure, index) {
+      var card = el('section', 'structure-card');
+      card.dataset.structureId = structure.id;
+
+      var head = el('div', 'structure-card__head');
       head.appendChild(el('h2', 'result-section__title', 'Структура ' + (index + 1)));
       var removeBtn = el('button', 'button button--text structure-remove', '✕ Видалити структуру');
       removeBtn.type = 'button';
       head.appendChild(removeBtn);
-      section.appendChild(head);
+      card.appendChild(head);
 
       var list = el('div', 'structure-block-list');
-      section.appendChild(list);
+      card.appendChild(list);
       renderStructureList(list, structure.order, state, true, structure.id);
 
-      structuresList.appendChild(section);
+      structuresPicker.appendChild(card);
     });
+
+    var addCell = document.createElement('button');
+    addCell.type = 'button';
+    addCell.className = 'structure-add-cell';
+    addCell.textContent = '+ Додати структуру';
+    structuresPicker.appendChild(addCell);
   }
 
   /* Немає власного стану, який треба заморожувати на вході: базовий
@@ -5687,13 +5760,7 @@ firebase.initializeApp(firebaseConfig);
   function showStructures() {
     if (!isLoggedIn) { showLogin(); return; }
     pruneStructuresDraft();
-    var state = collectState();
-
-    var baselineOrder = (state.structureBlocks || [])
-      .filter(function (b) { return b.name.trim() !== ''; })
-      .map(function (b) { return b.name; });
-    renderStructureList(structureBaselineList, baselineOrder, state, false, 'baseline');
-    renderStructuresList(getStructuresDraft(), state);
+    renderStructuresPicker();
 
     formScreen.hidden = true;
     confirmScreen.hidden = true;
@@ -5706,29 +5773,27 @@ firebase.initializeApp(firebaseConfig);
 
   structuresBackBtn.addEventListener('click', showAgreement);
 
-  addStructureBtn.addEventListener('click', function () {
-    var state = collectState();
-    var baselineOrder = (state.structureBlocks || [])
-      .filter(function (b) { return b.name.trim() !== ''; })
-      .map(function (b) { return b.name; });
-    var draft = getStructuresDraft();
-    draft.push({ id: genId(), order: baselineOrder.slice() });
-    setStructuresDraft(draft);
-    saveState();
-    renderStructuresList(draft, state);
-  });
-
-  /* видалення чернетки структури — не та сама вага дії, що видалення
-     збереженого прогону: нічого остаточного ще не сталось (аудит не
-     прогнаний), тож без озброєної кнопки-підтвердження */
-  structuresList.addEventListener('click', function (event) {
+  /* один делегований клік на сітку — "+ Додати структуру" (сама картка,
+     остання в сітці) і "✕ Видалити структуру" на кожній доданій;
+     видалення чернетки — не та сама вага дії, що видалення збереженого
+     прогону: нічого остаточного ще не сталось (аудит не прогнаний),
+     тож без озброєної кнопки-підтвердження */
+  structuresPicker.addEventListener('click', function (event) {
+    if (event.target.closest('.structure-add-cell')) {
+      var draft = getStructuresDraft();
+      draft.push({ id: genId(), order: baselineStructureOrder(collectState()) });
+      setStructuresDraft(draft);
+      saveState();
+      renderStructuresPicker();
+      return;
+    }
     var removeBtn = event.target.closest('.structure-remove');
     if (!removeBtn) { return; }
-    var structureId = removeBtn.closest('.structure-section').dataset.structureId;
+    var structureId = removeBtn.closest('.structure-card').dataset.structureId;
     var draft = getStructuresDraft().filter(function (s) { return s.id !== structureId; });
     setStructuresDraft(draft);
     saveState();
-    renderStructuresList(draft, collectState());
+    renderStructuresPicker();
   });
 
   /* «Прогнати аудит» — записує прогін. Синхронно: машинні метрики
