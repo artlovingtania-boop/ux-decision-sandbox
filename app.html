@@ -1512,35 +1512,52 @@ textarea.field-input {
 }
 
 /* ті самі колонки й відступ, що .variants-grid на «Результаті» (3,
-   var(--spacing-24)) — значення ті самі, клас окремий: .variants-grid
-   несе grid-template-rows на subgrid-вирівнювання однойменних секцій
-   між картками (потрібне Результату, тут немає кількох секцій, які
-   вирівнювати). Без явних рядків — зайві картки самі йдуть на новий
-   рядок при трьох і більше структурах; звуження колонок означало б
-   нечитабельні картки без межі, а сенс сітки саме в однаковій ширині. */
+   var(--spacing-24)) — значення ті самі, клас окремий: набір секцій
+   інший (тут 3 — назва, підпис, список, не 7). Без явних колонок
+   зайві картки самі йдуть на новий рядок при трьох і більше
+   структурах; звуження колонок означало б нечитабельні картки без
+   межі, а сенс сітки саме в однаковій ширині.
+   grid-template-rows: repeat(3, auto) — той самий subgrid-механізм,
+   що на «Результаті», на 3 рядки замість 7: назва, підпис (у базової —
+   текст, у доданих — порожній рядок-заповнювач нижче) і список блоків
+   мають стояти на одному рівні між картками. Назва — окремим рядком
+   від підпису (не одна шапка на двох, як була): підпис базової
+   переноситься у два рядки й розтягує спільний трек, і коли назва з
+   підписом ділили один рядок, розтягувався й трек назви — «Структура
+   1»/«Структура 2» опинялись нижче за «Базова структура» (BUGS.md,
+   вирівняний низ шапки, а не верх). Трек назви тепер розтягує тільки
+   сама назва, якщо колись не влізе в рядок. Перенесений рядок (3+
+   структур) отримує свою трійку треків тим самим авто-розміщенням —
+   вирівнюється сам із собою, не з першим рядком. */
 .structure-picker {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: repeat(3, auto);
   gap: var(--spacing-24);
 }
 
-/* та сама рамка/фон/заокруглення, що .variant-card на «Результаті» —
-   не сам клас: той display:grid із subgrid, тут воно нема до чого
-   прив'язати (картка тут — заголовок і список, без секцій-сусідів) */
+/* та сама рамка/фон/заокруглення, що .variant-card на «Результаті»,
+   і тепер той самий subgrid-механізм — картка сітка на 3 рядки (назва,
+   підпис, список), кожен читає висоту зі спільних треків
+   .structure-picker. row-gap — свій, не успадкований 24 від сітки:
+   subgrid успадковує позиції треків, не сам відступ, тому 12
+   (компактніше, як і було, той самий, що раніше був gap шапки) можна
+   задати окремо. */
 .structure-card {
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-12);
+  display: grid;
+  grid-row: span 3;
+  grid-template-rows: subgrid;
+  row-gap: var(--spacing-12);
   padding: var(--spacing-24);
   background: var(--surface-page);
   border: 1px solid var(--border-default);
   border-radius: var(--radius-ml);
 }
 
-/* колонка вужча за колишній повноширинний рядок — заголовок і другий
-   елемент (підпис базової / кнопка видалення доданої) при потребі
-   переносяться на свій рядок, а не тиснуться в один, кожен своїм
-   переносом слів */
+/* тепер тільки назва (+ кнопка видалення в доданих) — підпис виведений
+   в окремий рядок сітки нижче. flex-wrap лишається на випадок, якщо
+   сама назва колись не влізе в рядок поруч із кнопкою — той самий
+   принцип, що привів до subgrid: не ламатись від переносу. */
 .structure-card__head {
   display: flex;
   flex-wrap: wrap;
@@ -1549,14 +1566,37 @@ textarea.field-input {
   gap: var(--spacing-12);
 }
 
+/* та сама дія — той самий вигляд: розмір і колір, що .block-remove на
+   Узгодженні (18px, --text-secondary). Темніший на наведенні, не
+   світліший — той самий принцип, що sl-button[variant="text"] вище:
+   світліший сірий був би на межі контрасту, а не завжди помітнішим. */
+.structure-remove {
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  padding: var(--spacing-4);
+  font-family: 'DM Sans', sans-serif;
+  font-size: 18px;
+  line-height: 1;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.structure-remove:hover {
+  color: var(--text-primary);
+}
+
 /* картка "+ Додати структуру" — останній елемент сітки, тому сама займає
    наступну вільну комірку; пунктир — той самий border-card, що вже
    в .field-add-btn, заокруглення — .radius-ml карток, не .radius-md
    кнопки: розміром вона ближча до картки, не до інлайн-кнопки.
-   Висота — stretch за замовчуванням (grid item без align-self), тому
-   дорівнює висоті рядка, тобто найвищій картці поруч */
+   grid-row: span 3 — без нього зайняла б лише перший трек (назви),
+   не всі три: інші картки — subgrid на 3 рядки, а в цієї немає
+   внутрішнього поділу на назву/підпис/список, тому явно, замість того
+   щоб покладатись на дефолтний розмір в 1 трек. */
 .structure-add-cell {
   display: flex;
+  grid-row: span 3;
   align-items: center;
   justify-content: center;
   padding: var(--spacing-24);
@@ -5720,8 +5760,8 @@ firebase.initializeApp(firebaseConfig);
     baselineCard.dataset.structureId = 'baseline';
     var baselineHead = el('div', 'structure-card__head');
     baselineHead.appendChild(el('h2', 'result-section__title', 'Базова структура'));
-    baselineHead.appendChild(el('p', 'field-hint', 'порядок з опису сторінки · не перетягується'));
     baselineCard.appendChild(baselineHead);
+    baselineCard.appendChild(el('p', 'field-hint structure-card__caption', 'порядок з опису сторінки · не перетягується'));
     var baselineList = el('div', 'structure-block-list');
     baselineCard.appendChild(baselineList);
     structuresPicker.appendChild(baselineCard);
@@ -5733,10 +5773,17 @@ firebase.initializeApp(firebaseConfig);
 
       var head = el('div', 'structure-card__head');
       head.appendChild(el('h2', 'result-section__title', 'Структура ' + (index + 1)));
-      var removeBtn = el('button', 'button button--text structure-remove', '✕ Видалити структуру');
+      var removeBtn = el('button', 'structure-remove', '✕');
       removeBtn.type = 'button';
+      removeBtn.setAttribute('aria-label', 'Видалити структуру');
       head.appendChild(removeBtn);
       card.appendChild(head);
+
+      /* порожній рядок-заповнювач: у базової тут текст підпису, у доданих —
+         нічого, але сам елемент має бути, інакше авто-розміщення сітки
+         зсуне список доданих структур у другий трек замість третього
+         (subgrid-рядки призначаються за порядком дітей, не за змістом) */
+      card.appendChild(el('p', 'field-hint structure-card__caption'));
 
       var list = el('div', 'structure-block-list');
       card.appendChild(list);
