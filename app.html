@@ -1884,9 +1884,9 @@ sl-button[variant="text"]::part(label):hover {
       <div class="variants-grid" id="structures-grid"></div>
 
       <div class="divergence-footer">
-        <p class="field-hint">Висновок читається звідси, а не з чисел чи зауважень персони окремо: порівняльні числа без інтерпретації висновком не є, і зауваження персони поза порівнянням — теж; тут вони поруч, і саме їхнє зіставлення дає висновок за методикою.</p>
-        <p class="field-hint">Інструмент не називає кращу структуру: щоб зважити метрики одна проти одної, потрібні ваги, яких у літературі немає.</p>
-        <p class="field-hint">🔶 Зіставлення «бачить код / бачить персона» — на рівні структури, не окремої знахідки: чи вони кажуть про те саме місце, вирішує дизайнер. Це межа реалізації, не методики — зауваження персони не прив'язані до номера питання, на яке відповідають.</p>
+        <p class="field-hint">Висновок читається з розходження, а не з чисел чи зауважень персони окремо. Порівняльні числа висновком не є: «блоків підряд без виходу — 6» нічого не каже, поки немає ні порога, ні другої структури. Зауваження персони теж не є: вони змістовні, але ступінь важкості пливе.</p>
+        <p class="field-hint">Інструмент не називає кращу структуру: щоб зважити метрики одна проти одної, потрібні ваги, яких у літературі немає, — а ще поправка на те, що метрики залежні між собою й рахуються з одного порядку блоків.</p>
+        <p class="field-hint">🔶 Межа реалізації: зіставлення «бачить код / бачить персона» йде на рівні структури, не окремої знахідки — зауваження персони не прив'язані до місця в структурі. Чи код і персона кажуть про те саме місце, вирішує дизайнер. 🔶 Самі правила трактування виведені з розбору, не з прогонів.</p>
       </div>
 
       <div class="report-actions">
@@ -3089,24 +3089,67 @@ firebase.initializeApp(firebaseConfig);
     return entries.filter(function (id) { return valuesByStructureId[id] === extreme; });
   }
 
-  /* Текст трактування — спільний для екрана й звіту, щоб вони не могли
-     розійтись (той самий довід, що buildDivergenceCodeText() у старому
-     шляху). Варіант А (PROGRESS.md, «зіставлення на рівні структури, не
-     окремої знахідки»): «обидва бачать» означає «обидві лінзи мають
-     претензію до цієї структури», не «вказали на те саме місце» —
-     зауваження персони не прив'язані до номера питання, на яке
-     відповідають, тож перевірити збіг місця код не може. */
-  function divergenceVerdictText(hasCode, hasPersona) {
-    if (hasCode && hasPersona) {
-      return 'Обидві перевірки мають претензію до цієї структури — подивись, чи про те саме.';
+  /* Вердикт розходження й два рядки, з яких він вийшов, — спільні для
+     екрана й звіту, щоб вони не могли розійтись (той самий довід, що
+     buildDivergenceCodeText() у старому шляху). Варіант А (PROGRESS.md,
+     «зіставлення на рівні структури, не окремої знахідки»): «обидва
+     бачать» означає «обидві перевірки мають претензію до цієї
+     структури», не «вказали на те саме місце» — зауваження персони не
+     прив'язані до номера питання, на яке відповідають, тож перевірити
+     збіг місця код не може.
+     Чотири випадки діють, лише коли обидві перевірки справді відбулись.
+     «Не виміряв» — не те саме, що «виміряв і не побачив»: структура одна
+     (коду нема з чим зіставити — метрики міряють, але без бази), персона
+     не виконується, ще читає чи не відповіла — тоді вердикту немає, і
+     це сказано прямо, а не проведено тихо через одну з чотирьох гілок. */
+  function buildDivergenceView(findings, personaResult, structureCount) {
+    var codeCount = findings.filter(function (f) { return f.origin === 'код'; }).length;
+    var comparable = structureCount >= 2;
+
+    var codeLine = !comparable ? 'Код: порівнювати нема з чим — структура одна'
+      : codeCount ? 'Код: найгірша серед структур ' + (codeCount % 10 === 1 && codeCount % 100 !== 11
+          ? 'на ' + codeCount + ' метриці' : 'на ' + codeCount + ' метриках')
+      : 'Код: ні на одній метриці не найгірша';
+
+    var personaLine;
+    if (personaResult.status === 'unavailable') {
+      personaLine = 'Персона: аудит для цієї аудиторії не виконується';
+    } else if (personaResult.status === 'loading') {
+      personaLine = 'Персона: читає структури…';
+    } else if (personaResult.status === 'error') {
+      personaLine = 'Персона: ' + personaResult.errorText;
+    } else if (!personaResult.remarks.length) {
+      personaLine = 'Персона: зауважень немає';
+    } else {
+      var n = personaResult.remarks.length;
+      var noun = (n % 10 === 1 && n % 100 !== 11) ? 'зауваження'
+        : (n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 12 || n % 100 > 14)) ? 'зауваження' : 'зауважень';
+      var byLevel = ['критично', 'помірно', 'незначно'].map(function (level) {
+        var count = personaResult.remarks.filter(function (r) { return r.level === level; }).length;
+        return count ? count + ' ' + level : null;
+      }).filter(function (part) { return part !== null; });
+      personaLine = 'Персона: ' + n + ' ' + noun + ' — ' + byLevel.join(', ');
     }
-    if (hasCode) {
-      return 'Поріг формальний: порушення є в числах, на читача не діє.';
+
+    var verdict;
+    if (!comparable) {
+      verdict = 'Порівняння немає: структура одна, коду нема з чим зіставити.';
+    } else if (personaResult.status === 'unavailable') {
+      verdict = 'Вердикту немає: персонний аудит для цієї аудиторії не виконується.';
+    } else if (personaResult.status === 'loading') {
+      verdict = 'Вердикту ще немає: персона читає структури…';
+    } else if (personaResult.status === 'error') {
+      verdict = 'Вердикту немає: персонна перевірка не відповіла.';
+    } else {
+      var hasCode = codeCount > 0;
+      var hasPersona = personaResult.remarks.length > 0;
+      verdict = hasCode && hasPersona ? 'Обидві перевірки мають претензію до цієї структури; подивись, чи про те саме.'
+        : hasCode ? 'Поріг формальний: порушення є в числах, на читача не діє.'
+        : hasPersona ? 'Метрики цього не міряють. Найцінніший випадок і найризикованіший, бо спирається на одну перевірку.'
+        : 'Нічого не знайдено. Це не те саме, що «все добре»: перевірки обмежені тим, що вміють.';
     }
-    if (hasPersona) {
-      return 'Метрики цього не міряють. Найцінніший результат перевірки — і найризикованіший, бо спирається на одну перевірку.';
-    }
-    return 'Нічого не знайдено — це не те саме, що «все добре»: перевірки обмежені тим, що вміють.';
+
+    return { verdict: verdict, codeLine: codeLine, personaLine: personaLine };
   }
 
   /* Знахідки код-сторони — де структура порівняно найгірша серед прогону
@@ -3401,15 +3444,22 @@ firebase.initializeApp(firebaseConfig);
     return section;
   }
 
-  /* Знахідки — список, кожна з міткою походження (тег «код»/«персона»,
-     не претензія на збіг місця); трактування — один абзац нижче списку,
-     обраний за тим, чи в структури є хоч одна знахідка кожного походження
-     (divergenceVerdictText — рівень структури, не окремої знахідки). */
-  function renderDivergenceSection(findings, personaResult) {
+  /* Вердикт — перший і тим самим стилем, що висновок персони: заради
+     нього секція й існує. Під ним — два рядки, з яких він вийшов (що
+     побачив код і що персона), тож вердикт можна перевірити. Список
+     знахідок — останнім, з міткою «підстава»: вхідні дані для вердикту,
+     а не він сам (buildDivergenceView — рівень структури, не окремої
+     знахідки). */
+  function renderDivergenceSection(findings, personaResult, structureCount) {
+    var view = buildDivergenceView(findings, personaResult, structureCount);
     var section = el('div', 'card-section card-section--divided');
     section.appendChild(el('span', 'section-label', 'Розходження'));
+    section.appendChild(el('p', 'conclusion__text', view.verdict));
+    section.appendChild(el('p', 'field-hint', view.codeLine));
+    section.appendChild(el('p', 'field-hint', view.personaLine));
 
     if (findings.length) {
+      section.appendChild(el('span', 'field-caption', 'підстава'));
       var list = el('div', 'finding-list');
       findings.forEach(function (f) {
         var row = el('div', 'finding');
@@ -3418,16 +3468,6 @@ firebase.initializeApp(firebaseConfig);
         list.appendChild(row);
       });
       section.appendChild(list);
-    }
-
-    if (personaResult.status === 'loading') {
-      section.appendChild(el('p', 'field-caption', 'Персона читає структури…'));
-    } else if (personaResult.status === 'error') {
-      section.appendChild(el('p', 'field-caption', personaResult.errorText));
-    } else {
-      var hasCode = findings.some(function (f) { return f.origin === 'код'; });
-      var hasPersona = personaResult.status === 'ready' && personaResult.remarks.length > 0;
-      section.appendChild(el('p', 'field-caption', divergenceVerdictText(hasCode, hasPersona)));
     }
 
     return section;
@@ -3440,7 +3480,7 @@ firebase.initializeApp(firebaseConfig);
      аргументу renderRemarks()/renderConclusion() теж не читає), метрики,
      персонний аудит, розходження. Бейдж — той самий hasCleanPersonaAudit(),
      що на старому шляху. */
-  function renderStructureCard(structure, index, state, structureMetrics, findings, personaResult) {
+  function renderStructureCard(structure, index, state, structureMetrics, findings, personaResult, structureCount) {
     var card = el('article', 'variant-card');
 
     var badge = el('span', 'tag tag--muted', 'без критичних зауважень');
@@ -3460,7 +3500,7 @@ firebase.initializeApp(firebaseConfig);
     card.appendChild(renderStructureMetricsSection(structureMetrics, state));
     card.appendChild(renderRemarks(structure, personaResult));
     card.appendChild(renderConclusion(structure, personaResult));
-    card.appendChild(renderDivergenceSection(findings, personaResult));
+    card.appendChild(renderDivergenceSection(findings, personaResult, structureCount));
 
     return card;
   }
@@ -3484,7 +3524,7 @@ firebase.initializeApp(firebaseConfig);
     structuresGrid.innerHTML = '';
     structures.forEach(function (structure, index) {
       var personaResult = getPersonaResultFor(structure.id);
-      var card = renderStructureCard(structure, index, state, allMetrics[index], findingsById[structure.id] || [], personaResult);
+      var card = renderStructureCard(structure, index, state, allMetrics[index], findingsById[structure.id] || [], personaResult, structures.length);
       structuresGrid.appendChild(card);
     });
   }
@@ -3967,18 +4007,17 @@ firebase.initializeApp(firebaseConfig);
           : personaResult.errorText);
       }
 
+      /* той самий порядок, що в картці: вердикт, два рядки, підстава */
       var findings = findingsById[structure.id] || [];
+      var view = buildDivergenceView(findings, personaResult, structures.length);
       lines.push('');
       lines.push('Розходження:');
-      if (!findings.length) {
-        lines.push('  жодних знахідок');
-      } else {
-        findings.forEach(function (f) { lines.push('  [' + f.origin + '] ' + f.text); });
-      }
-      if (personaResult.status !== 'loading') {
-        var hasCode = findings.some(function (f) { return f.origin === 'код'; });
-        var hasPersona = personaResult.status === 'ready' && personaResult.remarks.length > 0;
-        lines.push('  ' + divergenceVerdictText(hasCode, hasPersona));
+      lines.push('  ' + view.verdict);
+      lines.push('  ' + view.codeLine);
+      lines.push('  ' + view.personaLine);
+      if (findings.length) {
+        lines.push('  Підстава:');
+        findings.forEach(function (f) { lines.push('    [' + f.origin + '] ' + f.text); });
       }
     });
 
