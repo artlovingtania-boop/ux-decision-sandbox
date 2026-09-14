@@ -1807,6 +1807,23 @@ textarea.field-input {
   border-color: var(--accent-yellow);
 }
 
+/* рядок-розкриття матриці, коли пар іще нема — легша дія, не картка,
+   повторюється в кожному блоці без прив'язок. Кольори й розмір — наявні
+   токени, border-bottom:dashed своя, іншого способу підкреслити
+   пунктиром у проєкті нема (той самий клас, що в "+ ще одна прив'язка"
+   до переходу на матрицю — повернула під нову роль, не вигадала заново) */
+.confirm-add-link {
+  align-self: flex-start;
+  background: none;
+  border: none;
+  border-bottom: 1px dashed var(--border-medium);
+  padding: 0;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 14px;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
 </style>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.20.1/cdn/themes/light.css">
 <script type="module" src="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.20.1/cdn/shoelace-autoloader.js"></script>
@@ -2927,13 +2944,6 @@ firebase.initializeApp(firebaseConfig);
     taskList.appendChild(item);
   }
 
-  /* "опис" необов'язковий на рівні блоку: якщо одиниця й кількість
-     порожні — підпис каже це прямо, а не мовчить і не підставляє число */
-  function updateBlockCaption(item) {
-    var unit = item.querySelector('.block-unit').value;
-    var count = item.querySelector('.block-count').value;
-    item.querySelector('.block-caption').hidden = !(unit === '' && count === '');
-  }
 
   /* одиниця — вільний текст, не вибір зі списку: список притискав прочитане
      до найближчого варіанта («велика картка звіту з фото й посиланням»
@@ -2959,8 +2969,7 @@ firebase.initializeApp(firebaseConfig);
       '<sl-input class="block-count" type="number" min="0" step="1" placeholder="кількість"></sl-input>' +
       '<sl-checkbox class="block-countable">читають поштучно</sl-checkbox>' +
       '</div>' +
-      '<p class="field-caption" data-source-mark hidden></p>' +
-      '<p class="field-hint block-caption">не визначено — можна пропустити</p>' +
+      '<p class="field-hint" data-source-mark hidden></p>' +
       '<div class="confirm-links"></div>';
 
     item.querySelector('.block-name').value = name || '';
@@ -2972,18 +2981,9 @@ firebase.initializeApp(firebaseConfig);
       updateEditNotice();
     });
 
-    item.querySelector('.block-unit').addEventListener('sl-input', function () {
-      updateBlockCaption(item);
-    });
-
-    item.querySelector('.block-count').addEventListener('sl-input', function () {
-      updateBlockCaption(item);
-    });
-
     blockList.appendChild(item);
     /* sl-input (на відміну від sl-select) приймає .value одразу після
-       appendChild — підключення до DOM для нього досить, тому й підпис
-       "не визначено" можна рахувати одразу, без setSlSelectValue */
+       appendChild — підключення до DOM для нього досить */
     item.querySelector('.block-unit').value = unit || '';
     item.querySelector('.block-count').value = count || '';
     /* countable — чи одиницю читають поштучно (картки, посилання), чи
@@ -2991,7 +2991,6 @@ firebase.initializeApp(firebaseConfig);
        стосується лише першого. Поле готується наперед, метрика окремим
        етапом. sl-checkbox, як і sl-input, приймає властивість одразу */
     item.querySelector('.block-countable').checked = countable === true;
-    updateBlockCaption(item);
     refreshFieldUi();
     /* прив'язки задача↔аудиторія — одразу, щоб картка була повною з моменту
        появи; task-list/audience-list на цей момент уже наповнені (порядок
@@ -5573,24 +5572,42 @@ firebase.initializeApp(firebaseConfig);
 
     var links = JSON.parse(blockItem.dataset.links || 'null');
     var hasLinks = Array.isArray(links) && links.length > 0;
-    /* [] від агента, ще не підтверджений: матриця видна, рішення за
+    /* [] від агента, ще не підтверджений: секція видна, рішення за
        дизайнером, не прийняте за нього */
     var pending = isLinksPending(blockItem);
-    var showMatrix = taskItems.length > 0 && audienceItems.length > 0 && (links === null || hasLinks || pending);
+    /* підтверджено дизайнером "не обслуговує" (links: [], не pending) —
+       секції взагалі нема, лишається тільки чекбокс нижче, як і було */
+    var confirmedEmpty = Array.isArray(links) && links.length === 0 && !pending;
+    var showSection = taskItems.length > 0 && audienceItems.length > 0 && !confirmedEmpty;
 
-    if (showMatrix) {
-      container.appendChild(el('p', 'field-hint', 'Кому яку задачу закриває'));
-      container.appendChild(renderLinkMatrix(links, taskItems, audienceItems));
-
-      var ctaState = ctaAggregateState(links);
-      if (ctaState !== null) {
-        var ctaCheckbox = document.createElement('sl-checkbox');
-        ctaCheckbox.className = 'confirm-link-cta';
-        ctaCheckbox.textContent = 'кнопка';
-        if (ctaState === 'checked') { ctaCheckbox.setAttribute('checked', ''); }
-        else if (ctaState === 'mixed') { ctaCheckbox.setAttribute('indeterminate', ''); }
-        container.appendChild(ctaCheckbox);
+    if (showSection) {
+      /* 0 пар — не матриця з порожніх рядків, а рядок-розкриття: картка
+         без прив'язок не важить стільки само, скільки з ними. Розкриття —
+         сеансовий прапорець на самому .block-item (dataset), не в links:
+         рендериться заново з чистого стану після перезавантаження, так
+         само як колишній чернетковий рядок. Клік по клітинці одразу дає
+         hasLinks і матриця лишається розкритою сама собою. */
+      if (hasLinks || blockItem.dataset.matrixExpanded === 'yes') {
+        container.appendChild(renderLinkMatrix(links, taskItems, audienceItems));
+      } else {
+        var revealBtn = document.createElement('button');
+        revealBtn.type = 'button';
+        revealBtn.className = 'confirm-add-link';
+        revealBtn.textContent = "прив'язати задачу";
+        container.appendChild(revealBtn);
       }
+
+      /* завжди в секції, не лише коли є пари — інакше картки без прив'язок
+         виглядають інакшими за формою, не тільки за вмістом. Порожньо —
+         приглушений і недоступний: ctaAggregateState() null саме на це */
+      var ctaState = ctaAggregateState(links);
+      var ctaCheckbox = document.createElement('sl-checkbox');
+      ctaCheckbox.className = 'confirm-link-cta';
+      ctaCheckbox.textContent = 'кнопка';
+      if (ctaState === null) { ctaCheckbox.setAttribute('disabled', ''); }
+      else if (ctaState === 'checked') { ctaCheckbox.setAttribute('checked', ''); }
+      else if (ctaState === 'mixed') { ctaCheckbox.setAttribute('indeterminate', ''); }
+      container.appendChild(ctaCheckbox);
     }
 
     var checkbox = document.createElement('sl-checkbox');
@@ -5656,6 +5673,17 @@ firebase.initializeApp(firebaseConfig);
   /* click, не sl-change: клітинки матриці — звичайні кнопки, не
      Shoelace-компоненти */
   blockList.addEventListener('click', function (event) {
+    var revealBtn = event.target.closest('.confirm-add-link');
+    if (revealBtn) {
+      var blockToExpand = revealBtn.closest('.block-item');
+      if (!blockToExpand) { return; }
+      /* сеансовий прапорець, не в links — саме розкриття нічого не
+         вирішує, вирішує клік по клітинці */
+      blockToExpand.dataset.matrixExpanded = 'yes';
+      renderBlockLinks(blockToExpand);
+      return;
+    }
+
     var cell = event.target.closest('.link-matrix__cell');
     if (!cell) { return; }
     var blockItem = cell.closest('.block-item');
@@ -6403,6 +6431,17 @@ firebase.initializeApp(firebaseConfig);
     designer: 'задано дизайнером'
   };
 
+  /* Короткі мітки для рядка на картці блоку (blockSourceTextShort) —
+     без переліку полів, самі джерела. Повний варіант (SOURCE_LABELS,
+     з полями) лишається в title рядка, не зникає — стає другим кроком,
+     не першим. */
+  var SHORT_SOURCE_LABELS = {
+    page: 'з опису',
+    brief: 'з брифу',
+    agent: 'агент',
+    designer: 'дизайнер'
+  };
+
   function defaultScalarSources() {
     return { category: 'designer', support: 'designer', goal: 'designer' };
   }
@@ -6466,22 +6505,50 @@ firebase.initializeApp(firebaseConfig);
     return groups.map(function (g) { return g.label + ' — ' + g.parts.join(', '); }).join(' · ');
   }
 
-  function setSourceMark(mark, text) {
-    mark.hidden = !text;
-    mark.textContent = text || '';
+  /* Коротка версія — «з опису · агент», без переліку полів: дизайнер тут
+     перевіряє, чому вірити, не яке підполе звідки (те лишається в title,
+     повний blockSourceText()). Порядок — перша поява серед
+     name/unit/count/countable, дублі прибрані. Той самий "немає жодного
+     непорожнього підполя → без позначки", що в blockSourceText(). */
+  function blockSourceTextShort(block, labels) {
+    var sources = block.sources || {};
+    var keys = [];
+    if (String(block.name || '').trim() !== '') { keys.push(sources.name); }
+    if (String(block.unit || '').trim() !== '') { keys.push(sources.unit); }
+    if (String(block.count || '').trim() !== '') { keys.push(sources.count); }
+    if (!keys.length) { return ''; }
+    keys.push(sources.countable);
+    var seen = [];
+    keys.forEach(function (key) {
+      var label = labels[key];
+      if (label && seen.indexOf(label) === -1) { seen.push(label); }
+    });
+    return seen.join(' · ');
   }
 
-  /* Підписи джерела на картках блоків — .field-caption з data-source-mark
-     усередині картки. Джерела п'яти полів показує картка «Що я зрозуміла»
-     (renderInputCard). Порожнє значення позначки не має */
+  function setSourceMark(mark, shortText, fullText) {
+    mark.hidden = !shortText;
+    mark.textContent = shortText || '';
+    mark.title = fullText || '';
+  }
+
+  /* Підписи джерела на картках блоків — .field-hint з data-source-mark
+     усередині картки, звичайний приглушений текст (не капс — той самий
+     перегляд, що вже пройшли інші екрани цього дня), коротко; повний
+     рядок (з полями) — у title, при наведенні. Джерела п'яти полів
+     показує картка «Що я зрозуміла» (renderInputCard). Порожнє значення
+     позначки не має. */
   function renderSourceMarks() {
     Array.from(blockList.querySelectorAll('.block-item')).forEach(function (item) {
-      setSourceMark(item.querySelector('[data-source-mark]'), blockSourceText({
+      var block = {
         name: item.querySelector('.block-name').value,
         unit: item.querySelector('.block-unit').value,
         count: item.querySelector('.block-count').value,
         sources: JSON.parse(item.dataset.sources || 'null')
-      }, SOURCE_LABELS));
+      };
+      setSourceMark(item.querySelector('[data-source-mark]'),
+        blockSourceTextShort(block, SHORT_SOURCE_LABELS),
+        blockSourceText(block, SOURCE_LABELS));
     });
   }
 
