@@ -1562,6 +1562,7 @@ sl-button[variant="text"]::part(label):hover {
 
     <div class="form-actions">
       <button type="button" id="parse-btn" class="button button--primary" disabled>Розібрати</button>
+      <button type="button" id="to-agreement-btn" class="button button--secondary" hidden>До узгодження →</button>
       <button type="button" id="load-example-btn" class="button button--text">Зразок · «Ватра»</button>
     </div>
 
@@ -1882,6 +1883,7 @@ firebase.initializeApp(firebaseConfig);
   var addTaskBtn = document.getElementById('add-task');
   var addBlockBtn = document.getElementById('add-block');
   var loadExampleBtn = document.getElementById('load-example-btn');
+  var toAgreementBtn = document.getElementById('to-agreement-btn');
   var docForm = document.getElementById('doc-form');
   var briefInput = document.getElementById('brief');
   var pageDescInput = document.getElementById('page-description');
@@ -4132,6 +4134,11 @@ firebase.initializeApp(firebaseConfig);
     disarmEdit();
     disarmLoadExample();
     disarmParse();
+    /* «До узгодження →» — друга половина «← Назад до документів»: без неї
+       з Екрана 1 на Узгодження веде лише розбір, який перезаписує правки.
+       Той самий критерій, що на вході в застосунок. Чернетка на Екрані 1
+       не міняється (тут лише документи), тож рахується при показі екрана */
+    toAgreementBtn.hidden = isDraftEmpty();
     /* поки екран був прихований, textarea не мали висоти */
     autoGrowAll();
   }
@@ -4613,6 +4620,11 @@ firebase.initializeApp(firebaseConfig);
     /* новий вхід на екран — стара помилка генерації більше не про поточну спробу */
     generateErrorText = null;
     refreshAgreementLinks();
+    /* поки екран був прихований, textarea не мали висоти — autoGrow() їх
+       пропускає, і довге підкріплення лишалось у трьох рядках із прокруткою
+       всередині (після розбору й після входу з перезавантаження) — той самий
+       виклик, що в showForm() */
+    autoGrowAll();
     window.scrollTo(0, 0);
   }
 
@@ -5192,6 +5204,7 @@ firebase.initializeApp(firebaseConfig);
   }
 
   loadExampleBtn.addEventListener('click', loadExampleDocs);
+  toAgreementBtn.addEventListener('click', showAgreement);
 
   /* копіювання звіту: без мережі, лише буфер обміну браузера */
   copyReportBtn.addEventListener('click', function () {
@@ -5336,7 +5349,17 @@ firebase.initializeApp(firebaseConfig);
       pageDescBtn.hidden = !user;
       runsBtn.hidden = !user;
       if (user) {
-        showForm();
+        /* Непорожня чернетка Узгодження — туди, а не на Екран 1: з Екрана 1
+           на Узгодження веде лише розбір, а він перезаписує поля, тож
+           після перезавантаження вся заповнена робота була б недосяжна
+           (BUGS.md, регресія етапу 3а). Критерій — той самий isDraftEmpty(),
+           що перепитує перед розбором; документи в нього не входять.
+           Назад на Екран 1 — «← Назад до документів» і «Опис сторінки» */
+        if (isDraftEmpty()) {
+          showForm();
+        } else {
+          showAgreement();
+        }
       } else {
         showLogin();
       }
