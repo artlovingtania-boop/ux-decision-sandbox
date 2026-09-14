@@ -1339,6 +1339,12 @@ textarea.field-input {
   min-width: 0;
 }
 
+/* прапорець «кнопка» — четверта колонка рядка, своєї ширини: стискаються
+   селекти, картка не росте */
+.confirm-link-cta {
+  flex-shrink: 0;
+}
+
 .confirm-link-remove {
   flex-shrink: 0;
   background: none;
@@ -2019,7 +2025,9 @@ firebase.initializeApp(firebaseConfig);
         return {
           id: item.dataset.id,
           value: item.querySelector('.audience-input').value,
-          type: item.querySelector('.audience-select').value,
+          /* порожнє значення селекта буває лише до його ініціалізації
+             (порожньої опції немає) — тоді тип, з яким рядок створено */
+          type: item.querySelector('.audience-select').value || item.dataset.type,
           source: item.dataset.source || 'designer'
         };
       }),
@@ -2173,6 +2181,18 @@ firebase.initializeApp(firebaseConfig);
       });
     }
 
+    /* cta (кнопка дії на парі прив'язки) з'явився пізніше — старим парам
+       false, останнім ключем пари: форма пише його завжди, і без нього
+       прогін розходився б із формою в порівнянні JSON («Опис змінено») */
+    if (Array.isArray(state.structureBlocks)) {
+      state.structureBlocks.forEach(function (b) {
+        if (!Array.isArray(b.links)) { return; }
+        b.links.forEach(function (link) {
+          if (!('cta' in link)) { link.cta = false; }
+        });
+      });
+    }
+
     /* countable (чи одиницю читають поштучно) з'явився пізніше. Форма пише
        ключ завжди, тож блок без нього розходився б з формою в порівнянні
        JSON. false — те, що показує незнятий прапорець, коли старий прогін
@@ -2318,6 +2338,11 @@ firebase.initializeApp(firebaseConfig);
     item.dataset.id = id || genId();
     /* новий рядок, доданий кнопкою, — дизайнерів */
     item.dataset.source = source || 'designer';
+    /* тип, з яким рядок створено: collectState() бере його, поки sl-select
+       ще не має значення (не зареєстрований або setSlSelectValue() не
+       встиг). Без цього будь-яке раннє saveState() писало аудиторії без
+       type, і після перезавантаження обидві ставали «головна» (BUGS.md) */
+    item.dataset.type = type || 'головна';
     item.innerHTML =
       '<div class="audience-row">' +
       '<div class="field field-wrap">' +
@@ -4358,6 +4383,17 @@ firebase.initializeApp(firebaseConfig);
       setSlSelectValue(audienceSelect, link.audienceId);
     }
 
+    /* Кнопка дії — прапорець на парі, а не окреме поле: її аудиторія —
+       аудиторія задачі, яку блок закриває, а текст кнопки на метрику не
+       впливає (рахується позиція й доказова база до неї). Кілька
+       прапорців у блоці — одна позиція (номер блоку), кілька дій. Блок
+       без пар кнопки мати не може: кандидат виникає з покриття задачі */
+    var ctaCheckbox = document.createElement('sl-checkbox');
+    ctaCheckbox.className = 'confirm-link-cta';
+    ctaCheckbox.textContent = 'кнопка';
+    if (link.cta === true) { ctaCheckbox.setAttribute('checked', ''); }
+    linkRow.appendChild(ctaCheckbox);
+
     var removeBtn = document.createElement('button');
     removeBtn.type = 'button';
     removeBtn.className = 'confirm-link-remove';
@@ -4503,7 +4539,7 @@ firebase.initializeApp(firebaseConfig);
 
         var draftLinks = JSON.parse(linkRow.blockItemRef.dataset.links || 'null');
         if (!Array.isArray(draftLinks)) { draftLinks = []; }
-        draftLinks.push({ taskId: target.value, audienceId: newAudienceId });
+        draftLinks.push({ taskId: target.value, audienceId: newAudienceId, cta: false });
         linkRow.blockItemRef.dataset.links = JSON.stringify(draftLinks);
         setLinksSource(linkRow.blockItemRef, 'designer');
         saveState();
@@ -4541,6 +4577,19 @@ firebase.initializeApp(firebaseConfig);
       setLinksSource(linkRow2.blockItemRef, 'designer');
       saveState();
       updateMissingSection();
+      return;
+    }
+
+    if (target.classList.contains('confirm-link-cta')) {
+      var ctaRow = target.closest('.confirm-link-row');
+      /* у чернетки прапорця немає — він з'являється, коли рядок стає парою */
+      if (!ctaRow || ctaRow.linkIndex === undefined) { return; }
+      var ctaLinks = JSON.parse(ctaRow.blockItemRef.dataset.links || 'null');
+      if (!Array.isArray(ctaLinks) || !ctaLinks[ctaRow.linkIndex]) { return; }
+      ctaLinks[ctaRow.linkIndex].cta = target.checked;
+      ctaRow.blockItemRef.dataset.links = JSON.stringify(ctaLinks);
+      setLinksSource(ctaRow.blockItemRef, 'designer');
+      saveState();
       return;
     }
 
@@ -4964,7 +5013,7 @@ firebase.initializeApp(firebaseConfig);
           console.warn('[parse] прив\'язка блоку «' + blockName + '» без відповідника у формі → відкинуто', link);
           return;
         }
-        pairs.push({ taskId: taskId, audienceId: audienceId });
+        pairs.push({ taskId: taskId, audienceId: audienceId, cta: link.cta === true });
       });
       /* та сама межа, що на сервері: відкинуті всі — не «не обслуговує» */
       return links.length > 0 && pairs.length === 0 ? null : pairs;

@@ -198,14 +198,23 @@ function resolveLinks(rawLinks, label, tasks, audiences, droppedAudiences, fixes
     const isObject = link !== null && typeof link === 'object';
     const taskText = asString(isObject ? link.task : undefined);
     const audienceText = asString(isObject ? link.audience : undefined);
+    // cta — кнопка дії на парі (правило 13): true лише на явне true, як
+    // countable. Прапорець живе на парі, тож відкинута пара забирає його
+    // з собою — це кажемо в тому самому warn, щоб втрачену кнопку було видно
+    const rawCta = isObject ? link.cta : undefined;
+    if (typeof rawCta !== 'boolean') {
+      fixes.push(pairLabel + ' cta ' + JSON.stringify(rawCta) + ' → false');
+    }
+    const cta = rawCta === true;
+    const lost = cta ? ' (з кнопкою дії — кнопку втрачено)' : '';
     if (taskText === '' || audienceText === '') {
-      fixes.push('прив\'язка ' + pairLabel + ' ' + JSON.stringify(link) + ' без задачі чи аудиторії → відкинуто');
+      fixes.push('прив\'язка ' + pairLabel + ' ' + JSON.stringify(link) + ' без задачі чи аудиторії → відкинуто' + lost);
       return;
     }
 
     const task = bestMatch(taskText, taskValues);
     if (task === null) {
-      fixes.push('прив\'язка ' + pairLabel + ' задача ' + JSON.stringify(taskText) + ' не зіставилась → відкинуто');
+      fixes.push('прив\'язка ' + pairLabel + ' задача ' + JSON.stringify(taskText) + ' не зіставилась → відкинуто' + lost);
       return;
     }
     if (task.tied) {
@@ -214,22 +223,24 @@ function resolveLinks(rawLinks, label, tasks, audiences, droppedAudiences, fixes
 
     const audience = bestMatch(audienceText, audienceValues.concat(droppedValues));
     if (audience === null) {
-      fixes.push('прив\'язка ' + pairLabel + ' аудиторія ' + JSON.stringify(audienceText) + ' не зіставилась → відкинуто');
+      fixes.push('прив\'язка ' + pairLabel + ' аудиторія ' + JSON.stringify(audienceText) + ' не зіставилась → відкинуто' + lost);
       return;
     }
     if (audience.tied) {
-      fixes.push('прив\'язка ' + pairLabel + ' аудиторія ' + JSON.stringify(audienceText) + ' — нічия між аудиторіями → відкинуто');
+      fixes.push('прив\'язка ' + pairLabel + ' аудиторія ' + JSON.stringify(audienceText) + ' — нічия між аудиторіями → відкинуто' + lost);
       return;
     }
     if (audience.index >= audienceValues.length) {
-      fixes.push('прив\'язка ' + pairLabel + ' аудиторія ' + JSON.stringify(audienceText) + ' — з droppedAudiences, у формі її немає → відкинуто');
+      fixes.push('прив\'язка ' + pairLabel + ' аудиторія ' + JSON.stringify(audienceText) + ' — з droppedAudiences, у формі її немає → відкинуто' + lost);
       return;
     }
 
-    const pair = { task: taskValues[task.index], audience: audienceValues[audience.index] };
-    const duplicate = resolved.some(function (p) { return p.task === pair.task && p.audience === pair.audience; });
+    const pair = { task: taskValues[task.index], audience: audienceValues[audience.index], cta: cta };
+    const duplicate = resolved.filter(function (p) { return p.task === pair.task && p.audience === pair.audience; })[0];
     if (duplicate) {
-      fixes.push('прив\'язка ' + pairLabel + ' дубль пари → відкинуто');
+      // дубль зливається: кнопка, названа хоч на одному з них, лишається
+      duplicate.cta = duplicate.cta || pair.cta;
+      fixes.push('прив\'язка ' + pairLabel + ' дубль пари → злито');
       return;
     }
     resolved.push(pair);
@@ -437,7 +448,7 @@ ${pageDescription.trim()}
 - droppedAudiences — аудиторії, що не ввійшли в audiences
 - goal — бізнес-ціль: що має статися після візиту
 - tasks — Top Tasks
-- blocks — блоки сторінки; для кожного: name — назва, unit — одиниця, count — кількість одиниць, countable — чи одиницю читають поштучно, links — які задачі й для яких аудиторій блок обслуговує (правило 12)
+- blocks — блоки сторінки; для кожного: name — назва, unit — одиниця, count — кількість одиниць, countable — чи одиницю читають поштучно, links — які задачі й для яких аудиторій блок обслуговує (правило 12), у кожній парі links — cta: чи є в блоці кнопка дії для цієї аудиторії (правило 13)
 - sources, source — джерело кожного значення (правило 11): sources для category/support/goal, source у кожної аудиторії й задачі, sources для name/unit/count кожного блоку
 
 Правила:
@@ -455,7 +466,7 @@ ${pageDescription.trim()}
 
 6. tasks — рівно три Top Tasks, виведені з ролей блоків в описі сторінки. Формат кожної: "дієслово + об'єкт" (наприклад: "підтвердити легітимність організації").
 
-7. Кнопки, CTA й точки дії не витягуй. Секцію без власного змісту, крім кнопок, блоком не роби. Якщо в секції є власний зміст (заголовок, текст, зображення) — вона блок, а кнопки в ній не згадуються.
+7. Кнопка не буває ні блоком, ні одиницею блоку. Секцію, в якій немає нічого, крім кнопок, блоком не роби: її кнопки — прапорець cta на прив'язках попереднього блоку (людина бачить їх, дійшовши до кінця попереднього блоку). Якщо в секції є власний зміст (заголовок, текст, зображення) — вона блок, а її кнопки — прапорець cta на її прив'язках (правило 13).
 
 8. unit — вільний текст: те, що повторюється в блоці, іменник в однині, коротко. Зі списку не обирай і до відомих слів не притискай.
 
@@ -467,8 +478,10 @@ ${pageDescription.trim()}
 
 12. links — для кожного блоку масив пар {task, audience}. task — рівно текст однієї із задач у tasks, audience — рівно текст однієї з аудиторій у audiences; не перефразовуй. Аудиторії з droppedAudiences у пари не став. Блок може обслуговувати кілька задач і кілька аудиторій — тоді кілька пар, по одній на кожну комбінацію, де блок справді дає відповідь. Блок може не обслуговувати жодної задачі — тоді links: [] (порожній масив — правильна відповідь, а не недогляд): типово шапка, футер, смуга партнерів, перше представлення. Прив'язка ставиться там, де блок дає відповідь на задачу, а не там, де тема згадана поруч.
 
+13. cta — у кожній парі links: true, якщо за описом сторінки в цьому блоці є кнопка дії для аудиторії цієї пари; інакше false. Кнопка дії — те, що виконує дію на місці або веде до неї: реєстрація, підписка (форма з полем), пожертва, «стати спонсором», «стати волонтером». Посилання, що веде читати іншу сторінку сайту (наприклад, «про нас», «читати далі», «усі учасники»), — не кнопка дії, як би воно не було оформлене. Не вигадуй: якщо опис дії в блоці не називає — false. Постійну кнопку, однакову на всіх сторінках (наприклад, у шапці), не став на жоден блок. Якщо кнопка дії в блоці є, а пари для її аудиторії немає, — пару заради кнопки не додавай.
+
 Поверни ТІЛЬКИ JSON, без пояснень і без markdown-огорожі, у форматі:
-{"category": "", "support": "", "goal": "", "sources": {"category": "page|brief|agent", "support": "page|brief|agent", "goal": "page|brief|agent"}, "audiences": [{"value": "", "type": "головна", "source": "page|brief|agent"}], "droppedAudiences": [{"value": ""}], "tasks": [{"value": "", "source": "agent"}], "blocks": [{"name": "", "unit": "", "count": "", "countable": true, "sources": {"name": "page|brief|agent", "unit": "page|brief|agent", "count": "page|brief|agent"}, "links": [{"task": "", "audience": ""}]}]}`;
+{"category": "", "support": "", "goal": "", "sources": {"category": "page|brief|agent", "support": "page|brief|agent", "goal": "page|brief|agent"}, "audiences": [{"value": "", "type": "головна", "source": "page|brief|agent"}], "droppedAudiences": [{"value": ""}], "tasks": [{"value": "", "source": "agent"}], "blocks": [{"name": "", "unit": "", "count": "", "countable": true, "sources": {"name": "page|brief|agent", "unit": "page|brief|agent", "count": "page|brief|agent"}, "links": [{"task": "", "audience": "", "cta": false}]}]}`;
 
   // ТИМЧАСОВО gemini-3.1-flash-lite: денна квота free tier на 3.8-flash
   // вичерпана (13.09.2026), а правку категорії треба було перевірити
