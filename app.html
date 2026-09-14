@@ -162,6 +162,16 @@ body {
   border: 1px solid var(--border-card);
 }
 
+/* бейдж «код»/«персона» над переліком (секція розходження) — читається
+   підписом, не кнопкою: кегль той самий, що .field-caption (12px, а не
+   вигадане число), тісніші відступи з наявних токенів, без рамки —
+   слабший сигнал, а не новий колір */
+.tag--tiny {
+  padding: var(--spacing-4) var(--spacing-8);
+  font-size: 12px;
+  border: none;
+}
+
 /* ---------- layout ---------- */
 .container {
   width: 100%;
@@ -566,6 +576,15 @@ textarea.field-input {
   display: flex;
   flex-direction: column;
   gap: var(--spacing-48);
+}
+
+/* .app-head має власний margin-bottom: 48 (спільний для всіх екранів,
+   де він єдине джерело відступу — .container там не flex). Тут джерел
+   стало два: той margin і .result gap, разом 96 замість 48. Єдине
+   джерело — .result; обнуляємо margin тільки в її межах, .app-head
+   не чіпаємо, бо інші екрани на ньому й досі стоять. */
+.result > .app-head {
+  margin-bottom: 0;
 }
 
 /* шапка застосунку — спільна для обох екранів, на всю ширину вікна;
@@ -1275,34 +1294,136 @@ textarea.field-input {
   margin-top: auto;
 }
 
-/* ---------- Розходження на картці структури (етап 6) ---------- */
-/* .tag.tag--muted тут — походження знахідки («код»/«персона»), не
-   рівень зауваження (той tag reused, а не .remark__dot: тут немає
-   критично/помірно/незначно, лише "хто це побачив") */
-.finding-list {
+/* ---------- Розходження між кодом і персоною (етап 6) ---------- */
+/* Сітка структур — 6 рядків-секцій замість 7: «Розходження» винесене з
+   картки в окрему секцію під картками. Модифікатор, а не зміна
+   .variants-grid/.variant-card: їх досі використовує заморожений старий
+   шлях (renderVariants, 7 секцій). */
+.variants-grid--structures {
+  grid-template-rows: repeat(6, auto);
+}
+
+.variants-grid--structures > .variant-card {
+  grid-row: span 6;
+}
+
+/* #result-body власного ритму не має — діти стоять впритул, тож кожен
+   зазор на екрані «Результат» задано явно тут, за трирівневою шкалою:
+   48 між великими блоками екрана (опис → перемикач-групу, групу →
+   картки, картки → секцію, секцію → абзаци, абзаци → кнопки звіту),
+   24 між блоками всередині однієї секції (перемикач персон і два
+   підписи під ним — вони пов'язані за змістом, підпис пояснює
+   перемикач), 16/8/4 усередині блока (title→вердикт→підстава→рядок,
+   .divergence-block/.divergence-basis/.divergence-list нижче). */
+.persona-switcher {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-24);
+}
+
+/* підпис про пороги — третій блок тієї самої смислової групи, що
+   перемикач і підпис під ним, тому теж 24, не 48 */
+#persona-switcher + .field-hint {
+  margin-top: var(--spacing-24);
+}
+
+/* сітка карток — уже інша секція екрана, тож 48 */
+#structures-grid {
+  margin-top: var(--spacing-48);
+}
+
+.divergence-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-24);
+  margin-top: var(--spacing-48);
+}
+
+.divergence-section__head {
   display: flex;
   flex-direction: column;
   gap: var(--spacing-8);
 }
 
-.finding {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--spacing-8);
+/* ті самі колонки й відступ, що .variants-grid, — структури стоять одна
+   проти одної, як картки вище; блоки — subgrid, щоб вердикти й переліки
+   всіх структур стояли на одній висоті */
+.divergence-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows: repeat(4, auto);
+  gap: var(--spacing-24);
 }
 
-.finding__text {
+/* та сама рамка, фон і padding, що .variant-card — інакше секція
+   читалась голими стовпчиками, хвостом попередньої */
+.divergence-block {
+  display: grid;
+  grid-row: span 4;
+  grid-template-rows: subgrid;
+  row-gap: var(--spacing-16);
+  padding: var(--spacing-24);
+  background: var(--surface-page);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-ml);
+}
+
+/* вердикт головний у блоці розміром; риска відділяє, а не розфарбовує —
+   тому --text-primary, не жовтий: жовтим уже позначено рівень «помірно»,
+   і два значення одного кольору на екрані читались би як одне.
+   3px — та сама товщина, що в .block-item--unlinked */
+.divergence-verdict {
+  padding-left: var(--spacing-12);
+  border-left: 3px solid var(--text-primary);
   font-size: 16px;
   line-height: 1.5;
   color: var(--text-primary);
 }
 
-/* три підсумкові абзаци під картками — той самий .field-hint, що скрізь
-   для другорядного пояснювального тексту, просто в один стос */
+/* одна з перевірок не відбулась — вердикту немає, тож і акценту немає */
+.divergence-verdict--none {
+  border-left-color: var(--border-medium);
+  color: var(--text-secondary);
+}
+
+/* бейдж — над своїм переліком, окремим рядком, не збоку */
+.divergence-basis {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--spacing-8);
+}
+
+/* ресет обнуляє відступ ul — маркер і відступ задані явно; не flex:
+   у флекс-контейнері li втрачали б маркери */
+.divergence-list {
+  padding-left: var(--spacing-20);
+  list-style: disc;
+  font-size: 14px;
+  line-height: 1.4;
+  color: var(--text-primary);
+}
+
+.divergence-list li + li {
+  margin-top: var(--spacing-4);
+}
+
+/* три підсумкові абзаци під секцією розходження — той самий .field-hint,
+   що скрізь для другорядного пояснювального тексту, просто в один стос.
+   48 зверху — той самий великий зазор, що між рештою секцій екрана */
 .divergence-footer {
   display: flex;
   flex-direction: column;
   gap: var(--spacing-12);
+  margin-top: var(--spacing-48);
+}
+
+/* кнопки звіту (копіювати/завантажити/додати структуру) — прямий
+   нащадок #result-body, на відміну від другого .report-actions
+   («Видалити прогін»), що стоїть поза ним і вже дістає свої 48 від
+   .result gap; без >, правило зачепило б і його, подвоївши відступ */
+#result-body > .report-actions {
+  margin-top: var(--spacing-48);
 }
 
 /* ---------- таблиця розходжень ---------- */
@@ -1881,7 +2002,15 @@ sl-button[variant="text"]::part(label):hover {
 
       <p class="field-hint">порогу немає — числа показують різницю між структурами, не оцінку</p>
 
-      <div class="variants-grid" id="structures-grid"></div>
+      <div class="variants-grid variants-grid--structures" id="structures-grid"></div>
+
+      <section class="divergence-section">
+        <div class="divergence-section__head">
+          <h2 class="result-section__title">Розходження між кодом і персоною</h2>
+          <p class="field-hint" id="divergence-lede">Один аспект перевірено двічі, різними способами. Розходження інформативніше за збіг.</p>
+        </div>
+        <div class="divergence-grid" id="divergence-grid"></div>
+      </section>
 
       <div class="divergence-footer">
         <p class="field-hint">Висновок читається з розходження, а не з чисел чи зауважень персони окремо. Порівняльні числа висновком не є: «блоків підряд без виходу — 6» нічого не каже, поки немає ні порога, ні другої структури. Зауваження персони теж не є: вони змістовні, але ступінь важкості пливе.</p>
@@ -2115,6 +2244,8 @@ firebase.initializeApp(firebaseConfig);
   var resultBody = document.getElementById('result-body');
   var singleStructureNotice = document.getElementById('single-structure-notice');
   var structuresGrid = document.getElementById('structures-grid');
+  var divergenceGrid = document.getElementById('divergence-grid');
+  var divergenceLede = document.getElementById('divergence-lede');
   var addStructureCtaBtn = document.getElementById('add-structure-cta-btn');
 
   var runsScreen = document.getElementById('runs-screen');
@@ -3102,33 +3233,43 @@ firebase.initializeApp(firebaseConfig);
      (коду нема з чим зіставити — метрики міряють, але без бази), персона
      не виконується, ще читає чи не відповіла — тоді вердикту немає, і
      це сказано прямо, а не проведено тихо через одну з чотирьох гілок. */
+  /* Персона в переліку — не повний список зауважень (він уже є в
+     «Персонному аудиті» картки вище), а два рядки: скільки й за рівнями,
+     і найважче — перше з найвищим рівнем, у порядку, в якому його дала
+     персона. Код — рядки знахідок, як є. */
   function buildDivergenceView(findings, personaResult, structureCount) {
-    var codeCount = findings.filter(function (f) { return f.origin === 'код'; }).length;
+    var codeFindings = findings.filter(function (f) { return f.origin === 'код'; });
+    var codeCount = codeFindings.length;
     var comparable = structureCount >= 2;
+    var LEVELS = ['критично', 'помірно', 'незначно'];
 
-    var codeLine = !comparable ? 'Код: порівнювати нема з чим — структура одна'
-      : codeCount ? 'Код: найгірша серед структур ' + (codeCount % 10 === 1 && codeCount % 100 !== 11
-          ? 'на ' + codeCount + ' метриці' : 'на ' + codeCount + ' метриках')
-      : 'Код: ні на одній метриці не найгірша';
+    var codeItems = !comparable ? ['порівнювати нема з чим — структура одна']
+      : codeCount ? codeFindings.map(function (f) { return f.text; })
+      : ['ні на одній метриці не найгірша'];
 
-    var personaLine;
+    var personaItems;
     if (personaResult.status === 'unavailable') {
-      personaLine = 'Персона: аудит для цієї аудиторії не виконується';
+      personaItems = ['аудит для цієї аудиторії не виконується'];
     } else if (personaResult.status === 'loading') {
-      personaLine = 'Персона: читає структури…';
+      personaItems = ['читає структури…'];
     } else if (personaResult.status === 'error') {
-      personaLine = 'Персона: ' + personaResult.errorText;
+      personaItems = [personaResult.errorText];
     } else if (!personaResult.remarks.length) {
-      personaLine = 'Персона: зауважень немає';
+      personaItems = ['зауважень немає'];
     } else {
       var n = personaResult.remarks.length;
       var noun = (n % 10 === 1 && n % 100 !== 11) ? 'зауваження'
         : (n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 12 || n % 100 > 14)) ? 'зауваження' : 'зауважень';
-      var byLevel = ['критично', 'помірно', 'незначно'].map(function (level) {
+      var byLevel = LEVELS.map(function (level) {
         var count = personaResult.remarks.filter(function (r) { return r.level === level; }).length;
         return count ? count + ' ' + level : null;
       }).filter(function (part) { return part !== null; });
-      personaLine = 'Персона: ' + n + ' ' + noun + ' — ' + byLevel.join(', ');
+      var worst = null;
+      LEVELS.forEach(function (level) {
+        if (worst) { return; }
+        worst = personaResult.remarks.filter(function (r) { return r.level === level; })[0] || null;
+      });
+      personaItems = [n + ' ' + noun + ' — ' + byLevel.join(', '), 'найважче: [' + worst.level + '] ' + worst.text];
     }
 
     var verdict;
@@ -3149,7 +3290,12 @@ firebase.initializeApp(firebaseConfig);
         : 'Нічого не знайдено. Це не те саме, що «все добре»: перевірки обмежені тим, що вміють.';
     }
 
-    return { verdict: verdict, codeLine: codeLine, personaLine: personaLine };
+    return {
+      verdict: verdict,
+      isEdge: !comparable || personaResult.status !== 'ready',
+      codeItems: codeItems,
+      personaItems: personaItems
+    };
   }
 
   /* Знахідки код-сторони — де структура порівняно найгірша серед прогону
@@ -3444,33 +3590,29 @@ firebase.initializeApp(firebaseConfig);
     return section;
   }
 
-  /* Вердикт — перший і тим самим стилем, що висновок персони: заради
-     нього секція й існує. Під ним — два рядки, з яких він вийшов (що
-     побачив код і що персона), тож вердикт можна перевірити. Список
-     знахідок — останнім, з міткою «підстава»: вхідні дані для вердикту,
-     а не він сам (buildDivergenceView — рівень структури, не окремої
-     знахідки). */
-  function renderDivergenceSection(findings, personaResult, structureCount) {
+  /* Блок структури в секції «Розходження між кодом і персоною» — окремо
+     від картки: у картці вердикт стояв одразу після висновку персони, два
+     підсумки підряд, і незрозуміло, який головний. Вердикт — з рискою
+     (у граничних випадках нейтральною), під ним підстава: «код» і
+     «персона», кожна — бейдж над своїм маркованим переліком
+     (buildDivergenceView — рівень структури, не окремої знахідки). */
+  function renderDivergenceBlock(structure, index, findings, personaResult, structureCount) {
     var view = buildDivergenceView(findings, personaResult, structureCount);
-    var section = el('div', 'card-section card-section--divided');
-    section.appendChild(el('span', 'section-label', 'Розходження'));
-    section.appendChild(el('p', 'conclusion__text', view.verdict));
-    section.appendChild(el('p', 'field-hint', view.codeLine));
-    section.appendChild(el('p', 'field-hint', view.personaLine));
+    var block = el('div', 'divergence-block');
+    block.appendChild(el('h3', 'variant-card__title', structure.isBaseline ? 'Базова структура' : 'Структура ' + index));
+    block.appendChild(el('p', 'divergence-verdict' + (view.isEdge ? ' divergence-verdict--none' : ''), view.verdict));
+    block.appendChild(renderDivergenceBasis('код', view.codeItems));
+    block.appendChild(renderDivergenceBasis('персона', view.personaItems));
+    return block;
+  }
 
-    if (findings.length) {
-      section.appendChild(el('span', 'field-caption', 'підстава'));
-      var list = el('div', 'finding-list');
-      findings.forEach(function (f) {
-        var row = el('div', 'finding');
-        row.appendChild(el('span', 'tag tag--muted', f.origin));
-        row.appendChild(el('p', 'finding__text', f.text));
-        list.appendChild(row);
-      });
-      section.appendChild(list);
-    }
-
-    return section;
+  function renderDivergenceBasis(label, items) {
+    var basis = el('div', 'divergence-basis');
+    basis.appendChild(el('span', 'tag tag--muted tag--tiny', label));
+    var list = el('ul', 'divergence-list');
+    items.forEach(function (text) { list.appendChild(el('li', null, text)); });
+    basis.appendChild(list);
+    return basis;
   }
 
   /* Картка структури: назва (базова — з підписом походження, решта —
@@ -3478,9 +3620,10 @@ firebase.initializeApp(firebaseConfig);
      Екрана «Структури» — прогін уже застиг), потік із позначками кнопок
      (renderFlow переюзана як є — читає лише variant.flow, першого
      аргументу renderRemarks()/renderConclusion() теж не читає), метрики,
-     персонний аудит, розходження. Бейдж — той самий hasCleanPersonaAudit(),
-     що на старому шляху. */
-  function renderStructureCard(structure, index, state, structureMetrics, findings, personaResult, structureCount) {
+     персонний аудит із висновком. «Розходження» — не тут, окремою секцією
+     під картками (renderDivergenceBlock). Бейдж — той самий
+     hasCleanPersonaAudit(), що на старому шляху. */
+  function renderStructureCard(structure, index, state, structureMetrics, personaResult) {
     var card = el('article', 'variant-card');
 
     var badge = el('span', 'tag tag--muted', 'без критичних зауважень');
@@ -3500,7 +3643,6 @@ firebase.initializeApp(firebaseConfig);
     card.appendChild(renderStructureMetricsSection(structureMetrics, state));
     card.appendChild(renderRemarks(structure, personaResult));
     card.appendChild(renderConclusion(structure, personaResult));
-    card.appendChild(renderDivergenceSection(findings, personaResult, structureCount));
 
     return card;
   }
@@ -3522,10 +3664,11 @@ firebase.initializeApp(firebaseConfig);
     singleStructureNotice.hidden = structures.length >= 2;
 
     structuresGrid.innerHTML = '';
+    divergenceGrid.innerHTML = '';
     structures.forEach(function (structure, index) {
       var personaResult = getPersonaResultFor(structure.id);
-      var card = renderStructureCard(structure, index, state, allMetrics[index], findingsById[structure.id] || [], personaResult, structures.length);
-      structuresGrid.appendChild(card);
+      structuresGrid.appendChild(renderStructureCard(structure, index, state, allMetrics[index], personaResult));
+      divergenceGrid.appendChild(renderDivergenceBlock(structure, index, findingsById[structure.id] || [], personaResult, structures.length));
     });
   }
 
@@ -4007,18 +4150,31 @@ firebase.initializeApp(firebaseConfig);
           : personaResult.errorText);
       }
 
-      /* той самий порядок, що в картці: вердикт, два рядки, підстава */
-      var findings = findingsById[structure.id] || [];
-      var view = buildDivergenceView(findings, personaResult, structures.length);
+    });
+
+    /* Розходження — окремим розділом після всіх структур, тим самим
+       порядком, що на екрані: вердикт, «код», «персона». Підзаголовок і
+       три абзаци — з тієї самої розмітки, що на екрані, щоб текст був
+       один: звіт читають окремо від екрана, і без абзаців вердикт
+       виглядає як оцінка від системи. */
+    lines.push('');
+    lines.push('— — —');
+    lines.push('');
+    lines.push('РОЗХОДЖЕННЯ МІЖ КОДОМ І ПЕРСОНОЮ');
+    lines.push(divergenceLede.textContent);
+    structures.forEach(function (structure, index) {
+      var view = buildDivergenceView(findingsById[structure.id] || [], getPersonaResultFor(structure.id), structures.length);
       lines.push('');
-      lines.push('Розходження:');
+      lines.push(structure.isBaseline ? 'Базова структура' : 'Структура ' + index);
       lines.push('  ' + view.verdict);
-      lines.push('  ' + view.codeLine);
-      lines.push('  ' + view.personaLine);
-      if (findings.length) {
-        lines.push('  Підстава:');
-        findings.forEach(function (f) { lines.push('    [' + f.origin + '] ' + f.text); });
-      }
+      lines.push('  Код:');
+      view.codeItems.forEach(function (item) { lines.push('    • ' + item); });
+      lines.push('  Персона:');
+      view.personaItems.forEach(function (item) { lines.push('    • ' + item); });
+    });
+    Array.prototype.forEach.call(document.querySelectorAll('.divergence-footer p'), function (p) {
+      lines.push('');
+      lines.push(p.textContent);
     });
 
     return lines.join('\n');
@@ -4823,6 +4979,7 @@ firebase.initializeApp(firebaseConfig);
     /* показаний результат скидається: наступний — тільки після «Прогнати аудит» */
     summaryBody.innerHTML = '';
     structuresGrid.innerHTML = '';
+    divergenceGrid.innerHTML = '';
     disarmReset();
     disarmEdit();
     disarmLoadExample();
