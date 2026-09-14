@@ -65,9 +65,14 @@ export default async function handler(req, res) {
     return;
   }
 
-  if (!Array.isArray(structures) || structures.length < 3 || structures.length > 4) {
-    console.error('[persona] structures поза межами 3-4', Array.isArray(structures) ? structures.length : typeof structures);
-    res.status(400).json({ error: 'structures має містити від 3 до 4 елементів' });
+  // Етап 6: довільна кількість структур від дизайнера, не фіксовані
+  // три варіанти з осей + базовий порядок. Межа "хоча б один" — калібрування
+  // (personas.js, calibratedOn) робилось одночасно на трьох структурах;
+  // надійність на одній чи двох не переміряна — межа методики, не дефект
+  // (PROGRESS.md).
+  if (!Array.isArray(structures) || structures.length < 1) {
+    console.error('[persona] structures порожній або не масив', Array.isArray(structures) ? structures.length : typeof structures);
+    res.status(400).json({ error: 'structures має містити хоча б один елемент' });
     return;
   }
 

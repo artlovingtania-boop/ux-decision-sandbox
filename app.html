@@ -1277,6 +1277,36 @@ textarea.field-input {
   margin-top: auto;
 }
 
+/* ---------- Розходження на картці структури (етап 6) ---------- */
+/* .tag.tag--muted тут — походження знахідки («код»/«персона»), не
+   рівень зауваження (той tag reused, а не .remark__dot: тут немає
+   критично/помірно/незначно, лише "хто це побачив") */
+.finding-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-8);
+}
+
+.finding {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--spacing-8);
+}
+
+.finding__text {
+  font-size: 16px;
+  line-height: 1.5;
+  color: var(--text-primary);
+}
+
+/* три підсумкові абзаци під картками — той самий .field-hint, що скрізь
+   для другорядного пояснювального тексту, просто в один стос */
+.divergence-footer {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-12);
+}
+
 /* ---------- таблиця розходжень ---------- */
 .table-wrap {
   overflow-x: auto;
@@ -1801,6 +1831,10 @@ sl-button[variant="text"]::part(label):hover {
   <div class="form-actions">
     <button type="button" id="add-structure-btn" class="button button--secondary">+ Додати структуру</button>
   </div>
+
+  <div class="form-actions">
+    <button type="button" id="run-audit-btn" class="button button--primary">Прогнати аудит</button>
+  </div>
 </div>
 </div>
 
@@ -1813,6 +1847,10 @@ sl-button[variant="text"]::part(label):hover {
 
 <div id="result-screen" hidden>
   <div class="container container--wide result">
+
+    <header class="app-head">
+      <h1 class="app-head__title">Результат</h1>
+    </header>
 
     <sl-alert variant="warning" id="save-notice">Прогін не збережено: сховище браузера недоступне або переповнене.</sl-alert>
 
@@ -1831,34 +1869,37 @@ sl-button[variant="text"]::part(label):hover {
       </div>
     </details>
 
-    <div class="audience-switcher" id="audience-switcher" hidden></div>
+    <!-- Прогони старого формату (result.variants, три варіанти з осей) —
+         людське повідомлення замість дублювання шляху показу (PROGRESS.md) -->
+    <div id="result-legacy-notice" hidden>
+      <p class="field-hint">Цей прогін записаний у старому форматі — трьома варіантами з осей, без структур від дизайнера. Показ для нього більше не підтримується. Такі прогони лишились тестовими: видали або створи новий через «Новий прогін».</p>
+    </div>
 
-    <div class="baseline-strip" id="baseline-strip" hidden></div>
+    <div id="result-body">
 
-    <div class="variants-grid" id="variants-grid"></div>
+      <sl-alert variant="warning" id="single-structure-notice" hidden>Одна структура в цьому прогоні — порівняльні метрики без бази для зіставлення, а зауваження персони не пройшли перевірку порівнянням: в ізоляції вона знаходить зауваження до чого завгодно.</sl-alert>
 
-    <div class="persona-switcher" id="persona-switcher" hidden></div>
+      <div class="persona-switcher" id="persona-switcher" hidden></div>
 
-    <section class="result-section">
-      <h2 class="result-section__title">Розходження: код ↔ персона</h2>
-      <div class="table-wrap">
-        <table class="divergence">
-          <thead>
-            <tr>
-              <th>Варіант</th>
-              <th>Код</th>
-              <th>Персона</th>
-              <th>Що це означає</th>
-            </tr>
-          </thead>
-          <tbody id="divergence-body"></tbody>
-        </table>
+      <p class="field-hint">порогу немає — числа показують різницю між структурами, не оцінку</p>
+
+      <div class="variants-grid" id="structures-grid"></div>
+
+      <div class="divergence-footer">
+        <p class="field-hint">Висновок читається звідси, а не з чисел чи зауважень персони окремо: порівняльні числа без інтерпретації висновком не є, і зауваження персони поза порівнянням — теж; тут вони поруч, і саме їхнє зіставлення дає висновок за методикою.</p>
+        <p class="field-hint">Інструмент не називає кращу структуру: щоб зважити метрики одна проти одної, потрібні ваги, яких у літературі немає.</p>
+        <p class="field-hint">🔶 Зіставлення «бачить код / бачить персона» — на рівні структури, не окремої знахідки: чи вони кажуть про те саме місце, вирішує дизайнер. Це межа реалізації, не методики — зауваження персони не прив'язані до номера питання, на яке відповідають.</p>
       </div>
-    </section>
+
+      <div class="report-actions">
+        <button type="button" id="copy-report-btn" class="button button--secondary">Скопіювати звіт</button>
+        <button type="button" id="save-report-btn" class="button button--secondary">Завантажити звіт</button>
+        <button type="button" id="add-structure-cta-btn" class="button button--secondary">+ Додати структуру й порівняти</button>
+      </div>
+
+    </div>
 
     <div class="report-actions">
-      <button type="button" id="copy-report-btn" class="button button--secondary">Скопіювати звіт</button>
-      <button type="button" id="save-report-btn" class="button button--secondary">Завантажити звіт</button>
       <button type="button" id="delete-run-btn" class="button button--text">Видалити прогін</button>
     </div>
 
@@ -2064,12 +2105,19 @@ firebase.initializeApp(firebaseConfig);
   var summaryBody = document.getElementById('summary-body');
   var inputSummary = document.getElementById('input-summary');
   var summaryHint = document.getElementById('summary-hint');
-  var audienceSwitcher = document.getElementById('audience-switcher');
-  var baselineStrip = document.getElementById('baseline-strip');
-  var variantsGrid = document.getElementById('variants-grid');
+  /* audience-switcher/baseline-strip/divergence-body (розмітка старого
+     шляху з осями) прибрані з екрана — етап 6, «Перемикач аудиторій НЕ
+     переноситься», «Розходження» тепер у кожній картці, не окремою
+     таблицею. Самі функції старого шляху (renderAudienceSwitcher,
+     renderBaselineStrip, renderDivergence) лишились недоторканими —
+     просто без виклику й без DOM, у який їм тепер писати */
   var personaSwitcher = document.getElementById('persona-switcher');
-  var divergenceBody = document.getElementById('divergence-body');
   var saveNotice = document.getElementById('save-notice');
+  var resultLegacyNotice = document.getElementById('result-legacy-notice');
+  var resultBody = document.getElementById('result-body');
+  var singleStructureNotice = document.getElementById('single-structure-notice');
+  var structuresGrid = document.getElementById('structures-grid');
+  var addStructureCtaBtn = document.getElementById('add-structure-cta-btn');
 
   var runsScreen = document.getElementById('runs-screen');
   var runsBody = document.getElementById('runs-body');
@@ -2082,6 +2130,7 @@ firebase.initializeApp(firebaseConfig);
   var structureBaselineList = document.getElementById('structure-baseline-list');
   var structuresList = document.getElementById('structures-list');
   var addStructureBtn = document.getElementById('add-structure-btn');
+  var runAuditBtn = document.getElementById('run-audit-btn');
 
   var confirmScreen = document.getElementById('confirm-screen');
   var confirmBackBtn = document.getElementById('confirm-back-btn');
@@ -2961,6 +3010,174 @@ firebase.initializeApp(firebaseConfig);
     return ratio.toFixed(2).replace('.', ',');
   }
 
+  /* ---------- Екран «Результат» для структур (етап 6) ---------- */
+  /* Нове обчислення поруч зі старим (computeVariantMetrics, formatRatio,
+     computeEvidenceRatios, computeLongestGapWithoutAction — усі
+     переюзані як є, без правок). Стосується лише нового шляху: Узгодження
+     → Структури → «Прогнати аудит». Осьовий шлях (finishRun,
+     generateVariants, buildAxisCombinations, computeActionCandidates,
+     selectActionPoints, MOCK_RESULT, renderDivergence) — не чіпали. */
+
+  /* "0,N" — кома, один знак після неї: розкид між аудиторіями — різниця
+     середніх (ядро v2.3), число рідко ціле. formatRatio() тут не годиться:
+     два знаки після коми доречні для частки 0..1, не для кроків. */
+  function formatSpread(value) {
+    return String(Math.round(value * 10) / 10).replace('.', ',');
+  }
+
+  /* Розкид між аудиторіями (ядро v2.3): різниця середніх — середній номер
+     секції задач, покритих аудиторією, між двома аудиторіями. Рахується,
+     лише коли аудиторій дві й обидві мають хоч одну покриту задачу;
+     інакше null, як і решта метрик на неповних даних (той самий патерн,
+     що {max:null} у computeVariantMetrics). */
+  function computeAudienceSpread(order, state) {
+    var namedAudiences = (state.audiences || []).filter(function (a) { return a.value.trim() !== ''; });
+    if (namedAudiences.length !== 2) { return null; }
+    var means = namedAudiences.map(function (a) {
+      var m = computeVariantMetrics(order, state, a.id);
+      if (!m || !m.tasks.length) { return null; }
+      var sum = m.tasks.reduce(function (acc, t) { return acc + t.section; }, 0);
+      return sum / m.tasks.length;
+    });
+    if (means[0] === null || means[1] === null) { return null; }
+    return Math.abs(means[0] - means[1]);
+  }
+
+  /* Позиції кнопки дії в конкретному порядку — з links[].cta самого блоку
+     (правило 13, етап 4), не з осей: кнопка не зберігається на структурі,
+     вона властивість блоку і їде з ним при перетягуванні (розділ
+     «Кнопки дії», PROGRESS.md). */
+  function computeCtaSections(order, state) {
+    var sections = [];
+    order.forEach(function (name, index) {
+      if (blockHasCta(state, name)) { sections.push(index + 1); }
+    });
+    return sections;
+  }
+
+  /* Усі машинні метрики однієї структури разом: по кожній аудиторії
+     (computeVariantMetrics), розкид між аудиторіями, доказова база до
+     кожної кнопки (evidenceRatios — переюзаний computeEvidenceRatios,
+     тепер з actionSections від cta, не від осі) і блоків підряд без виходу. */
+  function computeStructureMetrics(order, state) {
+    var namedAudiences = (state.audiences || []).filter(function (a) { return a.value.trim() !== ''; });
+    var perAudience = namedAudiences.map(function (a) {
+      return { audience: a, metrics: computeVariantMetrics(order, state, a.id) };
+    });
+    var actionSections = computeCtaSections(order, state);
+    return {
+      perAudience: perAudience,
+      spread: computeAudienceSpread(order, state),
+      evidenceRatios: computeEvidenceRatios(order, actionSections, state),
+      gap: computeLongestGapWithoutAction(order.length, actionSections)
+    };
+  }
+
+  /* Хто найгірший серед структур на одній метриці: значення null (метрику
+     не порахувати для цієї структури) не бере участі; менше двох значень
+     чи всі однакові — нема з чим порівнювати, findings не виникає (той
+     самий випадок, що «одна структура» — порівняльні метрики без бази).
+     Нічия — усі, хто ділить крайнє значення, дістають знахідку (той самий
+     принцип, що тег «найкоротше» в metricMinimums()). direction: 'max' —
+     більше гірше, 'min' — менше гірше (доказова база: менше підстав гірше). */
+  function worstStructureIds(valuesByStructureId, direction) {
+    var entries = Object.keys(valuesByStructureId).filter(function (id) { return valuesByStructureId[id] !== null; });
+    if (entries.length < 2) { return []; }
+    var values = entries.map(function (id) { return valuesByStructureId[id]; });
+    var min = Math.min.apply(null, values);
+    var max = Math.max.apply(null, values);
+    if (min === max) { return []; }
+    var extreme = direction === 'max' ? max : min;
+    return entries.filter(function (id) { return valuesByStructureId[id] === extreme; });
+  }
+
+  /* Текст трактування — спільний для екрана й звіту, щоб вони не могли
+     розійтись (той самий довід, що buildDivergenceCodeText() у старому
+     шляху). Варіант А (PROGRESS.md, «зіставлення на рівні структури, не
+     окремої знахідки»): «обидва бачать» означає «обидві лінзи мають
+     претензію до цієї структури», не «вказали на те саме місце» —
+     зауваження персони не прив'язані до номера питання, на яке
+     відповідають, тож перевірити збіг місця код не може. */
+  function divergenceVerdictText(hasCode, hasPersona) {
+    if (hasCode && hasPersona) {
+      return 'Обидві перевірки мають претензію до цієї структури — подивись, чи про те саме.';
+    }
+    if (hasCode) {
+      return 'Поріг формальний: порушення є в числах, на читача не діє.';
+    }
+    if (hasPersona) {
+      return 'Метрики цього не міряють. Найцінніший результат перевірки — і найризикованіший, бо спирається на одну перевірку.';
+    }
+    return 'Нічого не знайдено — це не те саме, що «все добре»: перевірки обмежені тим, що вміють.';
+  }
+
+  /* Знахідки код-сторони — де структура порівняно найгірша серед прогону
+     на конкретній метриці (worstStructureIds). Знахідки персона-сторони —
+     кожне зауваження персони, як є. Найслабша кнопка структури (мінімум
+     зі списку доказової бази) — для порівняння «хто найгірший»; на картці
+     показується весь список (renderStructureMetricsSection), не тільки
+     мінімум. */
+  function computeStructureFindings(structures, allMetrics, state) {
+    var findings = {};
+    structures.forEach(function (s) { findings[s.id] = []; });
+
+    function addCodeFinding(valuesByStructureId, direction, textFor) {
+      worstStructureIds(valuesByStructureId, direction).forEach(function (id) {
+        findings[id].push({ origin: 'код', text: textFor(valuesByStructureId[id]) });
+      });
+    }
+
+    var namedAudiences = (state.audiences || []).filter(function (a) { return a.value.trim() !== ''; });
+    namedAudiences.forEach(function (a) {
+      var maxByStructure = {};
+      var spreadByStructure = {};
+      structures.forEach(function (s, i) {
+        var entry = allMetrics[i].perAudience.filter(function (x) { return x.audience.id === a.id; })[0];
+        var m = entry && entry.metrics;
+        maxByStructure[s.id] = (m && m.max) ? m.max.section : null;
+        spreadByStructure[s.id] = (m && m.max) ? (m.max.section - m.min.section) : null;
+      });
+      addCodeFinding(maxByStructure, 'max', function (v) {
+        return 'До найдальшої задачі (аудиторія «' + a.value + '») — найбільше серед структур: ' + v + '.';
+      });
+      addCodeFinding(spreadByStructure, 'max', function (v) {
+        return 'Розкид кроків (аудиторія «' + a.value + '») — найбільший серед структур: ' + v + '.';
+      });
+    });
+
+    var spreadValues = {};
+    structures.forEach(function (s, i) { spreadValues[s.id] = allMetrics[i].spread; });
+    addCodeFinding(spreadValues, 'max', function (v) {
+      return 'Розкид між аудиторіями — найбільший серед структур: ' + formatSpread(v) + '.';
+    });
+
+    var evidenceMinValues = {};
+    structures.forEach(function (s, i) {
+      var ratios = allMetrics[i].evidenceRatios;
+      evidenceMinValues[s.id] = ratios.length ? Math.min.apply(null, ratios) : null;
+    });
+    addCodeFinding(evidenceMinValues, 'min', function (v) {
+      return 'Доказова база до дії — найслабша кнопка серед структур: ' + formatRatio(v) + '.';
+    });
+
+    var gapValues = {};
+    structures.forEach(function (s, i) { gapValues[s.id] = allMetrics[i].gap; });
+    addCodeFinding(gapValues, 'max', function (v) {
+      return 'Блоків підряд без точки виходу — найбільше серед структур: ' + v + '.';
+    });
+
+    structures.forEach(function (s) {
+      var personaResult = getPersonaResultFor(s.id);
+      if (personaResult.status === 'ready') {
+        personaResult.remarks.forEach(function (r) {
+          findings[s.id].push({ origin: 'персона', text: '[' + r.level + '] ' + r.text });
+        });
+      }
+    });
+
+    return findings;
+  }
+
   /* Найменший "До найдальшої задачі" серед трьох варіантів для тієї самої
      аудиторії — єдина метрика в картці, тож єдине число, не мапа по
      назвах. Варіанти без метрик (null) чи без покритих задач (max: null)
@@ -3132,6 +3349,146 @@ firebase.initializeApp(firebaseConfig);
       : personaResult.errorText;
     section.appendChild(el('p', 'conclusion__text', text));
     return section;
+  }
+
+  /* Порівняльні метрики структури: по кожній аудиторії — «до найдальшої
+     задачі» й розкид, потім розкид між аудиторіями, доказова база до
+     кожної кнопки (увесь список, не тільки мінімум — мінімум лише для
+     порівняння «хто найгірший», computeStructureFindings) і блоків
+     підряд без виходу — цей рядок завжди, він не залежить від задач.
+     Секція ніколи не порожня, тож функція завжди повертає вузол. */
+  function renderStructureMetricsSection(structureMetrics, state) {
+    var section = el('div', 'card-section card-section--divided');
+    section.appendChild(el('span', 'section-label', 'Порівняльні метрики'));
+
+    structureMetrics.perAudience.forEach(function (entry) {
+      var m = entry.metrics;
+      if (!m) { return; }
+      var a = entry.audience;
+      if (!m.max) {
+        section.appendChild(el('p', 'field-caption', a.value + ' (' + a.type + '): жодна задача не прив’язана до цієї аудиторії'));
+        return;
+      }
+      var row1 = el('div', 'metric-row');
+      row1.appendChild(el('span', 'metric-label', 'До найдальшої задачі · ' + a.type));
+      row1.appendChild(el('span', 'metric-row__value', String(m.max.section)));
+      section.appendChild(row1);
+      section.appendChild(el('p', 'field-hint', '«' + m.max.task + '» (' + a.value + ') — вперше на секції ' + m.max.section));
+
+      var row2 = el('div', 'metric-row');
+      row2.appendChild(el('span', 'metric-label', 'Розкид кроків · ' + a.type));
+      row2.appendChild(el('span', 'metric-row__value metric-row__value--secondary', String(m.max.section - m.min.section)));
+      section.appendChild(row2);
+    });
+
+    if (structureMetrics.spread !== null) {
+      var spreadRow = el('div', 'metric-row');
+      spreadRow.appendChild(el('span', 'metric-label', 'Розкид між аудиторіями'));
+      spreadRow.appendChild(el('span', 'metric-row__value metric-row__value--secondary', formatSpread(structureMetrics.spread)));
+      section.appendChild(spreadRow);
+    }
+
+    if (structureMetrics.evidenceRatios.length) {
+      var evRow = el('div', 'metric-row');
+      evRow.appendChild(el('span', 'metric-label', 'Доказова база до кожної кнопки'));
+      evRow.appendChild(el('span', 'metric-row__value metric-row__value--secondary', structureMetrics.evidenceRatios.map(formatRatio).join(' · ')));
+      section.appendChild(evRow);
+    }
+
+    var gapRow = el('div', 'metric-row');
+    gapRow.appendChild(el('span', 'metric-label', 'Блоків підряд без точки виходу'));
+    gapRow.appendChild(el('span', 'metric-row__value metric-row__value--secondary', String(structureMetrics.gap)));
+    section.appendChild(gapRow);
+
+    return section;
+  }
+
+  /* Знахідки — список, кожна з міткою походження (тег «код»/«персона»,
+     не претензія на збіг місця); трактування — один абзац нижче списку,
+     обраний за тим, чи в структури є хоч одна знахідка кожного походження
+     (divergenceVerdictText — рівень структури, не окремої знахідки). */
+  function renderDivergenceSection(findings, personaResult) {
+    var section = el('div', 'card-section card-section--divided');
+    section.appendChild(el('span', 'section-label', 'Розходження'));
+
+    if (findings.length) {
+      var list = el('div', 'finding-list');
+      findings.forEach(function (f) {
+        var row = el('div', 'finding');
+        row.appendChild(el('span', 'tag tag--muted', f.origin));
+        row.appendChild(el('p', 'finding__text', f.text));
+        list.appendChild(row);
+      });
+      section.appendChild(list);
+    }
+
+    if (personaResult.status === 'loading') {
+      section.appendChild(el('p', 'field-caption', 'Персона читає структури…'));
+    } else if (personaResult.status === 'error') {
+      section.appendChild(el('p', 'field-caption', personaResult.errorText));
+    } else {
+      var hasCode = findings.some(function (f) { return f.origin === 'код'; });
+      var hasPersona = personaResult.status === 'ready' && personaResult.remarks.length > 0;
+      section.appendChild(el('p', 'field-caption', divergenceVerdictText(hasCode, hasPersona)));
+    }
+
+    return section;
+  }
+
+  /* Картка структури: назва (базова — з підписом походження, решта —
+     номер за позицією у result.structures, не за динамічним переліком
+     Екрана «Структури» — прогін уже застиг), потік із позначками кнопок
+     (renderFlow переюзана як є — читає лише variant.flow, першого
+     аргументу renderRemarks()/renderConclusion() теж не читає), метрики,
+     персонний аудит, розходження. Бейдж — той самий hasCleanPersonaAudit(),
+     що на старому шляху. */
+  function renderStructureCard(structure, index, state, structureMetrics, findings, personaResult) {
+    var card = el('article', 'variant-card');
+
+    var badge = el('span', 'tag tag--green-soft', 'без критичних зауважень');
+    if (!hasCleanPersonaAudit(personaResult)) { badge.classList.add('variant-card__badge--empty'); }
+    card.appendChild(badge);
+
+    var head = el('div', 'variant-card__head');
+    head.appendChild(el('h2', 'variant-card__title', structure.isBaseline ? 'Базова структура' : 'Структура ' + index));
+    if (structure.isBaseline) {
+      head.appendChild(el('p', 'variant-card__subtitle', 'порядок з опису сторінки'));
+    }
+    card.appendChild(head);
+
+    card.appendChild(renderFlow({ flow: structure.order.map(function (name) {
+      return { name: name, action: blockHasCta(state, name) };
+    }) }));
+    card.appendChild(renderStructureMetricsSection(structureMetrics, state));
+    card.appendChild(renderRemarks(structure, personaResult));
+    card.appendChild(renderConclusion(structure, personaResult));
+    card.appendChild(renderDivergenceSection(findings, personaResult));
+
+    return card;
+  }
+
+  /* Орендатор нового екрана результату: усі структури — рівноправні картки
+     (базова теж, розділ «Структури», PROGRESS.md), обидві аудиторії в
+     метриках одночасно (перемикача більше нема), персона — спільна для
+     всіх карток одразу (perSonaSwitcher переюзаний як є). Попередження
+     про відсутність бази для порівняння — коли структура одна (тільки
+     базова): findings тоді порожні для всіх за побудовою
+     (worstStructureIds повертає [] при < 2 значень) — власної гілки на
+     це тут не треба, вона вже в самому обчисленні. */
+  function renderStructuresResult() {
+    var state = currentRun.input;
+    var structures = currentRun.result.structures || [];
+    var allMetrics = structures.map(function (s) { return computeStructureMetrics(s.order, state); });
+    var findingsById = computeStructureFindings(structures, allMetrics, state);
+
+    singleStructureNotice.hidden = structures.length >= 2;
+
+    structuresGrid.innerHTML = '';
+    structures.forEach(function (structure, index) {
+      var personaResult = getPersonaResultFor(structure.id);
+      var card = renderStructureCard(structure, index, state, allMetrics[index], findingsById[structure.id] || [], personaResult);
+      structuresGrid.appendChild(card);
+    });
   }
 
   /* Базова смуга — порядок блоків як введено на Екрані 1, точка відліку,
@@ -3513,6 +3870,123 @@ firebase.initializeApp(firebaseConfig);
     return (slug || 'ux-sandbox') + '-' + date + '.txt';
   }
 
+  /* Звіт для нового формату прогону (result.structures, етап 6) —
+     паралельно buildReportText() для старого (result.variants), який
+     лишається недоторканим: кнопки звіту для прогонів старого формату
+     не показуються (#result-body прихований, renderCurrentRun()), тож
+     buildReportText() більше нізвідки не викликається. "ВХІДНИЙ ОПИС"
+     тут — той самий текст, що там: скопійовано, не винесено в спільну
+     функцію, щоб не чіпати тіло старої. */
+  function buildStructuresReportText() {
+    var state = currentRun.input;
+    var lines = [];
+
+    lines.push('UX SANDBOX · ' + state.category);
+    lines.push('');
+    lines.push('ВХІДНИЙ ОПИС');
+    var sources = state.sources || {};
+    var withSource = function (value, sourceText) {
+      return value + (sourceText ? ' (' + sourceText + ')' : '');
+    };
+    lines.push('Категорія продукту: ' + withSource(state.category, outputSource(state.category, sources.category)));
+    lines.push('Чим підкріплюється діяльність: ' + withSource(state.support, outputSource(state.support, sources.support)));
+    state.audiences.forEach(function (a) {
+      lines.push('Цільова аудиторія: ' + withSource(a.value + ' · ' + a.type, outputSource(a.value, a.source)));
+    });
+    var droppedAudiences = state.droppedAudiences || [];
+    if (droppedAudiences.length) {
+      lines.push('Поза аналізом: ' + droppedAudiences.map(function (a) { return a.value; }).join('; '));
+    }
+    lines.push('Бізнес-ціль: ' + withSource(state.goal, outputSource(state.goal, sources.goal)));
+    var tasks = state.tasks.filter(function (t) { return t.value.trim() !== ''; });
+    if (tasks.length) {
+      lines.push('Задачі читача: ' + tasks.map(function (t) { return withSource(t.value, outputSource(t.value, t.source)); }).join('; '));
+    }
+    var namedBlocks = (state.structureBlocks || []).filter(function (b) { return b.name.trim() !== ''; });
+    if (namedBlocks.length) {
+      lines.push('Перелік блоків: ' + namedBlocks.map(function (b) {
+        var desc = b.unit ? (' — ' + b.unit + (b.count ? ' × ' + b.count : '')) : '';
+        return withSource(b.name + desc, blockSourceText(b, OUTPUT_SOURCE_LABELS));
+      }).join('; '));
+    }
+
+    var structures = currentRun.result.structures || [];
+    var allMetrics = structures.map(function (s) { return computeStructureMetrics(s.order, state); });
+    var findingsById = computeStructureFindings(structures, allMetrics, state);
+
+    if (structures.length < 2) {
+      lines.push('');
+      lines.push('Одна структура в цьому прогоні — порівняльні метрики без бази для зіставлення, а зауваження персони не пройшли перевірку порівнянням: в ізоляції вона знаходить зауваження до чого завгодно.');
+    }
+
+    structures.forEach(function (structure, index) {
+      var metrics = allMetrics[index];
+      lines.push('');
+      lines.push('— — —');
+      lines.push('');
+      lines.push((structure.isBaseline ? 'БАЗОВА СТРУКТУРА' : 'СТРУКТУРА ' + index) + (structure.isBaseline ? ' · порядок з опису сторінки' : ''));
+      lines.push('');
+      lines.push('Потік блоків:');
+      lines.push(structure.order.map(function (name, i) {
+        return (i + 1) + '. ' + name + (blockHasCta(state, name) ? ' (кнопка)' : '');
+      }).join(' → '));
+
+      lines.push('');
+      lines.push('Порівняльні метрики (порогу немає — числа показують різницю між структурами, не оцінку):');
+      metrics.perAudience.forEach(function (entry) {
+        var m = entry.metrics;
+        var a = entry.audience;
+        if (!m) { return; }
+        if (!m.max) {
+          lines.push('  ' + a.value + ' (' + a.type + '): жодна задача не прив’язана до цієї аудиторії');
+          return;
+        }
+        lines.push('  ' + a.value + ' (' + a.type + '): до найдальшої задачі — ' + m.max.section + ', розкид — ' + (m.max.section - m.min.section));
+      });
+      if (metrics.spread !== null) {
+        lines.push('  Розкид між аудиторіями: ' + formatSpread(metrics.spread));
+      }
+      if (metrics.evidenceRatios.length) {
+        lines.push('  Доказова база до кожної кнопки: ' + metrics.evidenceRatios.map(formatRatio).join(' · '));
+      }
+      lines.push('  Блоків підряд без точки виходу: ' + metrics.gap);
+
+      var personaResult = getPersonaResultFor(structure.id);
+      if (personaResult.status !== 'loading') {
+        lines.push('');
+        lines.push('Персонний аудит:');
+        if (personaResult.status !== 'ready') {
+          lines.push('  ' + (personaResult.status === 'unavailable' ? 'персонний аудит не виконується' : 'персонний аудит не виконано: ' + personaResult.errorText));
+        } else if (!personaResult.remarks.length) {
+          lines.push('  без зауважень');
+        } else {
+          personaResult.remarks.forEach(function (r) { lines.push('  [' + r.level + '] ' + r.text); });
+        }
+        lines.push('');
+        lines.push('Висновок:');
+        lines.push(personaResult.status === 'ready' ? personaResult.conclusion
+          : personaResult.status === 'unavailable' ? 'персонний аудит не виконується'
+          : personaResult.errorText);
+      }
+
+      var findings = findingsById[structure.id] || [];
+      lines.push('');
+      lines.push('Розходження:');
+      if (!findings.length) {
+        lines.push('  жодних знахідок');
+      } else {
+        findings.forEach(function (f) { lines.push('  [' + f.origin + '] ' + f.text); });
+      }
+      if (personaResult.status !== 'loading') {
+        var hasCode = findings.some(function (f) { return f.origin === 'код'; });
+        var hasPersona = personaResult.status === 'ready' && personaResult.remarks.length > 0;
+        lines.push('  ' + divergenceVerdictText(hasCode, hasPersona));
+      }
+    });
+
+    return lines.join('\n');
+  }
+
   /* Некритична дія — повідомлення після неї. Одне місце, зникає саме.
      Помилка збереження лишається окремою плашкою: вона зникати не має. */
   function showToast(text, withLink) {
@@ -3639,17 +4113,11 @@ firebase.initializeApp(firebaseConfig);
       'Перемикач впливає тільки на метрики. Структура варіантів однакова в обох режимах.'));
   }
 
-  /* Перемикання не звертається до моделі — метрики рахуються наживо з
-     currentRun.input у renderVariants(). Делеговано на контейнер: розмітка
-     перебудовується щоразу в renderAudienceSwitcher(). */
-  audienceSwitcher.addEventListener('click', function (event) {
-    var btn = event.target.closest('.audience-switcher__pill');
-    if (!btn) { return; }
-    selectedMetricsAudienceId = btn.dataset.audienceId;
-    renderAudienceSwitcher();
-    renderVariants();
-    renderDivergence();
-  });
+  /* Обробник на #audience-switcher (перемикання метрик по аудиторії)
+     прибраний разом з елементом — етап 6, «обидві аудиторії в метриках
+     одночасно». renderAudienceSwitcher() лишається визначеною, викликати
+     її більше нема звідки: не чіпаємо тіло функції старого шляху, лише
+     цей виклик. */
 
   /* Чотири нейтральні структури для /api/persona: три згенеровані
      варіанти + базовий порядок як четверта. Варіанти несуть ті самі
@@ -3664,25 +4132,22 @@ firebase.initializeApp(firebaseConfig);
      клієнті. */
   function buildPersonaStructures(run) {
     var state = run.input;
-
-    var variantStructures = run.result.variants.map(function (variant, index) {
+    /* Титул для моделі — за позицією в масиві, завжди «Структура N»,
+       включно з базовою: вона тепер рівноправна (розділ «Структури»,
+       PROGRESS.md), і нейтральний титул тут — той самий довід, що був
+       у старому шляху («модель не має знати, який порядок чий») — тепер
+       просто без винятку для жодної структури. Титул для дизайнера на
+       екрані — інший (renderStructureCard, «Базова структура»), і це
+       окремі речі: людині можна знати, моделі — ні. */
+    return (run.result.structures || []).map(function (structure, index) {
       return {
-        id: variant.id,
+        id: structure.id,
         title: 'Структура ' + (index + 1),
-        order: variant.flow.map(function (b) { return { name: b.name, action: b.action }; })
+        order: structure.order.map(function (name) {
+          return { name: name, action: blockHasCta(state, name) };
+        })
       };
     });
-
-    var baselineOrder = (state.structureBlocks || [])
-      .filter(function (b) { return b.name.trim() !== ''; })
-      .map(function (b) { return b.name; });
-    var baselineStructure = {
-      id: 'Г',
-      title: 'Структура 4',
-      order: baselineOrder.map(function (name) { return { name: name }; })
-    };
-
-    return variantStructures.concat([baselineStructure]);
   }
 
   /* Один запит до /api/persona. Клієнт сам не повторює — сервер уже
@@ -3738,10 +4203,12 @@ firebase.initializeApp(firebaseConfig);
       run.result.personaAudit[personaKey] = { status: 'error', structures: null, errorText: errorText };
     }).finally(function () {
       /* дизайнер міг устигнути піти на інший прогін чи персону, поки
-         запит ще йшов — рендерити застарілу відповідь не треба */
+         запит ще йшов — рендерити застарілу відповідь не треба.
+         renderStructuresResult() (етап 6) замінив renderVariants()/
+         renderDivergence(): цю функцію більше нічого, крім старого
+         (нечинного) шляху, не викликає */
       if (currentRun === run && selectedPersonaKey === personaKey) {
-        renderVariants();
-        renderDivergence();
+        renderStructuresResult();
       }
     });
   }
@@ -3830,10 +4297,15 @@ firebase.initializeApp(firebaseConfig);
     selectedPersonaKey = btn.dataset.personaKey;
     ensurePersonaAudit(currentRun, selectedPersonaKey);
     renderPersonaSwitcher();
-    renderVariants();
-    renderDivergence();
+    renderStructuresResult();
   });
 
+  /* Формат прогону визначає розгалуження: новий (result.structures,
+     етап 6) — повний показ; старий (result.variants, три варіанти з
+     осей) — людське повідомлення замість дублювання шляху показу
+     (PROGRESS.md, «мій продукт не в проді, ті прогони тестові»).
+     Перемикача аудиторій тут більше нема (renderAudienceSwitcher() не
+     кличемо) — обидві аудиторії в метриках картки одночасно. */
   function renderCurrentRun() {
     if (!isLoggedIn) { showLogin(); return; }
     /* вузол живе між прогонами: без цього раз розгорнутий блок
@@ -3842,17 +4314,22 @@ firebase.initializeApp(firebaseConfig);
     disarmReset();
     disarmEdit();
     disarmDeleteRun();
-    resetMetricsAudience();
-    resetPersonaSelection();
-    /* до рендеру карток/таблиці — щоб 'loading' устиг проставитись
-       синхронно (ensurePersonaAudit) і перший же renderVariants()
-       уже показав стан завантаження, а не порожнечу на мить */
-    ensurePersonaAudit(currentRun, selectedPersonaKey);
+    disarmAddStructureCta();
     renderSummary();
-    renderAudienceSwitcher();
-    renderVariants();
-    renderDivergence();
-    renderPersonaSwitcher();
+
+    var isNewFormat = !!(currentRun.result && Array.isArray(currentRun.result.structures));
+    resultLegacyNotice.hidden = isNewFormat;
+    resultBody.hidden = !isNewFormat;
+    if (isNewFormat) {
+      resetPersonaSelection();
+      /* до рендеру карток — щоб 'loading' устиг проставитись синхронно
+         (ensurePersonaAudit) і перший же renderStructuresResult() уже
+         показав стан завантаження, а не порожнечу на мить */
+      ensurePersonaAudit(currentRun, selectedPersonaKey);
+      renderPersonaSwitcher();
+      renderStructuresResult();
+    }
+
     formScreen.hidden = true;
     confirmScreen.hidden = true;
     structuresScreen.hidden = true;
@@ -4306,10 +4783,9 @@ firebase.initializeApp(firebaseConfig);
     loginScreen.hidden = true;
     formScreen.hidden = false;
     window.scrollTo(0, 0);
-    /* показаний результат скидається: наступний — тільки після «Запустити аналіз» */
+    /* показаний результат скидається: наступний — тільки після «Прогнати аудит» */
     summaryBody.innerHTML = '';
-    variantsGrid.innerHTML = '';
-    divergenceBody.innerHTML = '';
+    structuresGrid.innerHTML = '';
     disarmReset();
     disarmEdit();
     disarmLoadExample();
@@ -5063,6 +5539,46 @@ firebase.initializeApp(firebaseConfig);
     renderStructuresList(draft, collectState());
   });
 
+  /* «Прогнати аудит» — записує прогін. Синхронно: машинні метрики
+     рахуються наживо з голими іменами блоків (computeStructureMetrics),
+     мережевий виклик лише один — /api/persona, і той не тут, а лениво
+     всередині renderCurrentRun()/ensurePersonaAudit() (той самий
+     принцип, що вже діяв для персони на старому шляху). Базова
+     структура — id 'baseline', перша в масиві; решта — id чернетки,
+     у порядку додавання. Той самий "новий прогін завжди" принцип, що
+     на старому шляху: повторний запуск на тому самому вході — не дубль. */
+  function runAudit() {
+    editingRun = null;
+    updateEditNotice();
+
+    var state = collectState();
+    var baselineOrder = (state.structureBlocks || [])
+      .filter(function (b) { return b.name.trim() !== ''; })
+      .map(function (b) { return b.name; });
+    var draft = getStructuresDraft();
+
+    var structures = [{ id: 'baseline', isBaseline: true, order: baselineOrder }]
+      .concat(draft.map(function (s) { return { id: s.id, isBaseline: false, order: s.order.slice() }; }));
+
+    currentRun = {
+      id: genId(),
+      date: new Date().toISOString(),
+      category: state.category,
+      seq: nextSeq(state.category),
+      title: '',
+      input: state,
+      result: { structures: structures, personaAudit: {} }
+    };
+    runs.unshift(currentRun);
+
+    var saved = saveState();
+    saveNotice.open = !saved;
+    renderCurrentRun();
+    if (saved) { showToast('Прогін збережено в ', true); }
+  }
+
+  runAuditBtn.addEventListener('click', runAudit);
+
   generateBtn.addEventListener('click', startGeneration);
 
 
@@ -5089,6 +5605,11 @@ firebase.initializeApp(firebaseConfig);
   function disarmLoadExample() {
     loadExampleBtn.dataset.armed = '';
     loadExampleBtn.textContent = 'Зразок · «Ватра»';
+  }
+
+  function disarmAddStructureCta() {
+    addStructureCtaBtn.dataset.armed = '';
+    addStructureCtaBtn.textContent = '+ Додати структуру й порівняти';
   }
 
   function isDraftEmpty() {
@@ -5845,12 +6366,14 @@ firebase.initializeApp(firebaseConfig);
   loadExampleBtn.addEventListener('click', loadExampleDocs);
   toAgreementBtn.addEventListener('click', showAgreement);
 
-  /* копіювання звіту: без мережі, лише буфер обміну браузера */
+  /* копіювання звіту: без мережі, лише буфер обміну браузера. Кнопка
+     живе в #result-body — прихована для прогонів старого формату,
+     тож buildStructuresReportText() тут можна кликати безумовно */
   copyReportBtn.addEventListener('click', function () {
     /* при відкритті через file:// navigator.clipboard може бути відсутнім —
        без цієї перевірки виклик кидає помилку синхронно, повз обробник нижче */
     if (!navigator.clipboard || !navigator.clipboard.writeText) { return; }
-    navigator.clipboard.writeText(buildReportText()).then(function () {
+    navigator.clipboard.writeText(buildStructuresReportText()).then(function () {
       showToast('Звіт скопійовано', false);
     }, function () {
       /* браузер може відмовити в доступі до буфера — напис лишається без змін */
@@ -5859,7 +6382,7 @@ firebase.initializeApp(firebaseConfig);
 
   /* збереження — локальний Blob, без мережі й без бекенду */
   saveReportBtn.addEventListener('click', function () {
-    var blob = new Blob([buildReportText()], { type: 'text/plain;charset=utf-8' });
+    var blob = new Blob([buildStructuresReportText()], { type: 'text/plain;charset=utf-8' });
     var url = URL.createObjectURL(blob);
     var link = document.createElement('a');
     link.href = url;
@@ -5869,6 +6392,31 @@ firebase.initializeApp(firebaseConfig);
     link.remove();
     URL.revokeObjectURL(url);
     showToast('Файл збережено', false);
+  });
+
+  /* «Додати структуру й порівняти» — той самий шлях, що «Змінити опис»
+     (editDescription): чернетку форми мовчки не затираємо, перший клік
+     перепитує. runInput.structuresDraft — ті самі додані структури, що
+     стали result.structures цього прогону (runAudit() будує друге з
+     першого), тож applyFormState() відновлює їх сама, без окремого кроку */
+  addStructureCtaBtn.addEventListener('click', function () {
+    if (!currentRun) { return; }
+    var runInput = currentRun.input;
+    var differs = JSON.stringify(collectState()) !== JSON.stringify(runInput);
+
+    if (differs && !isDraftEmpty() && addStructureCtaBtn.dataset.armed !== 'yes') {
+      addStructureCtaBtn.dataset.armed = 'yes';
+      addStructureCtaBtn.textContent = 'Замінити поля прогоном?';
+      return;
+    }
+
+    disarmAddStructureCta();
+    editingRun = currentRun;
+    applyFormState(runInput).then(function () {
+      saveState();
+      updateEditNotice();
+      showStructures();
+    });
   });
 
   inputEditBtn.addEventListener('click', openInputEdit);
